@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">SimpBleP</string>
+    <string name="be_a_friend">Show Yourself!</string>
+    <string name="find_a_friend">Look Around</string>
+    <string name="action_settings">Settings</string>
+
+</resources>
