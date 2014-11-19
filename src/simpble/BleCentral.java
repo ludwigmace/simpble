@@ -15,6 +15,9 @@ import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanResult;
 import android.content.Context;
 import android.os.Handler;
 import android.util.Log;
@@ -53,6 +56,9 @@ public class BleCentral {
     // scan for 2 1/2 seconds at a time
     private long scanDuration;
 
+    // scanning object
+    private BluetoothLeScanner bleScanner;
+    
     /**
      * A helper class for dealing with Bluetooth Central operations
      * @param btA system bluetooth adapter
@@ -67,6 +73,8 @@ public class BleCentral {
     	
     	centralBTA = btA;
 
+    	bleScanner = centralBTA.getBluetoothLeScanner();
+    	
     	boolean validUuidBase = false;
     	
     	try {
@@ -201,16 +209,24 @@ public class BleCentral {
     }
     
  // when a device is found from the ScanLeDevice method, call this
-    private BluetoothAdapter.LeScanCallback mLeScanCallback = new BluetoothAdapter.LeScanCallback() {
-        
-    	@Override
-        public void onLeScan(final BluetoothDevice device, int rssi, byte[] scanRecord) {
-    		//Log.v(TAG, "LeScanCallback sez:" + device.getAddress());
-    		if (!foundDevices.contains(device)) {
-    			foundDevices.add(device);
-        	}
+    private ScanCallback scanCallback = new ScanCallback() {
+
+    	public void onBatchScanResults(List<ScanResult> results) {
     		
-       }
+    	}
+    	
+    	public void onScanFailed (int errorCode) {
+    		
+    	}
+    	
+    	public void onScanResult (int callbackType, ScanResult result) {
+    		
+    		// if we haven't already gotten the device, then add it to our list of found devices
+			if (!foundDevices.contains(result.getDevice())) {
+				foundDevices.add(result.getDevice());
+	    	}
+    	}
+    	
     };
     
     public ArrayList<BluetoothDevice> getAdvertisers() {
@@ -227,7 +243,7 @@ public class BleCentral {
                 @Override
                 public void run() {
                     mScanning = false;
-                    centralBTA.stopLeScan(mLeScanCallback);
+                    bleScanner.stopScan(scanCallback);
 
         			gattClientHandler.intakeFoundDevices(foundDevices);
         			Log.v(TAG, "scan stopped, found " + String.valueOf(foundDevices.size()) + " devices");
@@ -238,7 +254,8 @@ public class BleCentral {
             mScanning = true;
             
             Log.v(TAG, "scan started");
-            centralBTA.startLeScan(mLeScanCallback);
+            //centralBTA.startLeScan(mLeScanCallback);
+            bleScanner.startScan(scanCallback);
             // will only scan for "normal" UUIDs
             //centralBTA.startLeScan(serviceUuids, mLeScanCallback);
 
@@ -246,7 +263,7 @@ public class BleCentral {
         	
         	// the "enable" variable passed wa False, so turn scanning off
             mScanning = false;
-            centralBTA.stopLeScan(mLeScanCallback);
+            bleScanner.stopScan(scanCallback);
             
         }
 

@@ -65,17 +65,17 @@ public class BleMessenger {
      * Instantiates serviceDef arraylist, peerMap, fpNetMap, creates handles for peripheral/central,
      * populates serviceDef, and instantiates bleMessageMap
      * 
-     * @param m a hook to the system's BluetoothManager
-     * @param a a hook to the system's BluetoothAdapter
-     * @param c hook to the current app's context, to pass to central/peripheral controller
-     * @param BleStatusCallback handle events from central/peripheral roles
+     * @param bluetoothManager Instantiated BluetoothManager object you create
+     * @param bluetoothAdapter Instantiated BluetoothAdapter object you create
+     * @param context The current application's context (used by the central/peripheral functions)
+     * @param BleStatusCallback Callback of type BleStatusCallback you've created
      */
-	public BleMessenger(BluetoothManager m, BluetoothAdapter a, Context c, BleStatusCallback BleStatusCallback) {
+	public BleMessenger(BluetoothManager bluetoothManager, BluetoothAdapter bluetoothAdapter, Context context, BleStatusCallback eventCallback) {
 		
-		bleStatusCallback = BleStatusCallback;
-		btMgr = m;
-		btAdptr = a;
-		ctx = c;
+		bleStatusCallback = eventCallback;
+		btMgr = bluetoothManager;
+		btAdptr = bluetoothAdapter;
+		ctx = context;
 		
 		serviceDef = new ArrayList<BleCharacteristic>();
 		

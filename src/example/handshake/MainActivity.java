@@ -48,23 +48,23 @@ public class MainActivity extends Activity {
 	private Button btnAdvertise;
 	private boolean visible;
 	
+	private BluetoothManager btMgr;
+	private BluetoothAdapter btAdptr;
+	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 		
-		// we're not advertising when the program starts
+		// we're not showing ourselves when the program starts
 		visible = false;
 		
+		// get a pointer to our Be A Friend button 
 		btnAdvertise = (Button)findViewById(R.id.be_a_friend);
-		Log.v(TAG, "current SDK:" + String.valueOf(Build.VERSION.SDK_INT));
-		if (Build.VERSION.SDK_INT < 20) {
-			btnAdvertise.setEnabled(false);
-		}
 		
 		// because this is using BLE, we'll need to get the adapter and manager from the main context and thread 
-		BluetoothManager btMgr = (BluetoothManager) this.getSystemService(Context.BLUETOOTH_SERVICE);
-        BluetoothAdapter btAdptr = btMgr.getAdapter();
+		btMgr = (BluetoothManager) this.getSystemService(Context.BLUETOOTH_SERVICE);
+		btAdptr = btMgr.getAdapter();
         
         // check to see if the bluetooth adapter is enabled
         if (!btAdptr.isEnabled()) {
@@ -79,12 +79,6 @@ public class MainActivity extends Activity {
         String userName = getUserName(this.getContentResolver());
         EditText yourNameControl = (EditText) findViewById(R.id.your_name);
         yourNameControl.setText(userName);
-
-        // this isn't used right now
-        //BleMessengerOptions bo = new BleMessengerOptions();
-	    
-        //bo.FriendlyName = userName;
-        //bo.Identifier = myIdentifier;
         
         rsaKey = null;
         
@@ -96,12 +90,19 @@ public class MainActivity extends Activity {
 			e.printStackTrace();
 		}
 		
-		// bo.PublicKey = rsaKey.PublicKey();
-        
-        
-		// create a messenger along with the context (for bluetooth operations)
-		bleMessenger = new BleMessenger(btMgr, btAdptr, this, bleMessageStatus);
-        
+		// get our BLE operations going
+		if (btAdptr.isEnabled()) {
+			bleMessenger = new BleMessenger(btMgr, btAdptr, this, bleMessageStatus);
+		} // if not enabled, the onResume will catch this
+		
+		
+		// if our SDK isn't lollipop, then disable our advertising button
+		if (Build.VERSION.SDK_INT < 21) {
+			btnAdvertise.setEnabled(false);
+		} else if (!btAdptr.isMultipleAdvertisementSupported()) {
+			btnAdvertise.setEnabled(false);
+		}
+		
 		// generate message of particular byte size
 		byte[] bytesMessage = benchGenerateMessage(45);
 
@@ -112,6 +113,31 @@ public class MainActivity extends Activity {
 		// the sender is our app, so the next 20 bytes are our fingerprint
 		
 	}
+	
+	private void SetUpBle() {
+		if (btAdptr != null) {
+			if (btAdptr.isEnabled()) {
+				if (bleMessenger == null) {
+					bleMessenger = new BleMessenger(btMgr, btAdptr, this, bleMessageStatus);
+				} else {
+					Log.v(TAG, "bleMessenger is already instantiated; we're good to go.");
+				}
+			} else {
+				showMessage("Your Bluetooth Adapter isn't enabled; please close the app and enable it.");
+			}
+		} else {
+			showMessage("Your Bluetooth Adapter isn't instantiated; something is wrong.");
+		}
+	}
+	
+    @Override
+    protected void onResume() {
+    	// in case the program was run without the adapter on
+    	super.onResume();
+    	SetUpBle();
+
+    }
+	
 
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
