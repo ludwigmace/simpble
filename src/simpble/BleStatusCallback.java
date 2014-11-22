@@ -15,4 +15,6 @@ public interface BleStatusCallback {
 	public void advertisingStarted();
 	public void advertisingStopped();
 	
+	public void headsUp(String msg);
+	
 }

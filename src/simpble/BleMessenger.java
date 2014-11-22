@@ -107,10 +107,13 @@ public class BleMessenger {
 	 * @param Peer
 	 */
 	public void sendMessagesToPeer(BlePeer Peer) {
+		bleStatusCallback.headsUp("sending messages meant for peer " + Peer.GetFingerprint().substring(0,20));
 		writeOut(Peer);
 	}
 	
-	// perhaps have another signature that allows sending a single message
+	/* this calls bleCentral; needs to be written such that it calls blePeripheral if necessary
+	 * or have a different writeOut method if you're currently connected to the other party as a peripheral
+	*/
 	private void writeOut(BlePeer peer) {
 		
 		// given a peer, get an arbitrary message to send
@@ -217,6 +220,7 @@ public class BleMessenger {
 		int parentMessagePacketTotal = 0;
 		
 		Log.v(TAG, "incoming hex bytes:" + ByteUtilities.bytesToHex(incomingBytes));
+		//bleStatusCallback.headsUp("incoming bytes " + remoteAddress + ": " + ByteUtilities.bytesToHex(Arrays.copyOfRange(incomingBytes, 0, 4)));
 		
 		// if our msg is under a few bytes it can't be valid; return
     	if (incomingBytes.length < 5) {
@@ -299,7 +303,6 @@ public class BleMessenger {
     	public void incomingMissive(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
     		// based on remoteAddress, UUID of remote characteristic, put the incomingBytes into a Message
     		// probably need to have a switchboard function
-    		
     		incomingMessage(remoteAddress, remoteCharUUID, incomingBytes);
     			
     	}
@@ -333,7 +336,7 @@ public class BleMessenger {
     	
 		@Override
 		public void intakeFoundDevices(ArrayList<BluetoothDevice> devices) {
-			
+			bleStatusCallback.headsUp("stopped scanning");
 			// loop over all the found devices
 			// add them 
 			for (BluetoothDevice b: devices) {
@@ -349,7 +352,9 @@ public class BleMessenger {
 				}
 				
 				// this could possibly be moved into an exterior loop
+				bleStatusCallback.headsUp("connecting to " + peerAddress);
 				bleCentral.connectAddress(peerAddress);
+				
 			}
 			
 		}
@@ -368,10 +373,10 @@ public class BleMessenger {
 
 			// pass our remote address and desired uuid to our gattclient
 			// who will look up the gatt object and uuid and issue the read request
+			bleStatusCallback.headsUp("subscribing to 102 on " + remoteAddress);
 			bleCentral.submitSubscription(remoteAddress, uuidFromBase("102"));
-			
-			// still need to write identity info
 
+			// we should be expecting data on 102 now
 			
 		}
 		

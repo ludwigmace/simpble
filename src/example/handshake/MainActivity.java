@@ -12,6 +12,7 @@ import simpble.BleMessage;
 import simpble.BleMessenger;
 import simpble.BlePeer;
 import simpble.BleStatusCallback;
+import simpble.ByteUtilities;
 
 import com.google.common.io.ByteStreams;
 import com.google.common.primitives.Bytes;
@@ -32,6 +33,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 public class MainActivity extends Activity {
@@ -44,6 +46,7 @@ public class MainActivity extends Activity {
 	String myIdentifier;
 	
 	KeyStuff rsaKey;
+	TextView statusText;
 	
 	private Button btnAdvertise;
 	private boolean visible;
@@ -80,6 +83,8 @@ public class MainActivity extends Activity {
         EditText yourNameControl = (EditText) findViewById(R.id.your_name);
         yourNameControl.setText(userName);
         
+        statusText = (TextView) findViewById(R.id.status_log);
+        
         rsaKey = null;
         
 		try {
@@ -95,22 +100,39 @@ public class MainActivity extends Activity {
 			bleMessenger = new BleMessenger(btMgr, btAdptr, this, bleMessageStatus);
 		} // if not enabled, the onResume will catch this
 		
+		String testFriend = "";
+		String testMessage = "";
 		
 		// if our SDK isn't lollipop, then disable our advertising button
+		// for testing i can also tell which is my 5 and which is my Gnex
 		if (Build.VERSION.SDK_INT < 21) {
 			btnAdvertise.setEnabled(false);
 		} else if (!btAdptr.isMultipleAdvertisementSupported()) {
 			btnAdvertise.setEnabled(false);
+			testFriend = "4088D5A01D57320CA7D5E60A42ACD4EA333C5005";
+			testMessage = "I'd like to tell you about my feet.";
+		} else {
+			testFriend = "ABCDEF";
+			testMessage = "I'd like to tell you about my hands.";			
 		}
 		
 		// generate message of particular byte size
-		byte[] bytesMessage = benchGenerateMessage(45);
+		//byte[] bytesMessage = benchGenerateMessage(45);
 
 		bleFriends = new HashMap<String, BlePeer>();
-		
-		// load up a generic message to be sent to everybody the first time i connect
-		// there is no recipient, so the first 20 bytes are empty
-		// the sender is our app, so the next 20 bytes are our fingerprint
+
+		// make a test message
+		BleMessage testBleMsg = new BleMessage();
+		testBleMsg.MessageType = "datatext";
+		testBleMsg.RecipientFingerprint = ByteUtilities.hexToBytes(testFriend);
+		testBleMsg.SenderFingerprint = ByteUtilities.hexToBytes("5555EFA01D57320CA7D5E60A42ACD4EA333C7117"); 
+		testBleMsg.setMessage(testMessage.getBytes());
+
+		// create our test peer, and add this message for them
+		BlePeer testPeer = new BlePeer("");
+		testPeer.addBleMessageOut(testBleMsg);
+		testPeer.SetFingerprint(testFriend);
+		bleFriends.put(testFriend, testPeer);
 		
 	}
 	
@@ -176,7 +198,9 @@ public class MainActivity extends Activity {
 		@Override
 		public void handleReceivedMessage(String recipientFingerprint, String senderFingerprint, byte[] payload, String msgType) {
 
-			Log.v(TAG, "received msg of type:"+ msgType);
+			//Log.v(TAG, "received msg of type:"+ msgType);
+			logMessage("received msg of type:" + msgType);
+			
 			
 			// this is an identity message so handle it as such
 			if (msgType.equalsIgnoreCase("identity")) {
@@ -191,21 +215,24 @@ public class MainActivity extends Activity {
 					Log.v(TAG, "received msg from existing friend, payload size:"+ String.valueOf(payload.length));
 				}
 				
-				if (bleFriends.containsValue(senderFingerprint)) {
-					// we know the sender, check for any messages we want to send them
+				if (bleFriends.containsKey(senderFingerprint)) {
+					logMessage("known peer: " + senderFingerprint.substring(0,20));
+
+					// now send some messages to this peer!
+					bleMessenger.sendMessagesToPeer(bleFriends.get(senderFingerprint));
 				} else {
-					
 					BlePeer b = new BlePeer("");
-					b.SetName("getNamefromPayload");
+
 					bleFriends.put(senderFingerprint, b);
-					
-					Log.v(TAG, "received msg from new friend, payload size:"+ String.valueOf(payload.length));
+					logMessage("new peer: " + senderFingerprint.substring(0,20));
+					//Log.v(TAG, "received msg from new friend, payload size:"+ String.valueOf(payload.length));
 					// we don't know the sender and should add them;
 					// parse the public key & friendly name out of the payload, and add this as a new person
 				}
 				
 				// the First message we send them, however, needs to be our own ID message
 			} else {
+				logMessage("received data msg of size:" + String.valueOf(payload.length));
 				Log.v(TAG, "received data msg, payload size:"+ String.valueOf(payload.length));
 			}
 			
@@ -246,7 +273,7 @@ public class MainActivity extends Activity {
 
 		@Override
 		public void advertisingStarted() {
-			showMessage("advertising started");
+			logMessage("advertising started");
 			
 			runOnUiThread(new Runnable() {
 				  public void run() {
@@ -259,7 +286,7 @@ public class MainActivity extends Activity {
 
 		@Override
 		public void advertisingStopped() {
-			showMessage("advertising stopped");
+			logMessage("advertising stopped");
 			
 			runOnUiThread(new Runnable() {
 				  public void run() {
@@ -270,13 +297,19 @@ public class MainActivity extends Activity {
 
 			
 		}
+
+		@Override
+		public void headsUp(String msg) {
+			logMessage(msg);
+		}
 		
 		
 	};
 	
 	public void handleButtonBeAFriend(View view) {
 		// now we need to create the payload with our friendly name and public key
-		Log.v(TAG, "Show Yourself button pressed");
+		Log.v(TAG, "Advertising Toggle Pressed");
+		
 		if (!visible) {
 			Log.v(TAG, "Not currently visible, begin stuff");
 	        KeyStuff rsaKey = null;
@@ -309,6 +342,7 @@ public class MainActivity extends Activity {
 				Log.v(TAG, "advertising NOT supported");
 			}
 		} else {
+			Log.v(TAG, "Go Invisible");
 			bleMessenger.HideYourself();
 		}
 	}
@@ -390,7 +424,7 @@ public class MainActivity extends Activity {
     }
     
 	public void handleButtonFindAFriend(View view) {
-		
+		logMessage("look around");
 		// tell bleMessenger to look for folks and use the callback bleMessageStatus
 		bleMessenger.ShowFound();
 	}
@@ -407,6 +441,23 @@ public class MainActivity extends Activity {
 			});
 		
 	}
+	
+	private void logMessage(String msg) {
+
+		String oldText = statusText.getText().toString();
+		
+		final String newText = oldText + "\n" + "- " + msg;
+		
+		runOnUiThread(new Runnable() {
+			  public void run() {
+				  statusText.setText(newText);
+			  }
+			});
+		
+	}
+	
+	
+	
 	
 	private static byte[] trim(byte[] bytes) {
 		int i = bytes.length - 1;

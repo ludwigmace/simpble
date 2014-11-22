@@ -43,8 +43,6 @@ public class BlePeripheral {
       
     private ArrayList<BluetoothGattService> gattServices;
     private List<ParcelUuid> gattServiceIDs;
-
-    public BlePeripheralHandler myHandler;
     
     // the BLE gatt stuff
     private BluetoothGattServer btGattServer;
@@ -146,12 +144,16 @@ public class BlePeripheral {
 	
 	public void advertiseOff() {
 		// if we're not advertising, then don't call this
-        if(!isAdvertising) return;
+        if(!isAdvertising) {
+        	Log.v(TAG, "we weren't advertising in the first place; return");
+        	return;
+        }
         
         // flip our flag to indicate we're no longer advertising
         isAdvertising = false;
         
         // tell the system's BluetoothLeAdvertiser to stop advertising
+        Log.v(TAG, "tell system to stop advertising");
         btLeAdv.stopAdvertising(advertiseCallback);
         
         // clear out the system's BluetoothGattServer's services, and close it
@@ -160,6 +162,9 @@ public class BlePeripheral {
         
         // clear our local list of advertised services
         gattServices.clear();
+        
+        // tell our handler that we've stopped advertising
+        defaultHandler.handleAdvertiseChange(false);
         
 	}
 	

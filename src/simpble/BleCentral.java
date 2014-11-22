@@ -17,9 +17,13 @@ import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
 import android.content.Context;
+import android.os.Build;
 import android.os.Handler;
+import android.os.ParcelUuid;
 import android.util.Log;
 
 public class BleCentral {
@@ -58,6 +62,12 @@ public class BleCentral {
 
     // scanning object
     private BluetoothLeScanner bleScanner;
+    
+    // scan settings
+    private ScanSettings bleScanSettings;
+    
+    // scan filter
+    private List<ScanFilter> bleScanFilter;
     
     /**
      * A helper class for dealing with Bluetooth Central operations
@@ -104,6 +114,16 @@ public class BleCentral {
         serviceDef = new ArrayList<BleCharacteristic>();
         
         gattS = new HashMap<String, BluetoothGatt>();
+        
+        ScanSettings.Builder sb = new ScanSettings.Builder();
+        sb.setReportDelay(0);
+        sb.setScanMode(1);         //sb.setScanMode(ScanSettings.SCAN_MODE_BALANCED);
+        bleScanSettings = sb.build();
+        
+        ScanFilter.Builder sf = new ScanFilter.Builder();
+        sf.setServiceUuid(ParcelUuid.fromString(strSvcUuidBase));
+        bleScanFilter = new ArrayList<ScanFilter>();
+        bleScanFilter.add(sf.build());
         
     }
 
@@ -254,10 +274,9 @@ public class BleCentral {
             mScanning = true;
             
             Log.v(TAG, "scan started");
-            //centralBTA.startLeScan(mLeScanCallback);
-            bleScanner.startScan(scanCallback);
-            // will only scan for "normal" UUIDs
-            //centralBTA.startLeScan(serviceUuids, mLeScanCallback);
+
+            //bleScanner.startScan(scanCallback);
+            bleScanner.startScan(bleScanFilter, bleScanSettings, scanCallback);
 
         } else {
         	
@@ -273,10 +292,6 @@ public class BleCentral {
     	@Override
     	// Characteristic notification
     	public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-
-    		// probably need to pass the GATT object, or server, etc
-    		//gattClientHandler.getNotifyUpdate(characteristic.getUuid().toString(), characteristic.getValue());
-    		//Log.v(TAG, "characteristic changed val is " + bytesToHex(characteristic.getValue()));
     		gattClientHandler.incomingMissive(gatt.getDevice().getAddress(), characteristic.getUuid(), characteristic.getValue());
     		
     	}
@@ -329,21 +344,8 @@ public class BleCentral {
         // New services discovered
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                //broadcastUpdate(ACTION_GATT_SERVICES_DISCOVERED);
             	Log.v("SERVICES", "services discovered on " + gatt.getDevice().getAddress());
             	
-            	// now that services have been discovered, let's pull them down
-            	// we shouldn't actually need to do this
-            	/*
-            	List<BluetoothGattService> foundServices = gatt.getServices();
-            	
-            	Log.v(TAG, "found " + String.valueOf(foundServices.size()) + " service(s)");
-            	*/
-            	/*
-            	for (BluetoothGattService s : foundServices) {
-            		Log.v("SERVICES", "services found:" + s.getUuid().toString());
-            	}
-            	*/
             	// we're pulling a specific service
             	BluetoothGattService s = gatt.getService(UUID.fromString(strSvcUuidBase));
 
