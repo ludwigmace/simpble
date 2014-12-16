@@ -117,6 +117,8 @@ public class MainActivity extends Activity {
 			e.printStackTrace();
 		}
 		
+		myFingerprint = ByteUtilities.bytesToHex(rsaKey.PuFingerprint());
+		
 		// get our BLE operations going
 		if (btAdptr.isEnabled()) {
 			bleMessenger = new BleMessenger(btMgr, btAdptr, this, bleMessageStatus);
@@ -141,7 +143,7 @@ public class MainActivity extends Activity {
 			testMyself = "4088D5A01D57320CA7D5E60A42ACD4EA333C5005";
 			testMessage = "I'd like to tell you about my hands.";			
 		}
-		
+ 		
 		// generate message of particular byte size
 		//byte[] bytesMessage = benchGenerateMessage(45);
 
@@ -210,7 +212,7 @@ public class MainActivity extends Activity {
 	private BleMessage identityMessage() {
 		BleMessage m = new BleMessage();
 		m.MessageType = "identity";
-		m.SenderFingerprint = rsaKey.PublicKey();
+		m.SenderFingerprint = rsaKey.PuFingerprint();
 		m.RecipientFingerprint = new byte[20];
 		
 		m.setMessage(rsaKey.PublicKey());
@@ -232,6 +234,7 @@ public class MainActivity extends Activity {
 			if (msgType.equalsIgnoreCase("identity")) {
 				Log.v(TAG, "received identity msg");
 				
+				logMessage("msg intended for " + recipientFingerprint);
 				
 				if (recipientFingerprint.length() == 0) {
 					// there is no recipient; this is just an identifying message
@@ -239,7 +242,11 @@ public class MainActivity extends Activity {
 				} else if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
 					logMessage("msg intended for us");
 				} else {
-					logMessage("msg intended for somebody else");
+					if (myFingerprint != null) { 
+						logMessage("our fp is:" + myFingerprint.substring(0, 20) + " . . .");
+					} else {
+						logMessage("global myFingerprint is null");
+					}
 				}
 				
 				// if the sender is in our friends list
@@ -399,17 +406,7 @@ public class MainActivity extends Activity {
 		
 		if (!visible) {
 			Log.v(TAG, "Not currently visible, begin stuff");
-	        KeyStuff rsaKey = null;
-	        
-			try {
-				rsaKey = new KeyStuff(this, myIdentifier);
-			} catch (GeneralSecurityException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			
-			myFingerprint = bytesToHex(rsaKey.PuFingerprint());
+
 			
 			BleMessage m = new BleMessage();
 			
