@@ -96,7 +96,11 @@ public class BlePeer {
 	
 	
 	public String GetFingerprint() {
-		return ByteUtilities.bytesToHex(peerPublicKeyFingerprint);
+		if (peerPublicKeyFingerprint != null) {
+			return ByteUtilities.bytesToHex(peerPublicKeyFingerprint);
+		} else {
+			return "";
+		}
 	}
 
 	public byte[] GetFingerprintBytes() {

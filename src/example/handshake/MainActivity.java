@@ -49,21 +49,41 @@ public class MainActivity extends Activity {
 	TextView statusText;
 	
 	private Button btnAdvertise;
+	private Button btnXfer;
+	private Button btnGetId;
+	private Button btnSendId;
+	
 	private boolean visible;
 	
 	private BluetoothManager btMgr;
 	private BluetoothAdapter btAdptr;
+	
+	// this is just temporary to allow setting an address for subscription that we can call manually later
+	String ourMostRecentFriendsAddress;
+	String statusLogText;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 		
+		statusLogText = "";
+		
 		// we're not showing ourselves when the program starts
 		visible = false;
 		
-		// get a pointer to our Be A Friend button 
+		// get a pointer to our Be A Friend button, and our transfer packet button
 		btnAdvertise = (Button)findViewById(R.id.be_a_friend);
+		btnXfer = (Button)findViewById(R.id.xfer_packet);
+		btnGetId = (Button)findViewById(R.id.get_id);
+		btnSendId = (Button)findViewById(R.id.send_id);
+		
+		
+		// disable the Xfer button, because you're not connected and don't have anything set up to transfer
+		btnXfer.setEnabled(false);
+		// disable Id button, because you're not even connected yet, and thus not ready to identify
+		btnGetId.setEnabled(false);
+		btnSendId.setEnabled(false);
 		
 		// because this is using BLE, we'll need to get the adapter and manager from the main context and thread 
 		btMgr = (BluetoothManager) this.getSystemService(Context.BLUETOOTH_SERVICE);
@@ -78,13 +98,15 @@ public class MainActivity extends Activity {
         // get an identifier for this installation
         myIdentifier = Installation.id(this);
         
-        // get your name (that name part isn't working)
+        // get your name (that name part isn't working on Android 5.0)
         String userName = getUserName(this.getContentResolver());
         EditText yourNameControl = (EditText) findViewById(R.id.your_name);
         yourNameControl.setText(userName);
         
+        // get a pointer to the status text
         statusText = (TextView) findViewById(R.id.status_log);
         
+        // init the rsaKey object
         rsaKey = null;
         
 		try {
@@ -101,6 +123,7 @@ public class MainActivity extends Activity {
 		} // if not enabled, the onResume will catch this
 		
 		String testFriend = "";
+		String testMyself = "";
 		String testMessage = "";
 		
 		// if our SDK isn't lollipop, then disable our advertising button
@@ -110,9 +133,12 @@ public class MainActivity extends Activity {
 		} else if (!btAdptr.isMultipleAdvertisementSupported()) {
 			btnAdvertise.setEnabled(false);
 			testFriend = "4088D5A01D57320CA7D5E60A42ACD4EA333C5005";
+			testMyself = "5555EFA01D57320CA7D5E60A42ACD4EA333C7117";
 			testMessage = "I'd like to tell you about my feet.";
 		} else {
-			testFriend = "ABCDEF";
+			btnAdvertise.setEnabled(true);
+			testFriend = "5555EFA01D57320CA7D5E60A42ACD4EA333C7117";
+			testMyself = "4088D5A01D57320CA7D5E60A42ACD4EA333C5005";
 			testMessage = "I'd like to tell you about my hands.";			
 		}
 		
@@ -125,7 +151,7 @@ public class MainActivity extends Activity {
 		BleMessage testBleMsg = new BleMessage();
 		testBleMsg.MessageType = "datatext";
 		testBleMsg.RecipientFingerprint = ByteUtilities.hexToBytes(testFriend);
-		testBleMsg.SenderFingerprint = ByteUtilities.hexToBytes("5555EFA01D57320CA7D5E60A42ACD4EA333C7117"); 
+		testBleMsg.SenderFingerprint = ByteUtilities.hexToBytes(testMyself); 
 		testBleMsg.setMessage(testMessage.getBytes());
 
 		// create our test peer, and add this message for them
@@ -181,13 +207,13 @@ public class MainActivity extends Activity {
 	}
 	
 	// creates a message formatted for identity exchange
-	private BleMessage identityMessage(byte[] payload) {
+	private BleMessage identityMessage() {
 		BleMessage m = new BleMessage();
 		m.MessageType = "identity";
 		m.SenderFingerprint = rsaKey.PublicKey();
 		m.RecipientFingerprint = new byte[20];
 		
-		m.setMessage(payload);
+		m.setMessage(rsaKey.PublicKey());
 		
 		return m;
 	}
@@ -204,33 +230,44 @@ public class MainActivity extends Activity {
 			
 			// this is an identity message so handle it as such
 			if (msgType.equalsIgnoreCase("identity")) {
-				Log.v(TAG, "received identity msg"); 
+				Log.v(TAG, "received identity msg");
 				
 				
 				if (recipientFingerprint.length() == 0) {
 					// there is no recipient; this is just an identifying message
+					logMessage("no particular recipient for this msg");
 				} else if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
-					// recipient is us!
-				} else if (bleFriends.containsValue(recipientFingerprint)) {
-					Log.v(TAG, "received msg from existing friend, payload size:"+ String.valueOf(payload.length));
+					logMessage("msg intended for us");
+				} else {
+					logMessage("msg intended for somebody else");
 				}
 				
+				// if the sender is in our friends list
 				if (bleFriends.containsKey(senderFingerprint)) {
 					logMessage("known peer: " + senderFingerprint.substring(0,20));
 
-					// now send some messages to this peer!
-					bleMessenger.sendMessagesToPeer(bleFriends.get(senderFingerprint));
+					// now send some messages to this peer - we'll already have our Id message queued up
+					//bleMessenger.sendMessagesToPeer(bleFriends.get(senderFingerprint));
 				} else {
+					logMessage("new peer: " + senderFingerprint.substring(0,20));
+					
 					BlePeer b = new BlePeer("");
+					b.SetFingerprint(senderFingerprint);
+					b.addBleMessageOut(identityMessage());
 
 					bleFriends.put(senderFingerprint, b);
-					logMessage("new peer: " + senderFingerprint.substring(0,20));
+					
 					//Log.v(TAG, "received msg from new friend, payload size:"+ String.valueOf(payload.length));
 					// we don't know the sender and should add them;
 					// parse the public key & friendly name out of the payload, and add this as a new person
 				}
 				
 				// the First message we send them, however, needs to be our own ID message
+				
+				// enable the "send our id" button
+				runOnUiThread(new Runnable() { public void run() { btnSendId.setEnabled(true); }});
+				
+				
 			} else {
 				logMessage("received data msg of size:" + String.valueOf(payload.length));
 				Log.v(TAG, "received data msg, payload size:"+ String.valueOf(payload.length));
@@ -239,17 +276,10 @@ public class MainActivity extends Activity {
 		}
 		
 		@Override
-		public void messageSent(UUID uuid) {
+		public void messageSent(byte[] MessageHash, BlePeer blePeer) {
+			logMessage("message sent to " + blePeer.GetFingerprint().substring(0,20));
 			
-			final String sUUID = uuid.toString(); 
-			
-            runOnUiThread(new Runnable() {
-
-                @Override
-                public void run() {
-                	showMessage("message sent:" + sUUID);
-                }
-            });
+			// maybe add re-check of sending next message on UI thread?
 		}
 
 		@Override
@@ -278,7 +308,7 @@ public class MainActivity extends Activity {
 			runOnUiThread(new Runnable() {
 				  public void run() {
 						visible = true;
-						btnAdvertise.setText("Hide Yourself!");
+						btnAdvertise.setText("!Adv");
 				  }
 				});
 			
@@ -291,7 +321,7 @@ public class MainActivity extends Activity {
 			runOnUiThread(new Runnable() {
 				  public void run() {
 						visible = false;
-						btnAdvertise.setText("Show Yourself!");
+						btnAdvertise.setText("Advt");
 				  }
 				});
 
@@ -302,9 +332,66 @@ public class MainActivity extends Activity {
 		public void headsUp(String msg) {
 			logMessage(msg);
 		}
+
+		@Override
+		public void readyToTalk(String remo) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void headsUp(String msg, String action) {
+			logMessage(msg);
+			
+			// quick and dirty way to call actions passed from other object
+			String task = action.substring(0, action.indexOf("="));
+			String target = action.substring(action.indexOf("=")+1, action.length());
+			
+			Log.v(TAG, "task=" + task + ";target=" + target);
+			
+			if (task.equalsIgnoreCase("subscribe")) {
+				// now that we've got a target to subscribe to, enable our start Id button
+				 ourMostRecentFriendsAddress = target;
+				  
+				 // enable the Get Id button
+				runOnUiThread(new Runnable() { public void run() { btnGetId.setEnabled(true); } });
+			}
+			
+		}
 		
 		
 	};
+	
+	public void handleButtonXfer(View view) {
+		Log.v(TAG, "Xfer Toggle Pressed");
+	}
+	
+	public void handleButtonGetID(View view) {
+		Log.v(TAG, "Start Get ID");
+		
+		// right now this is a public method, but will end up being private
+		bleMessenger.getPeripheralIdentifyingInfo(ourMostRecentFriendsAddress);
+		
+	}
+	
+	public void handleButtonSendID(View view) {
+		Log.v(TAG, "Start Send ID to: " + ourMostRecentFriendsAddress);
+		// now send some messages to this peer - we'll already have our Id message queued up
+		
+		// the other party should have been added to our friends list, bleFriends
+		// just get one
+		BlePeer p = bleFriends.values().iterator().next();
+		
+		// if we pull a friend from the next one in the list, send to that peer
+		if (p != null) {
+			logMessage("send to:" + ByteUtilities.bytesToHexShort(p.GetFingerprintBytes()));
+			bleMessenger.sendMessagesToPeer(p);
+			
+		} else {
+			logMessage("can't get a bleFriend to send to");
+		}
+	}
+    
 	
 	public void handleButtonBeAFriend(View view) {
 		// now we need to create the payload with our friendly name and public key
@@ -444,21 +531,20 @@ public class MainActivity extends Activity {
 	
 	private void logMessage(String msg) {
 
-		String oldText = statusText.getText().toString();
+		statusLogText = "- " + msg + "\n" + statusLogText;
 		
-		final String newText = oldText + "\n" + "- " + msg;
+		// String oldText = statusText.getText().toString();
+		
+		//final String newText = oldText + "\n" + "- " + msg;
 		
 		runOnUiThread(new Runnable() {
 			  public void run() {
-				  statusText.setText(newText);
+				  statusText.setText(statusLogText);
 			  }
-			});
+		});
 		
 	}
-	
-	
-	
-	
+		
 	private static byte[] trim(byte[] bytes) {
 		int i = bytes.length - 1;
 		while(i >= 0 && bytes[i] == 0) { --i; }

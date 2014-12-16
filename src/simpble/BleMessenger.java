@@ -107,36 +107,62 @@ public class BleMessenger {
 	 * @param Peer
 	 */
 	public void sendMessagesToPeer(BlePeer Peer) {
-		bleStatusCallback.headsUp("sending messages meant for peer " + Peer.GetFingerprint().substring(0,20));
+		bleStatusCallback.headsUp("sending messages meant for peer " + getFirstChars(Peer.GetFingerprint(), 20));
 		writeOut(Peer);
 	}
 	
-	/* this calls bleCentral; needs to be written such that it calls blePeripheral if necessary
-	 * or have a different writeOut method if you're currently connected to the other party as a peripheral
-	*/
+	private String getFirstChars(String str, int index) {
+		if (str.length() >= index) {
+			return str.substring(0, index);
+		} else {
+			return str;
+		}
+	}
+
+	
+	/* this is called when in central mode */
 	private void writeOut(BlePeer peer) {
 		
-		// given a peer, get an arbitrary message to send
+		// given a peer, get the first message in the queue to send out
 		BleMessage b = peer.getBleMessageOut();
+		
+		if (b == null) {
+			Log.v(TAG, "cannot 'writeOut' - peer.getBleMessageOut returned null");
+			bleStatusCallback.headsUp("no message found for peer");
+			
+			return;
+		}
 		
 		// pull the remote address for this peer
 		String remoteAddress = fpNetMap.get(peer.GetFingerprint());
 		
-		// send the next packet
-    	if (b.PendingPacketStatus()) {
-    		byte[] nextPacket = b.GetPacket().MessageBytes;
-    		
-    		Log.v(TAG, "send write request to " + remoteAddress);
-    		
-    		if (nextPacket != null) {
-	    		bleCentral.submitCharacteristicWriteRequest(remoteAddress, uuidFromBase("101"), nextPacket);
+		// get an array list of all our packets
+		ArrayList<BlePacket> bps = b.GetAllPackets();
+		
+		// loop over all our packets to send
+		for (BlePacket p: bps) {
+			
+			try {
+		
+				byte[] nextPacket = p.MessageBytes;
+				
+				Log.v(TAG, "send write request to " + remoteAddress);
+				
+	    		if (nextPacket != null) {
+	    			bleStatusCallback.headsUp("o:" + ByteUtilities.bytesToHexShort(nextPacket));
+		    		bleCentral.submitCharacteristicWriteRequest(remoteAddress, uuidFromBase("101"), nextPacket);
+	    		}
 	    		
-	    		// call this until the message is sent
-	    		writeOut(peer);
+			}  catch (Exception e) {
+    			Log.v(TAG, "packet send error: " + e.getMessage());
+    			bleStatusCallback.headsUp("packet send error");
     		}
-    	} else {
-    		Log.v(TAG, "all pending packets sent");
-    	}
+			
+		}
+		
+		Log.v(TAG, "all pending packets sent");
+		bleStatusCallback.headsUp("all pending packets sent (hopefully)");
+		bleStatusCallback.messageSent(b.MessageHash, peer);
 		
 	}
 
@@ -149,8 +175,13 @@ public class BleMessenger {
 	}
 	
 	public void ShowFound() {
-		// actually return a list of some sort
+		// call our Central object to scan for devices
 		bleCentral.scanLeDevice(true);
+		
+		// centralHandler's intakeFoundDevices method is called after scanning is complete
+		// -- this then calls BleCentral's connectAddress for each found device
+		// -- which then discovers services by calling gattServer.discoverServices()
+		// -- if the service definition is met, then centralHandler's parlayWithRemote is called
 	}
 		
 	public boolean BeFound() {
@@ -178,7 +209,7 @@ public class BleMessenger {
 		blePeripheral.advertiseOff();
 	}
 	
-	// maybe we shouldn't use this to send our identity stuff . . .
+	// this sends out when you're in peripheral mode
     private void sendOutgoing(String remote, UUID uuid) {
     	
     	// if we've got messages to send
@@ -193,6 +224,10 @@ public class BleMessenger {
 	    	// if we have a next packet to send, send it
 	    	if (bp != null) {
 		    	byte[] nextPacket = bp.MessageBytes;
+
+		    	bleStatusCallback.headsUp("o:" + ByteUtilities.bytesToHexShort(nextPacket));
+		    	Log.v(TAG, "o:" + ByteUtilities.bytesToHex(nextPacket));
+		    	
 		    	// update the value of this characteristic, which will send to subscribers
 		    	blePeripheral.updateCharValue(uuid, nextPacket);
 		    
@@ -202,8 +237,9 @@ public class BleMessenger {
 	    	
 	    	// if PendingPacketStatus == false, remove CurrentParentMessage from bleMessageMap
 	    	if (!blmsgOut.PendingPacketStatus()) {
-	    		Log.v(TAG, "message sent, remove it from the map");
+	    		Log.v(TAG, "message " + ByteUtilities.bytesToHex(blmsgOut.MessageHash) + " sent, remove from map");
 	    		// if this message is sent, remove from our Map queue and increment our counter
+	    		
 	    		bleMessageMap.remove(CurrentParentMessage);
 	    		CurrentParentMessage++;
 	    		
@@ -219,8 +255,8 @@ public class BleMessenger {
     private void incomingMessage(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
 		int parentMessagePacketTotal = 0;
 		
-		Log.v(TAG, "incoming hex bytes:" + ByteUtilities.bytesToHex(incomingBytes));
-		//bleStatusCallback.headsUp("incoming bytes " + remoteAddress + ": " + ByteUtilities.bytesToHex(Arrays.copyOfRange(incomingBytes, 0, 4)));
+		//Log.v(TAG, "incoming hex bytes:" + ByteUtilities.bytesToHex(incomingBytes));
+		bleStatusCallback.headsUp("i:" + ByteUtilities.bytesToHexShort(incomingBytes));
 		
 		// if our msg is under a few bytes it can't be valid; return
     	if (incomingBytes.length < 5) {
@@ -228,9 +264,12 @@ public class BleMessenger {
     		return;
     	}
     	
+    	//000001024088D5A01D57320CA7D5E60A42ACD4EA
+    	//88D5A01D57320CA7D5E60A42ACD4EA
+
     	// get the Message to which these packets belong as well as the current counter
-    	int parentMessage = incomingBytes[0] & 0xFF;
-    	int packetCounter = (incomingBytes[1] << 8) | incomingBytes[2] & 0xFF;
+    	int parentMessage = incomingBytes[0] & 0xFF; //00
+    	int packetCounter = (incomingBytes[1] << 8) | incomingBytes[2] & 0xFF; //0001
 
     	// get the peer which matches the connected remote address 
     	BlePeer p = peerMap.get(remoteAddress);
@@ -246,7 +285,7 @@ public class BleMessenger {
     	// the number of packets we're expecting
     	if (packetCounter == 0) {
     		// right now this is only going to be a couple of bytes
-    		parentMessagePacketTotal = (incomingBytes[3] << 8) | incomingBytes[4] & 0xFF;
+    		parentMessagePacketTotal = (incomingBytes[3] << 8) | incomingBytes[4] & 0xFF; //0240
     		
     		Log.v(TAG, "parent message packet total is:" + String.valueOf(parentMessagePacketTotal));
     		b.BuildMessageFromPackets(packetCounter, packetPayload, parentMessagePacketTotal);
@@ -257,10 +296,19 @@ public class BleMessenger {
     	
     	// if this particular message is done; ie, is it still pending packets?
     	if (b.PendingPacketStatus() == false) {
+    		bleStatusCallback.headsUp("pending packet status now false");
     		
-    		fpNetMap.put(ByteUtilities.bytesToHex(b.SenderFingerprint), remoteAddress);
-    		
-    		bleStatusCallback.handleReceivedMessage(ByteUtilities.bytesToHex(b.RecipientFingerprint), ByteUtilities.bytesToHex(b.SenderFingerprint), b.MessagePayload, b.MessageType);
+    		if (b.SenderFingerprint != null) {
+	    		if (b.SenderFingerprint.length > 0) {
+	    			bleStatusCallback.headsUp("sender fp, handling msg");
+	    			fpNetMap.put(ByteUtilities.bytesToHex(b.SenderFingerprint), remoteAddress);
+	    			bleStatusCallback.handleReceivedMessage(ByteUtilities.bytesToHex(b.RecipientFingerprint), ByteUtilities.bytesToHex(b.SenderFingerprint), b.MessagePayload, b.MessageType);
+	    		} else {
+	    			bleStatusCallback.headsUp("msg error: SenderFingerprint.length=0");	
+	    		}
+    		} else {
+    			bleStatusCallback.headsUp("msg error: SenderFingerprint NULL");
+    		}
     		
     		// check message integrity here?
     		// what about encryption?
@@ -362,21 +410,14 @@ public class BleMessenger {
 		@Override
 		public void parlayWithRemote(String remoteAddress) {
 			
-			// so at this point we should still be connected with our remote device
-			// and we wouldn't have gotten here if the remote device didn't meet our service spec
-			// so now let's trade identification information and transfer any data
-
-			BleMessage b = new BleMessage();
+			// get the PuF?
+			// You can't do that unless you've already done the ID dance
 			
-			// add this new message to our message map
-			bleMessageMap.put(0, b);
-
-			// pass our remote address and desired uuid to our gattclient
-			// who will look up the gatt object and uuid and issue the read request
-			bleStatusCallback.headsUp("subscribing to 102 on " + remoteAddress);
-			bleCentral.submitSubscription(remoteAddress, uuidFromBase("102"));
-
-			// we should be expecting data on 102 now
+		    // look up peer by connected address
+			//BlePeer remoteGuy = peerMap.get(remoteAddress);
+		    
+			// you don't want to subscribe YET
+			bleStatusCallback.headsUp("ready to subscribe to 102 on " + remoteAddress, "subscribe=" + remoteAddress);
 			
 		}
 		
@@ -388,5 +429,29 @@ public class BleMessenger {
 		}
     	
     };
+    
+    
+    // if you're a central, identify a particular peripheral
+    // this function probably won't be called directly
+	public void getPeripheralIdentifyingInfo(String remoteAddress) {
+		
+		// so at this point we should still be connected with our remote device
+		// and we wouldn't have gotten here if the remote device didn't meet our service spec
+
+		// so now let's ask for identification information - SUBSEQUENTLY we may transfer other data
+		BleMessage b = new BleMessage();
+		
+		// add this new message to our message map
+		// ONLY WORKS FOR ONE CONNECTED PERIPHERAL; need to make per remoteAddress
+		bleMessageMap.put(0, b);
+
+		// pass our remote address and desired uuid to our gattclient
+		// who will look up the gatt object and uuid and issue the read request
+		bleStatusCallback.headsUp("subscribing to 102 on " + remoteAddress);
+		bleCentral.submitSubscription(remoteAddress, uuidFromBase("102"));
+
+		// we should be expecting data on 102 now
+		
+	}
     
 }
