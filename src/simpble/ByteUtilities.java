@@ -1,5 +1,7 @@
 package simpble;
 
+import java.util.Arrays;
+
 public class ByteUtilities {
     final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
     
@@ -30,6 +32,18 @@ public class ByteUtilities {
     	}
     	
     	return bytes;
+    }
+    
+    public static byte[] trimmedBytes(byte[] bytes) {
+    	
+    	int i = bytes.length - 1;
+    	while (i >= 0 && bytes[i] == 0) {
+    		--i;
+    	}
+    	
+    	return Arrays.copyOf(bytes, i+1);
+    	
+    	
     }
 	
 }

@@ -216,36 +216,58 @@ public class BleMessenger {
     	if (bleMessageMap.size() > 0) {
     	
     		// get the current message to send
-	    	BleMessage blmsgOut = bleMessageMap.get(CurrentParentMessage);
+	    	BleMessage b = bleMessageMap.get(CurrentParentMessage);
 	    	
-	    	// get the next packet to send
-	    	BlePacket bp = blmsgOut.GetPacket();
+			if (b == null) {
+				Log.v(TAG, "cannot 'sendOutgoing' - bleMessageMap.get(CurrentParentMessage) returned null");
+				bleStatusCallback.headsUp("no message found for peer");
+				
+				return;
+			}
 	    	
-	    	// if we have a next packet to send, send it
-	    	if (bp != null) {
-		    	byte[] nextPacket = bp.MessageBytes;
+			// get an array list of all our packets
+			ArrayList<BlePacket> bps = b.GetAllPackets();
+	    	
+			// loop over all our packets to send
+			for (BlePacket p: bps) {
+				
+				try {
+					
+					byte[] nextPacket = p.MessageBytes;
+					
+					Log.v(TAG, "send write request via " + uuid.toString());
+					
+		    		if (nextPacket != null) {
+		    			bleStatusCallback.headsUp("o:" + ByteUtilities.bytesToHexShort(nextPacket));
 
-		    	bleStatusCallback.headsUp("o:" + ByteUtilities.bytesToHexShort(nextPacket));
-		    	Log.v(TAG, "o:" + ByteUtilities.bytesToHex(nextPacket));
-		    	
-		    	// update the value of this characteristic, which will send to subscribers
-		    	blePeripheral.updateCharValue(uuid, nextPacket);
-		    
-		    	// call this routine again
-		    	sendOutgoing(remote, uuid);
-	    	}
-	    	
-	    	// if PendingPacketStatus == false, remove CurrentParentMessage from bleMessageMap
-	    	if (!blmsgOut.PendingPacketStatus()) {
-	    		Log.v(TAG, "message " + ByteUtilities.bytesToHex(blmsgOut.MessageHash) + " sent, remove from map");
-	    		// if this message is sent, remove from our Map queue and increment our counter
-	    		
-	    		bleMessageMap.remove(CurrentParentMessage);
-	    		CurrentParentMessage++;
-	    		
-	    		// handle anything you want to have handled when this message is sent
-	    	} 
-	    	
+		    			// update the value of this characteristic, which will send to subscribers
+				    	blePeripheral.updateCharValue(uuid, nextPacket);
+		    		}
+		    		
+				}  catch (Exception e) {
+	    			Log.v(TAG, "packet send error: " + e.getMessage());
+	    			bleStatusCallback.headsUp("packet send error");
+	    		}
+				
+			}
+			
+			bleMessageMap.remove(CurrentParentMessage);
+
+			bleStatusCallback.headsUp("message " + ByteUtilities.bytesToHex(b.MessageHash) + " sent, remove from map");
+
+			/*
+			byte[] MsgType;
+			
+			if (b.MessageType == "identity") {
+				MsgType = new byte[]{(byte)(0x01)};
+			} else {
+				MsgType = new byte[]{(byte)(0x02)};
+			}
+			
+			bleStatusCallback.headsUp("message " + ByteUtilities.bytesToHex(MsgType) + ByteUtilities.bytesToHex(b.RecipientFingerprint) + ByteUtilities.bytesToHex(b.SenderFingerprint) + ByteUtilities.bytesToHex(b.MessagePayload) + " sent, remove from map");
+			*/
+	    	CurrentParentMessage++;
+	
 	    	
     	}
     	// TODO: consider when to disconnect
@@ -263,9 +285,6 @@ public class BleMessenger {
     		Log.v(TAG, "message bytes less than 5");
     		return;
     	}
-    	
-    	//000001024088D5A01D57320CA7D5E60A42ACD4EA
-    	//88D5A01D57320CA7D5E60A42ACD4EA
 
     	// get the Message to which these packets belong as well as the current counter
     	int parentMessage = incomingBytes[0] & 0xFF; //00
@@ -298,11 +317,23 @@ public class BleMessenger {
     	if (b.PendingPacketStatus() == false) {
     		bleStatusCallback.headsUp("pending packet status now false");
     		
+    		// if there's a fingerprint for the sender, handle this message (you should always have a sender fingerprint, else the message is malformed)
+    		
+    		// add the sender's fingerprint to our map of senderfingerprint and remoteAddress - should this be elsewhere?
     		if (b.SenderFingerprint != null) {
 	    		if (b.SenderFingerprint.length > 0) {
 	    			bleStatusCallback.headsUp("sender fp, handling msg");
+	    			
+	    			if (b.checkHash()) {
+	    				bleStatusCallback.headsUp("hash good");
+	    			} else {
+	    				bleStatusCallback.headsUp("hash bad: " + b.GetCalcHash());
+	    				bleStatusCallback.headsUp("shouldbe: " + ByteUtilities.bytesToHexShort(b.MessageHash));
+	    			}
+	    			
 	    			fpNetMap.put(ByteUtilities.bytesToHex(b.SenderFingerprint), remoteAddress);
 	    			bleStatusCallback.handleReceivedMessage(ByteUtilities.bytesToHex(b.RecipientFingerprint), ByteUtilities.bytesToHex(b.SenderFingerprint), b.MessagePayload, b.MessageType);
+	    			
 	    		} else {
 	    			bleStatusCallback.headsUp("msg error: SenderFingerprint.length=0");	
 	    		}
@@ -333,8 +364,9 @@ public class BleMessenger {
 	    		// this global "CurrentParentMessage" thing only works when sending in peripheral mode
 	    		CurrentParentMessage = 0;
 	    		
-	    		// the message itself needs to know what it's sequence is when sent to recipient
+	    		// the message itself needs to know what its sequence is when sent to recipient
 	    		idMessage.SetMessageNumber(CurrentParentMessage);
+	    		
 	    		// add our id message to this message map
 	    		bleMessageMap.put(0, idMessage);
 	    		

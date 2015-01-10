@@ -7,7 +7,7 @@
     <string name="xfer_packet">Xfer</string>
     <string name="action_settings">Settings</string>
     <string name="status_log">Status History:</string>
-    <string name="get_id">id-in</string>
-    <string name="send_id">idout></string>
+    <string name="get_id">id&lt;-</string>
+    <string name="send_id">id-&gt;</string>
     
 </resources>

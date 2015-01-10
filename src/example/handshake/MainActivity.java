@@ -162,6 +162,12 @@ public class MainActivity extends Activity {
 		testPeer.SetFingerprint(testFriend);
 		bleFriends.put(testFriend, testPeer);
 		
+		if (myFingerprint != null) {
+			logMessage("our fp is:" + myFingerprint.substring(0, 20) + " . . .");
+		} else {
+			logMessage("global myFingerprint is null");
+		}
+		
 	}
 	
 	private void SetUpBle() {
@@ -223,18 +229,19 @@ public class MainActivity extends Activity {
 	
 	BleStatusCallback bleMessageStatus = new BleStatusCallback() {
 
+		// this is when all the packets have come in, and a message is received in its entirety (hopefully)
 		@Override
 		public void handleReceivedMessage(String recipientFingerprint, String senderFingerprint, byte[] payload, String msgType) {
 
 			//Log.v(TAG, "received msg of type:"+ msgType);
 			logMessage("received msg of type:" + msgType);
-			
+			logMessage("msg intended for " + recipientFingerprint);
 			
 			// this is an identity message so handle it as such
 			if (msgType.equalsIgnoreCase("identity")) {
 				Log.v(TAG, "received identity msg");
 				
-				logMessage("msg intended for " + recipientFingerprint);
+				
 				
 				if (recipientFingerprint.length() == 0) {
 					// there is no recipient; this is just an identifying message
@@ -242,11 +249,7 @@ public class MainActivity extends Activity {
 				} else if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
 					logMessage("msg intended for us");
 				} else {
-					if (myFingerprint != null) { 
-						logMessage("our fp is:" + myFingerprint.substring(0, 20) + " . . .");
-					} else {
-						logMessage("global myFingerprint is null");
-					}
+					// TODO: something
 				}
 				
 				// if the sender is in our friends list

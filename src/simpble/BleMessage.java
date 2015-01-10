@@ -97,7 +97,85 @@ public class BleMessage {
 	private void addPacket(int packetSequence, byte[] packetBytes) {
 		messagePackets.add(new BlePacket(packetSequence, packetBytes));
 	}
+
+	public String GetPayload() {
+		return ByteUtilities.bytesToHexShort(MessagePayload);
+	}
+
+	/**
+	 * Calculates a hash and checks if it matches what was provided
+	 */
+	public String GetCalcHash() {
 		
+        // get a digest for the message, to define it
+        MessageDigest md = null;
+        
+        try {
+			md = MessageDigest.getInstance("SHA-1");
+		} catch (NoSuchAlgorithmException e) {
+
+			e.printStackTrace();
+		}
+        
+        byte[] MsgType;
+        
+		if (MessageType == "identity") {
+			MsgType = new byte[]{(byte)(0x01)};
+		} else {
+			MsgType = new byte[]{(byte)(0x02)};
+		}
+        
+        byte[] MessageBytes = Bytes.concat(MsgType, RecipientFingerprint, SenderFingerprint, MessagePayload);
+        
+        // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
+        // (i want my digest to be the packet size less the 5 bytes needed for header info)
+        byte[] calcDigest = Arrays.copyOfRange(md.digest(ByteUtilities.trimmedBytes(MessageBytes)), 0, MessagePacketSize - 5);
+		
+		//return ByteUtilities.bytesToHexShort(calcDigest);
+        
+        // return the source for our hash so we can see if it's what we need
+        return ByteUtilities.bytesToHexShort(calcDigest);
+	}
+	
+
+	private byte[] calculateHash() {
+		
+        // get a digest for the message, to define it
+        MessageDigest md = null;
+        
+        try {
+			md = MessageDigest.getInstance("SHA-1");
+		} catch (NoSuchAlgorithmException e) {
+
+			e.printStackTrace();
+		}
+        
+        byte[] MsgType;
+        
+		if (MessageType == "identity") {
+			MsgType = new byte[]{(byte)(0x01)};
+		} else {
+			MsgType = new byte[]{(byte)(0x02)};
+		}
+        
+        byte[] MessageBytes = Bytes.concat(MsgType, RecipientFingerprint, SenderFingerprint, MessagePayload);
+        
+        // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
+        // (i want my digest to be the packet size less the 5 bytes needed for header info)
+        return Arrays.copyOfRange(md.digest(ByteUtilities.trimmedBytes(MessageBytes)), 0, MessagePacketSize - 5);
+		
+	}
+	
+	public boolean checkHash() {
+
+        if (Arrays.equals(calculateHash(), MessageHash)) {
+        	return true;
+        } else {
+        	return false;
+        }
+        
+	}
+	
 	/**
 	 * Takes the message payload from the calling method and builds the list
 	 * of BlePackets
@@ -123,6 +201,8 @@ public class BleMessage {
 			MsgType = new byte[]{(byte)(0x02)};
 		}
 		
+		MessagePayload = Payload;
+		
 		// Message Type, RFP, SFP, and payload
 		byte[] MessageBytes = Bytes.concat(MsgType, RecipientFingerprint, SenderFingerprint, Payload);
 		
@@ -147,8 +227,12 @@ public class BleMessage {
 			e.printStackTrace();
 		}
         
-        // i want my digest to be the packet size less the 5 bytes needed for header info
+        // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
+        // (i want my digest to be the packet size less the 5 bytes needed for header info)
         byte[] myDigest = Arrays.copyOfRange(md.digest(MessageBytes), 0, MessagePacketSize - 5);
+        
+        // set our global variable for the hash to this digest
+        MessageHash = myDigest;
         
         Log.v(TAG, "first payload is of size: " + String.valueOf(myDigest.length));
         
@@ -162,10 +246,11 @@ public class BleMessage {
         msgSize[0] = (byte)(msgCount >> 8);
         msgSize[1] = (byte)(msgCount & 0xFF);
         
-        /* the first BlePacket will be this BleMessage's identifying number,
-         * then 2 bytes indicating the current packet, 
-         * then 2 bytes of the number of BlePackets,
-         * finally the message digest
+        /* The first BlePacket!!!  includes:
+         * 1 byte - this BleMessage's identifying number,
+         * 2 bytes - the current packet counter, 
+         * 2 bytes  - the number of BlePackets,
+         * n bytes - the message digest
         */ 
         byte[] firstPacket = Bytes.concat(new byte[]{(byte)(messageNumber & 0xFF)}, new byte[]{(byte)0x00, (byte)0x00}, msgSize, myDigest);
 
@@ -286,7 +371,7 @@ public class BleMessage {
         for (BlePacket b : messagePackets) {
         	//Log.v(TAG, "packet" + String.valueOf(i) + ", msgseq:" + String.valueOf(b.MessageSequence) + ":" + bytesToHex(b.MessageBytes));
         	if (b.MessageSequence == 0) {
-        		MessageHash = b.MessageBytes;
+        		MessageHash = Arrays.copyOfRange(b.MessageBytes, 2, b.MessageBytes.length);
         	} else {
         		try {
 					os.write(b.MessageBytes);
