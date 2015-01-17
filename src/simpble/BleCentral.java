@@ -133,8 +133,18 @@ public class BleCentral {
     
     public void connectAddress(String btAddress){
     	BluetoothDevice b = centralBTA.getRemoteDevice(btAddress);
-    	
     	b.connectGatt(ctx, false, mGattCallback);
+    }
+    
+    public void disconnectAddress(String btAddress) {
+    	// get the gatt connection to the particular server and disconnect
+    	try {
+    		gattS.get(btAddress).disconnect();
+    	} catch (Exception e) {
+    		Log.e(TAG, "error disconnecting");
+    		Log.e(TAG, e.getMessage());
+    	}
+
     }
     
     

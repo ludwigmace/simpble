@@ -5,9 +5,13 @@ import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
 
 import android.bluetooth.BluetoothAdapter;
@@ -23,6 +27,8 @@ import android.widget.Toast;
 
 public class BleMessenger {
 	private static String TAG = "blemessenger";
+	
+	private Timer longTimer;
 	
 	// handles to the device and system's bluetooth management 
 	private BluetoothManager btMgr;
@@ -98,6 +104,8 @@ public class BleMessenger {
 		
 		bleMessageMap = new HashMap<Integer, BleMessage>();
 		
+		setupStaleChecker(10000);
+		
 	
 		// when we connect, send the id message to the connecting party
 	}
@@ -119,6 +127,51 @@ public class BleMessenger {
 		}
 	}
 
+	
+	private synchronized void setupStaleChecker(long timeout) {
+		if (longTimer != null) {
+			longTimer.cancel();
+			longTimer = null;
+		}
+		
+		if (longTimer == null) {
+			longTimer = new Timer();
+			
+			longTimer.schedule(new TimerTask() {
+				public void run() {
+					longTimer.cancel();
+					longTimer = null;
+					
+					// check timing on connections; drop those that are stale
+					checkForStaleConnections();
+				}
+				
+			}, timeout); // 10 sec, in ms
+		}
+	}
+	
+	private void checkForStaleConnections() {
+		//bleStatusCallback.headsUp("check for stale connection!");
+		// reset our stale-checker
+		setupStaleChecker(10000);
+		
+		String addressToDisconnectFromCentral = "";
+		
+		// THIS is if we are hitting the criteria for disconnecting
+		boolean dropMyCentral = false;
+		
+		// loop over peers and check for staleness!
+		for (Map.Entry<String, BlePeer> entry : peerMap.entrySet()) {
+			BlePeer p = entry.getValue();
+			
+			if (p.CheckStale()) {
+				bleCentral.disconnectAddress(entry.getKey());
+				blePeripheral.closeConnection();
+			}
+			
+		}
+
+	}
 	
 	/* this is called when in central mode */
 	private void writeOut(BlePeer peer) {
@@ -433,6 +486,9 @@ public class BleMessenger {
 				
 				// this could possibly be moved into an exterior loop
 				bleStatusCallback.headsUp("connecting to " + peerAddress);
+				
+				// initiate a connection to the remote address, which checks to see if it's a valid peer
+				// if it's not, then you won't be connected
 				bleCentral.connectAddress(peerAddress);
 				
 			}
@@ -441,6 +497,9 @@ public class BleMessenger {
 		
 		@Override
 		public void parlayWithRemote(String remoteAddress) {
+			// so now we're connected  			// you don't want to subscribe YET
+			bleStatusCallback.headsUp("connected and ready to exchange w/ " + remoteAddress, "subscribe=" + remoteAddress);
+			
 			
 			// get the PuF?
 			// You can't do that unless you've already done the ID dance
@@ -448,8 +507,7 @@ public class BleMessenger {
 		    // look up peer by connected address
 			//BlePeer remoteGuy = peerMap.get(remoteAddress);
 		    
-			// you don't want to subscribe YET
-			bleStatusCallback.headsUp("ready to subscribe to 102 on " + remoteAddress, "subscribe=" + remoteAddress);
+
 			
 		}
 		

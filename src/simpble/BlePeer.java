@@ -34,6 +34,8 @@ public class BlePeer {
 	// map of the BleMessages outgoing to this peer
 	private Map<Integer, BleMessage> peerMessagesOut;
 	
+	public Date lastActivity;
+	
 	/**
 	 * 
 	 * @param PeerAddress Network address of the peer, or really anything that uniquely identifies this peer for the current connection
@@ -43,6 +45,23 @@ public class BlePeer {
 		peerName="";
 		peerMessagesIn = new HashMap<Integer, BleMessage>();
 		peerMessagesOut = new HashMap<Integer, BleMessage>();
+		
+		// set the last activity date to right now
+		lastActivity = new Date();
+	}
+	
+	public boolean CheckStale() {
+		boolean isStale = false;
+		
+		Date rightnow = new Date();
+		
+		long diff = rightnow.getTime() - lastActivity.getTime();
+		
+		if (diff > (1000 * 10)) { // if we're over 10 seconds of stale time
+			isStale = true;
+		}
+		
+		return isStale;
 	}
 	
 	/**
