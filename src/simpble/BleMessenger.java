@@ -155,18 +155,24 @@ public class BleMessenger {
 		// reset our stale-checker
 		setupStaleChecker(10000);
 		
-		String addressToDisconnectFromCentral = "";
-		
-		// THIS is if we are hitting the criteria for disconnecting
-		boolean dropMyCentral = false;
-		
 		// loop over peers and check for staleness!
 		for (Map.Entry<String, BlePeer> entry : peerMap.entrySet()) {
 			BlePeer p = entry.getValue();
+			bleStatusCallback.headsUp("is this guy current? connected as: " + p.ConnectedAs);
 			
+			// right here it's easy to disconnect a particular peripheral if you're the central
+			// how to identify if the device you want to disconnect 
 			if (p.CheckStale()) {
-				bleCentral.disconnectAddress(entry.getKey());
-				blePeripheral.closeConnection();
+				// connected to your peer as a peripheral
+				if (p.ConnectedAs.equalsIgnoreCase("peripheral")) {
+					blePeripheral.closeConnection();
+				} else {
+					// connected to your peer as a central
+					bleCentral.disconnectAddress(entry.getKey());
+				}
+				
+				bleStatusCallback.headsUp("closing stale connection");
+				peerMap.remove(entry.getKey()); // because we've disconnected, remove from our peerlist
 			}
 			
 		}
@@ -346,6 +352,9 @@ public class BleMessenger {
     	// get the peer which matches the connected remote address 
     	BlePeer p = peerMap.get(remoteAddress);
     	
+    	// update "last heard from" time
+    	p.MarkActive();
+    	
     	// find the message we're building, identified by the first byte (cast to an integer 0-255)
     	// if this message wasn't already created, then the getBleMessageIn method will create it
     	BleMessage b = p.getBleMessageIn(parentMessage);
@@ -409,6 +418,7 @@ public class BleMessenger {
     	
     	public void ConnectionState(String device, int status, int newStatus) {
     		
+    		// if connected
     		if (newStatus == 2) {
     		
 	    		// create/reset our message map for our connection
@@ -425,8 +435,11 @@ public class BleMessenger {
 	    		
 	    		Log.v(TAG, "id message added to connection's message map");
 	    		
+	    		bleStatusCallback.headsUp("accepted connection from a central");
+	    		
 	    		 // create a new peer to hold messages and such for this network device
 	    		BlePeer p = new BlePeer(device);
+	    		p.ConnectedAs = "peripheral";
 	    		peerMap.put(device, p);
     		
     		}
@@ -444,6 +457,12 @@ public class BleMessenger {
 		public void handleNotifyRequest(String device, UUID uuid) {
     		// we're connected, so initiate send to "device", to whom we're already connected
     		Log.v(TAG, "from handleNotifyRequest, initiate sending messages");
+    		
+    		// we've got a notify request, so let's reset this peer's inactivity timeout
+    		bleStatusCallback.headsUp("notify request from " + device + "; reset timeout");
+    		BlePeer p = peerMap.get(device);
+    		p.MarkActive();
+    		
     		sendOutgoing(device, uuid);
 		}
 
@@ -481,6 +500,7 @@ public class BleMessenger {
 				
 				if (!peerMap.containsKey(peerAddress)) {
 					BlePeer blePeer = new BlePeer(peerAddress);
+					blePeer.ConnectedAs = "central";
 					peerMap.put(peerAddress, blePeer);
 				}
 				
@@ -499,7 +519,9 @@ public class BleMessenger {
 		public void parlayWithRemote(String remoteAddress) {
 			// so now we're connected  			// you don't want to subscribe YET
 			bleStatusCallback.headsUp("connected and ready to exchange w/ " + remoteAddress, "subscribe=" + remoteAddress);
+			BlePeer p = peerMap.get(remoteAddress);
 			
+			p.MarkActive();
 			
 			// get the PuF?
 			// You can't do that unless you've already done the ID dance

@@ -34,7 +34,11 @@ public class BlePeer {
 	// map of the BleMessages outgoing to this peer
 	private Map<Integer, BleMessage> peerMessagesOut;
 	
-	public Date lastActivity;
+	// how this peer is currently connected (if at all?)
+	public String ConnectedAs;
+	
+	// the last update of activity
+	private Date lastActivity;
 	
 	/**
 	 * 
@@ -46,7 +50,13 @@ public class BlePeer {
 		peerMessagesIn = new HashMap<Integer, BleMessage>();
 		peerMessagesOut = new HashMap<Integer, BleMessage>();
 		
+		ConnectedAs = "";
+		
 		// set the last activity date to right now
+		MarkActive();
+	}
+	
+	public void MarkActive() {
 		lastActivity = new Date();
 	}
 	
