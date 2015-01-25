@@ -27,6 +27,7 @@ import android.widget.Toast;
 
 public class BleMessenger {
 	private static String TAG = "blemessenger";
+	private static int INACTIVE_TIMEOUT = 60000; // 1 minute timeout
 	
 	private Timer longTimer;
 	
@@ -104,7 +105,7 @@ public class BleMessenger {
 		
 		bleMessageMap = new HashMap<Integer, BleMessage>();
 		
-		setupStaleChecker(10000);
+		setupStaleChecker(INACTIVE_TIMEOUT);  // setup timeout
 		
 	
 		// when we connect, send the id message to the connecting party
@@ -153,7 +154,7 @@ public class BleMessenger {
 	private void checkForStaleConnections() {
 		//bleStatusCallback.headsUp("check for stale connection!");
 		// reset our stale-checker
-		setupStaleChecker(10000);
+		setupStaleChecker(INACTIVE_TIMEOUT); // 1 minute
 		
 		// loop over peers and check for staleness!
 		for (Map.Entry<String, BlePeer> entry : peerMap.entrySet()) {

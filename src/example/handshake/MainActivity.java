@@ -41,7 +41,8 @@ public class MainActivity extends Activity {
 	private static final String TAG = "main";
 
 	BleMessenger bleMessenger;
-	Map <String, BlePeer> bleFriends;
+	Map <String, BlePeer> bleFriends;  // folks whom i have previously connected to, or i have their id info
+	Map <String, BlePeer> bleFolks; // folks i'm connected to, or recently connected to, for this session of the program's memory
 	String myFingerprint;
 	String myIdentifier;
 	
@@ -123,47 +124,55 @@ public class MainActivity extends Activity {
 		if (btAdptr.isEnabled()) {
 			bleMessenger = new BleMessenger(btMgr, btAdptr, this, bleMessageStatus);
 		} // if not enabled, the onResume will catch this
-		
-		String testFriend = "";
-		String testMyself = "";
-		String testMessage = "";
-		
+
 		// if our SDK isn't lollipop, then disable our advertising button
 		// for testing i can also tell which is my 5 and which is my Gnex
 		if (Build.VERSION.SDK_INT < 21) {
 			btnAdvertise.setEnabled(false);
 		} else if (!btAdptr.isMultipleAdvertisementSupported()) {
 			btnAdvertise.setEnabled(false);
-			testFriend = "4088D5A01D57320CA7D5E60A42ACD4EA333C5005";
-			testMyself = "5555EFA01D57320CA7D5E60A42ACD4EA333C7117";
-			testMessage = "I'd like to tell you about my feet.";
 		} else {
-			btnAdvertise.setEnabled(true);
-			testFriend = "5555EFA01D57320CA7D5E60A42ACD4EA333C7117";
-			testMyself = "4088D5A01D57320CA7D5E60A42ACD4EA333C5005";
-			testMessage = "I'd like to tell you about my hands.";			
+			btnAdvertise.setEnabled(true);			
 		}
- 		
+		
+		// this part should be populated by a database or previous application data
+		String testFriendFP = "";
+		String testMessage = "";
+		
+		// nexus 5: BC966C8DB89F0EBB91C82C97E561DF631DB96DC3
+		// gnex: D6DB868F6260FB74ADFE6E340288E77FCA3BA9E5
+		if (myFingerprint.equalsIgnoreCase("BC966C8DB89F0EBB91C82C97E561DF631DB96DC3")) {
+			testMessage = "i'm a nexus 5 and i love you SO MUCHCHCHCHCH - it's creepy";
+			testFriendFP = "D6DB868F6260FB74ADFE6E340288E77FCA3BA9E5";
+		} else if (myFingerprint.equalsIgnoreCase("D6DB868F6260FB74ADFE6E340288E77FCA3BA9E5")) {
+			testMessage = "i'm a GNEX and i'm tolerant of your existence";
+			testFriendFP = "BC966C8DB89F0EBB91C82C97E561DF631DB96DC3";
+		} else {
+			Log.v(TAG, "myFingerprint matches nothing!!!!");
+		}
+		 		
 		// generate message of particular byte size
 		//byte[] bytesMessage = benchGenerateMessage(45);
 
-		bleFriends = new HashMap<String, BlePeer>();
+		bleFolks = new HashMap<String, BlePeer>();
 
-		// make a test message
+		// create the test message, identified as being sent by me
 		BleMessage testBleMsg = new BleMessage();
 		testBleMsg.MessageType = "datatext";
-		testBleMsg.RecipientFingerprint = ByteUtilities.hexToBytes(testFriend);
-		testBleMsg.SenderFingerprint = ByteUtilities.hexToBytes(testMyself); 
+		testBleMsg.RecipientFingerprint = ByteUtilities.hexToBytes(testFriendFP);
+		testBleMsg.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint); 
 		testBleMsg.setMessage(testMessage.getBytes());
 
 		// create our test peer, and add this message for them
-		BlePeer testPeer = new BlePeer("");
+		BlePeer testPeer = new BlePeer(""); // constructor takes an address; since this goes
 		testPeer.addBleMessageOut(testBleMsg);
-		testPeer.SetFingerprint(testFriend);
-		bleFriends.put(testFriend, testPeer);
+		testPeer.SetFingerprint(testFriendFP);
+		
+		bleFriends.put(testFriendFP, testPeer);
 		
 		if (myFingerprint != null) {
 			logMessage("our fp is:" + myFingerprint.substring(0, 20) + " . . .");
+			Log.v(TAG, "our fp:" + myFingerprint);
 		} else {
 			logMessage("global myFingerprint is null");
 		}
@@ -213,20 +222,7 @@ public class MainActivity extends Activity {
 		}
 		return super.onOptionsItemSelected(item);
 	}
-	
-	// creates a message formatted for identity exchange
-	private BleMessage identityMessage() {
-		BleMessage m = new BleMessage();
-		m.MessageType = "identity";
-		m.SenderFingerprint = rsaKey.PuFingerprint();
-		m.RecipientFingerprint = new byte[20];
 		
-		m.setMessage(rsaKey.PublicKey());
-		
-		return m;
-	}
-
-	
 	BleStatusCallback bleMessageStatus = new BleStatusCallback() {
 
 		// this is when all the packets have come in, and a message is received in its entirety (hopefully)
@@ -240,9 +236,7 @@ public class MainActivity extends Activity {
 			// this is an identity message so handle it as such
 			if (msgType.equalsIgnoreCase("identity")) {
 				Log.v(TAG, "received identity msg");
-				
-				
-				
+								
 				if (recipientFingerprint.length() == 0) {
 					// there is no recipient; this is just an identifying message
 					logMessage("no particular recipient for this msg");
@@ -253,11 +247,11 @@ public class MainActivity extends Activity {
 				}
 				
 				// if the sender is in our friends list
-				if (bleFriends.containsKey(senderFingerprint)) {
+				if (bleFolks.containsKey(senderFingerprint)) {
 					logMessage("known peer: " + senderFingerprint.substring(0,20));
 
 					// now send some messages to this peer - we'll already have our Id message queued up
-					//bleMessenger.sendMessagesToPeer(bleFriends.get(senderFingerprint));
+					//bleMessenger.sendMessagesToPeer(bleFolks.get(senderFingerprint));
 				} else {
 					logMessage("new peer: " + senderFingerprint.substring(0,20));
 					
@@ -265,7 +259,7 @@ public class MainActivity extends Activity {
 					b.SetFingerprint(senderFingerprint);
 					b.addBleMessageOut(identityMessage());
 
-					bleFriends.put(senderFingerprint, b);
+					bleFolks.put(senderFingerprint, b);
 					
 					//Log.v(TAG, "received msg from new friend, payload size:"+ String.valueOf(payload.length));
 					// we don't know the sender and should add them;
@@ -374,6 +368,18 @@ public class MainActivity extends Activity {
 	
 	public void handleButtonXfer(View view) {
 		Log.v(TAG, "Xfer Toggle Pressed");
+
+		// iterate over our currently connected folks and see if anybody needs a message we have
+		for (String fp : bleFolks.keySet()) {
+			BlePeer p = bleFriends.get(fp);
+			// if we found a friend, send a message
+			if (p != null) {
+				// send pending messages to this peer . . .
+				bleMessenger.sendMessagesToPeer(p);
+			}
+			
+		}
+		
 	}
 	
 	public void handleButtonGetID(View view) {
@@ -388,9 +394,9 @@ public class MainActivity extends Activity {
 		Log.v(TAG, "Start Send ID to: " + ourMostRecentFriendsAddress);
 		// now send some messages to this peer - we'll already have our Id message queued up
 		
-		// the other party should have been added to our friends list, bleFriends
+		// the other party should have been added to our friends list, bleFolks
 		// just get one
-		BlePeer p = bleFriends.values().iterator().next();
+		BlePeer p = bleFolks.values().iterator().next();
 		
 		// if we pull a friend from the next one in the list, send to that peer
 		if (p != null) {
@@ -432,10 +438,6 @@ public class MainActivity extends Activity {
 			Log.v(TAG, "Go Invisible");
 			bleMessenger.HideYourself();
 		}
-	}
-	
-	public void queueOutboundMessage(String destinationFingerprint, byte[] message) {
-		
 	}
 	
 	private byte[] benchGenerateMessage(int MessageSize) {
@@ -512,7 +514,8 @@ public class MainActivity extends Activity {
     
 	public void handleButtonFindAFriend(View view) {
 		logMessage("look around");
-		// tell bleMessenger to look for folks and use the callback bleMessageStatus
+
+		// calls back bleMessageStatus when peers are found
 		bleMessenger.ShowFound();
 	}
 		
@@ -550,6 +553,18 @@ public class MainActivity extends Activity {
 		while(i >= 0 && bytes[i] == 0) { --i; }
 		
 		return Arrays.copyOf(bytes,  i+1);
+	}
+	
+	// creates a message formatted for identity exchange
+	private BleMessage identityMessage() {
+		BleMessage m = new BleMessage();
+		m.MessageType = "identity";
+		m.SenderFingerprint = rsaKey.PuFingerprint();
+		m.RecipientFingerprint = new byte[20];
+		
+		m.setMessage(rsaKey.PublicKey());
+		
+		return m;
 	}
 	
 }
