@@ -27,7 +27,7 @@ import android.widget.Toast;
 
 public class BleMessenger {
 	private static String TAG = "blemessenger";
-	private static int INACTIVE_TIMEOUT = 60000; // 1 minute timeout
+	private static int INACTIVE_TIMEOUT = 120000; // 2 minute timeout
 	
 	private Timer longTimer;
 	

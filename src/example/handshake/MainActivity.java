@@ -155,6 +155,7 @@ public class MainActivity extends Activity {
 		//byte[] bytesMessage = benchGenerateMessage(45);
 
 		bleFolks = new HashMap<String, BlePeer>();
+		bleFriends = new HashMap<String, BlePeer>();
 
 		// create the test message, identified as being sent by me
 		BleMessage testBleMsg = new BleMessage();
@@ -247,11 +248,18 @@ public class MainActivity extends Activity {
 				}
 				
 				// if the sender is in our friends list
-				if (bleFolks.containsKey(senderFingerprint)) {
+				if (bleFriends.containsKey(senderFingerprint)) {
 					logMessage("known peer: " + senderFingerprint.substring(0,20));
 
+					
+					 // enable the Xfer button
+					runOnUiThread(new Runnable() { public void run() { btnXfer.setEnabled(true); } });
+					
 					// now send some messages to this peer - we'll already have our Id message queued up
 					//bleMessenger.sendMessagesToPeer(bleFolks.get(senderFingerprint));
+					
+					// pull our peer's info from our friends group, put in Folks (friends are forever, folks are around now)
+					bleFolks.put(senderFingerprint, bleFriends.get(senderFingerprint));
 				} else {
 					logMessage("new peer: " + senderFingerprint.substring(0,20));
 					
@@ -274,6 +282,14 @@ public class MainActivity extends Activity {
 				
 			} else {
 				logMessage("received data msg of size:" + String.valueOf(payload.length));
+				
+				if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
+					logMessage("message is for us (as follows):");
+					logMessage(new String(payload));
+				} else {
+					logMessage("message isn't for us");
+				}
+				
 				Log.v(TAG, "received data msg, payload size:"+ String.valueOf(payload.length));
 			}
 			
@@ -370,6 +386,8 @@ public class MainActivity extends Activity {
 		Log.v(TAG, "Xfer Toggle Pressed");
 
 		// iterate over our currently connected folks and see if anybody needs a message we have
+		logMessage("iterating over " + String.valueOf(bleFolks.keySet().size()) + " entries in our folks keyset");
+		
 		for (String fp : bleFolks.keySet()) {
 			BlePeer p = bleFriends.get(fp);
 			// if we found a friend, send a message
