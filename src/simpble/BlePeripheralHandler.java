@@ -12,4 +12,6 @@ public interface BlePeripheralHandler {
 	
 	public void incomingMissive(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes);
 	
+	public void prepReadCharacteristic(String remoteAddress, UUID remoteCharUUID);
+	
 }

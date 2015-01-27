@@ -362,13 +362,35 @@ public class BleMessage {
 		
 	}
 
+	// make sure all the packets are there, and in the right order
+	public ArrayList<Integer> GetMissingPackets() {
+		
+		int seq = 0;
+		
+		ArrayList<Integer> l;
+		l = new ArrayList<Integer>();
+		
+		for (BlePacket b : messagePackets) {
+			if (seq != b.MessageSequence) {
+			
+				l.add(seq);
+				
+				seq++;
+			}
+			
+		}
+		
+		return l;
+	}
+	
 	// loop over all the BlePackets in the message - packet0 is the hash; write the rest to MessageBytes
 	private byte[] dePacketize() {
 		
 		ByteArrayOutputStream os = new ByteArrayOutputStream();
-		
+
 		// i'm still not necessarily writing these out in order!
         for (BlePacket b : messagePackets) {
+        	
         	//Log.v(TAG, "packet" + String.valueOf(i) + ", msgseq:" + String.valueOf(b.MessageSequence) + ":" + bytesToHex(b.MessageBytes));
         	if (b.MessageSequence == 0) {
         		MessageHash = Arrays.copyOfRange(b.MessageBytes, 2, b.MessageBytes.length);
@@ -380,7 +402,7 @@ public class BleMessage {
 					e.printStackTrace();
 				}
         	}
-
+        	
         }
 		
         return os.toByteArray(); 

@@ -71,7 +71,7 @@ public class BlePeripheral {
 		
 		// API 5.0
 		if (btAdptr.isMultipleAdvertisementSupported()) {
-			Log.v(TAG, "advertisement is SUPPORT on this chipset!");
+			Log.v(TAG, "advertisement is SUPPORTED on this chipset!");
 			btLeAdv = btAdptr.getBluetoothLeAdvertiser();
 		} else {
 			Log.v(TAG, "advertisement NOT supported on this chipset!");
@@ -463,6 +463,8 @@ public class BlePeripheral {
         	// get the characteristic that was affected
             BleGattCharacteristics myBGC = (BleGattCharacteristics) myBGCs.get(characteristic.getUuid());
 
+            myBGC.charHandler.prepReadCharacteristic(device.getAddress(), characteristic.getUuid());
+            
             if (characteristic.getValue() == null) {
 				Log.v(TAG, "can't respond to read request; characteristic value is null");	
 			} else {

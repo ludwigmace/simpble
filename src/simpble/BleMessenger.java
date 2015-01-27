@@ -98,6 +98,7 @@ public class BleMessenger {
 		serviceDef.add(new BleCharacteristic("identifier_read", uuidFromBase("100"), BleGattCharacteristics.GATT_READ));		
 		serviceDef.add(new BleCharacteristic("identifier_writes", uuidFromBase("101"), BleGattCharacteristics.GATT_WRITE));
 		serviceDef.add(new BleCharacteristic("data_notify", uuidFromBase("102"), BleGattCharacteristics.GATT_NOTIFY));
+		serviceDef.add(new BleCharacteristic("flow_control", uuidFromBase("105"), BleGattCharacteristics.GATT_READ));
 		//serviceDef.add(new BleCharacteristic("data_indicate", uuidFromBase("103"), MyAdvertiser.GATT_INDICATE));
 		//serviceDef.add(new BleCharacteristic("data_write", uuidFromBase("104"), MyAdvertiser.GATT_WRITE));
 
@@ -180,7 +181,7 @@ public class BleMessenger {
 
 	}
 	
-	/* this is called when in central mode */
+	// this is called when in central mode
 	private void writeOut(BlePeer peer) {
 		
 		// given a peer, get the first message in the queue to send out
@@ -248,13 +249,16 @@ public class BleMessenger {
 		
 		try {
 		
-			// have this pull from the service definition
+			/*
 			blePeripheral.addChar(BleGattCharacteristics.GATT_READ, uuidFromBase("100"), peripheralHandler);
 			blePeripheral.addChar(BleGattCharacteristics.GATT_WRITE, uuidFromBase("101"), peripheralHandler);
 			blePeripheral.addChar(BleGattCharacteristics.GATT_NOTIFY, uuidFromBase("102"), peripheralHandler);
+			*/
 			
-			//blePeripheral.updateCharValue(uuidFromBase("100"), new String(myIdentifier + "|" + myFriendlyName).getBytes());
-			//blePeripheral.updateCharValue(uuidFromBase("101"), new String("i'm listening").getBytes());
+			// pull from the service definition
+			for (BleCharacteristic c: serviceDef) {
+				blePeripheral.addChar(c.type, c.uuid, peripheralHandler);
+			}
 			
 			// advertising doesn't take much energy, so go ahead and do it
 			blePeripheral.advertiseNow();
@@ -473,6 +477,45 @@ public class BleMessenger {
 				bleStatusCallback.advertisingStarted();
 			} else {
 				bleStatusCallback.advertisingStopped();
+			}
+		}
+
+		@Override
+		public void prepReadCharacteristic(String remoteAddress, UUID remoteCharUUID) {
+			// figure out whom i'm talking to based on remoteAddress
+			// -- or do i even need to?  i can only have a single central at a time . . .
+			// -- perhaps though it's just more consistent to pretend as if i CAN have multiple
+			
+			// if somebody's hitting 105 they're gonna wanna know if their msg is sent or not
+			if (remoteCharUUID.toString().equalsIgnoreCase(uuidFromBase("105").toString())) {
+				BlePeer p = peerMap.get(remoteAddress);
+				
+				// iterate over all the messages we have
+				bleStatusCallback.headsUp("checking on " + String.valueOf(p.GetMessageIn().size()) + " messages we should have incoming");
+				for (int k: p.GetMessageIn().keySet()) {
+					BleMessage m = p.getBleMessageIn(k);
+
+					//see if we've got any missing packets
+					ArrayList<Integer> missing = m.GetMissingPackets();
+					
+					// create an array
+					byte[] missingPackets = new byte[missing.size()+1];
+					
+					// first byte will be message identifier
+					missingPackets[0] = Integer.valueOf(k).byteValue();
+					
+					// subsequent bytes are those that are missing!
+					int counter = 1;
+					for (Integer i: missing) {
+						missingPackets[counter] = i.byteValue();
+						counter++;
+					}
+					
+					// if we still need packets
+					if (missing != null) {
+						blePeripheral.updateCharValue(remoteCharUUID, missingPackets);
+					}
+				}
 			}
 		}
     	
