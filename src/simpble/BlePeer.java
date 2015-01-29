@@ -173,6 +173,22 @@ public class BlePeer {
 		return getBleMessageOut(min);
 	}
 	
+	public void RemoveBleMessage(int MessageIndex) {
+		// get the message based off the supplied index
+		BleMessage m = peerMessagesOut.get(MessageIndex);
+		
+		Log.v(TAG, "removing message " + String.valueOf(MessageIndex) + " b/c it was sent");
+		
+		// remove it
+		peerMessagesOut.remove(m);
+	
+	}
+
+	public void RemoveBleMessage(BleMessage m) {
+		// remove the sent message
+		peerMessagesOut.remove(m);
+	}
+	
 	
 	public void addBleMessageOut(BleMessage m) {
 		

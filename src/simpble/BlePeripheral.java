@@ -463,6 +463,7 @@ public class BlePeripheral {
         	// get the characteristic that was affected
             BleGattCharacteristics myBGC = (BleGattCharacteristics) myBGCs.get(characteristic.getUuid());
 
+            // prep the read characteristic for send
             myBGC.charHandler.prepReadCharacteristic(device.getAddress(), characteristic.getUuid());
             
             if (characteristic.getValue() == null) {

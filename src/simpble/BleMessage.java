@@ -8,9 +8,11 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.UUID;
 
 import android.util.Log;
+import android.util.SparseArray;
 
 import com.google.common.primitives.Bytes;
 
@@ -20,8 +22,8 @@ public class BleMessage {
 	private static final int MessagePacketSize = 20; 
 	
 	// holds all the packets that make up this message
-	private ArrayList<BlePacket> messagePackets;
-
+	private SparseArray<BlePacket> messagePackets;
+	
 	// hash of the payload of the message contents, which identifies the msg payload
 	private byte[] BleMsgDigest;
 	
@@ -54,7 +56,7 @@ public class BleMessage {
 
 	// initializes our list of BlePackets, current counter, and sent status
 	public BleMessage() {
-		messagePackets = new ArrayList<BlePacket>();
+		messagePackets = new SparseArray<BlePacket>();
 		currentPacketCounter = 0;
 		pendingPacketStatus = false;
 	}
@@ -65,7 +67,7 @@ public class BleMessage {
 	}
 	
 	// simply returns all the BlePackets that make up this message
-	public ArrayList<BlePacket> GetAllPackets() {
+	public SparseArray<BlePacket> GetAllPackets() {
 		return messagePackets;
 	}
 	
@@ -95,7 +97,7 @@ public class BleMessage {
 	
 	// create a BlePacket with a given sequence and payload, and add to our packets list
 	private void addPacket(int packetSequence, byte[] packetBytes) {
-		messagePackets.add(new BlePacket(packetSequence, packetBytes));
+		messagePackets.put(packetSequence, new BlePacket(packetSequence, packetBytes));
 	}
 
 	public String GetPayload() {
@@ -324,7 +326,7 @@ public class BleMessage {
 	 * @param messageSize
 	 */
 	public void BuildMessageFromPackets(int packetCounter, byte[] packetPayload, int messageSize) {
-		messagePackets = new ArrayList<BlePacket>();
+		messagePackets = new SparseArray<BlePacket>();
 		BlePacketCount = messageSize;
 		pendingPacketStatus = true;
 		BuildMessageFromPackets(packetCounter, packetPayload);
@@ -368,19 +370,30 @@ public class BleMessage {
 		int seq = 0;
 		
 		ArrayList<Integer> l;
-		l = new ArrayList<Integer>();
+		ArrayList<Integer> missing;
 		
-		for (BlePacket b : messagePackets) {
-			if (seq != b.MessageSequence) {
+		l = new ArrayList<Integer>();
+		missing = new ArrayList<Integer>();
+		
+		// add the message sequence for each packet in the msg packets into a list
+		// this will write these packets out in order
+		for (int i = 0; i < messagePackets.size(); i++) {
 			
-				l.add(seq);
-				
-				seq++;
+			// get the packet corresponding to the current index
+			BlePacket b = messagePackets.valueAt(i);
+			l.add(b.MessageSequence);
+		}
+
+		// search the list for every packet
+		for (int i = 0; i <= BlePacketCount; i++) {
+			if (!l.contains(i)) {
+				missing.add(i);
+				Log.v(TAG, "missing packet #" + String.valueOf(i));
 			}
-			
 		}
 		
-		return l;
+
+		return missing;
 	}
 	
 	// loop over all the BlePackets in the message - packet0 is the hash; write the rest to MessageBytes
@@ -388,10 +401,14 @@ public class BleMessage {
 		
 		ByteArrayOutputStream os = new ByteArrayOutputStream();
 
-		// i'm still not necessarily writing these out in order!
-        for (BlePacket b : messagePackets) {
+			
+		// this will write these packets out in order
+		for (int i = 0; i < messagePackets.size(); i++) {
+			
+			// get the packet corresponding to the current index
+			BlePacket b = messagePackets.valueAt(i);
         	
-        	//Log.v(TAG, "packet" + String.valueOf(i) + ", msgseq:" + String.valueOf(b.MessageSequence) + ":" + bytesToHex(b.MessageBytes));
+			//Log.v(TAG, "packet" + String.valueOf(i) + ", msgseq:" + String.valueOf(b.MessageSequence) + ":" + bytesToHex(b.MessageBytes));
         	if (b.MessageSequence == 0) {
         		MessageHash = Arrays.copyOfRange(b.MessageBytes, 2, b.MessageBytes.length);
         	} else {

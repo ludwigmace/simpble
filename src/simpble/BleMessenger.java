@@ -23,6 +23,7 @@ import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.os.Build;
 import android.util.Log;
+import android.util.SparseArray;
 import android.widget.Toast;
 
 public class BleMessenger {
@@ -180,8 +181,9 @@ public class BleMessenger {
 		}
 
 	}
+
 	
-	// this is called when in central mode
+	// this is called when in CENTRAL mode
 	private void writeOut(BlePeer peer) {
 		
 		// given a peer, get the first message in the queue to send out
@@ -197,11 +199,13 @@ public class BleMessenger {
 		// pull the remote address for this peer
 		String remoteAddress = fpNetMap.get(peer.GetFingerprint());
 		
-		// get an array list of all our packets
-		ArrayList<BlePacket> bps = b.GetAllPackets();
+		// get an array of all our packets
+		SparseArray<BlePacket> bps = b.GetAllPackets();
 		
 		// loop over all our packets to send
-		for (BlePacket p: bps) {
+		for (int i = 0; i < bps.size(); i++) {
+			
+			BlePacket p  = bps.valueAt(i);
 			
 			try {
 		
@@ -221,9 +225,11 @@ public class BleMessenger {
 			
 		}
 		
-		Log.v(TAG, "all pending packets sent");
-		bleStatusCallback.headsUp("all pending packets sent (hopefully)");
-		bleStatusCallback.messageSent(b.MessageHash, peer);
+		bleStatusCallback.headsUp("finishing trying to send packets; checking if sent");
+		bleCentral.submitCharacteristicReadRequest(remoteAddress, uuidFromBase("105"));
+		
+		// should only call this after we're sure the message was sent
+		//bleStatusCallback.messageSent(b.MessageHash, peer);
 		
 	}
 
@@ -289,11 +295,14 @@ public class BleMessenger {
 				return;
 			}
 	    	
-			// get an array list of all our packets
-			ArrayList<BlePacket> bps = b.GetAllPackets();
-	    	
+			// get an array of all our packets
+			SparseArray<BlePacket> bps = b.GetAllPackets();
+			
 			// loop over all our packets to send
-			for (BlePacket p: bps) {
+			for (int i = 0; i < bps.size(); i++) {
+				
+				BlePacket p  = bps.valueAt(i);
+
 				
 				try {
 					
@@ -417,6 +426,32 @@ public class BleMessenger {
 		
     }
     
+    public void checkSendStatus(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
+    	// get the remote peer based on the address
+    	BlePeer p = peerMap.get(remoteAddress);
+
+    	bleStatusCallback.headsUp("hearing back from " + remoteAddress + " about a message's status");
+    	// get the message ID to check on
+    	int msg_id = incomingBytes[0] & 0xFF;
+    	
+    	// how many missing packets?  if 0, we're all set; call it done
+    	int missing_packet_count = incomingBytes[1] & 0xFF;
+    	
+    	// if we're all done, mark this message sent
+    	if (missing_packet_count == 0) {
+    		bleStatusCallback.headsUp("all packets sent, removing msg " + String.valueOf(msg_id) + " from send queue") ;
+    		p.RemoveBleMessage(msg_id);
+    	} else {
+    		byte[] missingPackets = Arrays.copyOfRange(incomingBytes, 2, incomingBytes.length);
+    		
+    		bleStatusCallback.headsUp(String.valueOf(missingPackets.length) + " packets didn't make it");
+    		
+    		// we need to re-send
+    	}
+    	
+
+    }
+    
     
     BlePeripheralHandler peripheralHandler = new BlePeripheralHandler() {
     	
@@ -491,30 +526,39 @@ public class BleMessenger {
 				BlePeer p = peerMap.get(remoteAddress);
 				
 				// iterate over all the messages we have
-				bleStatusCallback.headsUp("checking on " + String.valueOf(p.GetMessageIn().size()) + " messages we should have incoming");
+				bleStatusCallback.headsUp("checking on " + String.valueOf(p.GetMessageIn().size()) + " message(s) we should have incoming");
+				
+				// loop over the inbound message numbers (even though we're only doing the first)
 				for (int k: p.GetMessageIn().keySet()) {
+					
+					// get the first message
 					BleMessage m = p.getBleMessageIn(k);
 
-					//see if we've got any missing packets
+					// see if we've got any missing packets
 					ArrayList<Integer> missing = m.GetMissingPackets();
 					
 					// create an array
-					byte[] missingPackets = new byte[missing.size()+1];
+					byte[] missingPackets = new byte[missing.size()+2];
 					
 					// first byte will be message identifier
 					missingPackets[0] = Integer.valueOf(k).byteValue();
 					
+					// second byte will be number of missing packets
+					missingPackets[1] = Integer.valueOf(missing.size()).byteValue();
+					
 					// subsequent bytes are those that are missing!
-					int counter = 1;
+					int counter = 2;
 					for (Integer i: missing) {
 						missingPackets[counter] = i.byteValue();
 						counter++;
 					}
 					
 					// if we still need packets
-					if (missing != null) {
-						blePeripheral.updateCharValue(remoteCharUUID, missingPackets);
-					}
+					blePeripheral.updateCharValue(remoteCharUUID, missingPackets);
+					
+					
+					// we're done checking this message
+					break;
 				}
 			}
 		}
@@ -526,7 +570,15 @@ public class BleMessenger {
     	
     	@Override
     	public void incomingMissive(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
-    		incomingMessage(remoteAddress, remoteCharUUID, incomingBytes);
+    		
+    		// if the UUID is 102, it's the notify
+    		if (remoteCharUUID.compareTo(uuidFromBase("102")) == 0) {
+    			incomingMessage(remoteAddress, remoteCharUUID, incomingBytes);    			
+    		} else if (remoteCharUUID.compareTo(uuidFromBase("105")) == 0) {
+    			checkSendStatus(remoteAddress, remoteCharUUID, incomingBytes);
+    		}
+    		
+    		
     		
     	}
     	
