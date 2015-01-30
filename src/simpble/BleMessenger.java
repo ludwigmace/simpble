@@ -187,9 +187,13 @@ public class BleMessenger {
 	private void writeOut(BlePeer peer) {
 		
 		// given a peer, get the first message in the queue to send out
-		BleMessage b = peer.getBleMessageOut();
+		BleMessage m = peer.getBleMessageOut();
 		
-		if (b == null) {
+		// the previous call allows us to get the current message
+		bleStatusCallback.headsUp("sending message: " + String.valueOf(peer.CurrentMessageIndex));
+		
+		// if no message found, there's a problem
+		if (m == null) {
 			Log.v(TAG, "cannot 'writeOut' - peer.getBleMessageOut returned null");
 			bleStatusCallback.headsUp("no message found for peer");
 			
@@ -199,8 +203,9 @@ public class BleMessenger {
 		// pull the remote address for this peer
 		String remoteAddress = fpNetMap.get(peer.GetFingerprint());
 		
-		// get an array of all our packets
-		SparseArray<BlePacket> bps = b.GetAllPackets();
+		
+		// get a sparsearray of the packets pending send for the message m
+		SparseArray<BlePacket> bps = m.GetPendingPackets();
 		
 		// loop over all our packets to send
 		for (int i = 0; i < bps.size(); i++) {
@@ -216,6 +221,9 @@ public class BleMessenger {
 	    		if (nextPacket != null) {
 	    			bleStatusCallback.headsUp("o:" + ByteUtilities.bytesToHexShort(nextPacket));
 		    		bleCentral.submitCharacteristicWriteRequest(remoteAddress, uuidFromBase("101"), nextPacket);
+		    		
+		    		// remove the packet from the list pending send
+		    		m.PacketSent(i);
 	    		}
 	    		
 			}  catch (Exception e) {
@@ -279,7 +287,7 @@ public class BleMessenger {
 		blePeripheral.advertiseOff();
 	}
 	
-	// this sends out when you're in peripheral mode
+	// this sends out when you're in PERIPHERAL mode
     private void sendOutgoing(String remote, UUID uuid) {
     	
     	// if we've got messages to send
@@ -298,6 +306,8 @@ public class BleMessenger {
 			// get an array of all our packets
 			SparseArray<BlePacket> bps = b.GetAllPackets();
 			
+			bleStatusCallback.headsUp("start sending packets for msg " + String.valueOf(CurrentParentMessage));
+			
 			// loop over all our packets to send
 			for (int i = 0; i < bps.size(); i++) {
 				
@@ -311,7 +321,7 @@ public class BleMessenger {
 					Log.v(TAG, "send write request via " + uuid.toString());
 					
 		    		if (nextPacket != null) {
-		    			bleStatusCallback.headsUp("o:" + ByteUtilities.bytesToHexShort(nextPacket));
+		    			//bleStatusCallback.headsUp("o:" + ByteUtilities.bytesToHexShort(nextPacket));
 
 		    			// update the value of this characteristic, which will send to subscribers
 				    	blePeripheral.updateCharValue(uuid, nextPacket);
@@ -429,10 +439,14 @@ public class BleMessenger {
     public void checkSendStatus(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
     	// get the remote peer based on the address
     	BlePeer p = peerMap.get(remoteAddress);
-
+    	
+    	
     	bleStatusCallback.headsUp("hearing back from " + remoteAddress + " about a message's status");
     	// get the message ID to check on
     	int msg_id = incomingBytes[0] & 0xFF;
+    	
+    	// pass in the message id?  it should be the same as if we didn't, because the message should never have been marked as being sent
+    	BleMessage m = p.getBleMessageOut(msg_id);
     	
     	// how many missing packets?  if 0, we're all set; call it done
     	int missing_packet_count = incomingBytes[1] & 0xFF;
@@ -442,11 +456,17 @@ public class BleMessenger {
     		bleStatusCallback.headsUp("all packets sent, removing msg " + String.valueOf(msg_id) + " from send queue") ;
     		p.RemoveBleMessage(msg_id);
     	} else {
+    		// read the missing packet numbers into an array
     		byte[] missingPackets = Arrays.copyOfRange(incomingBytes, 2, incomingBytes.length);
+    		bleStatusCallback.headsUp(String.valueOf(missingPackets.length) + " packet(s) didn't make it");
     		
-    		bleStatusCallback.headsUp(String.valueOf(missingPackets.length) + " packets didn't make it");
+    		for (byte b: missingPackets) {
+    			int missing_packet = b & 0xFF;
+    			m.PacketReQueue(missing_packet);
+    		}
     		
-    		// we need to re-send
+    		// flag these packets for re-send
+    		
     	}
     	
 
@@ -518,8 +538,7 @@ public class BleMessenger {
 		@Override
 		public void prepReadCharacteristic(String remoteAddress, UUID remoteCharUUID) {
 			// figure out whom i'm talking to based on remoteAddress
-			// -- or do i even need to?  i can only have a single central at a time . . .
-			// -- perhaps though it's just more consistent to pretend as if i CAN have multiple
+			// BT 4.1 allows multiple centrals (so i've read), so you need to keep remoteAddress
 			
 			// if somebody's hitting 105 they're gonna wanna know if their msg is sent or not
 			if (remoteCharUUID.toString().equalsIgnoreCase(uuidFromBase("105").toString())) {

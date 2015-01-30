@@ -24,6 +24,8 @@ public class BleMessage {
 	// holds all the packets that make up this message
 	private SparseArray<BlePacket> messagePackets;
 	
+	private SparseArray<BlePacket> pendingPackets;
+	
 	// hash of the payload of the message contents, which identifies the msg payload
 	private byte[] BleMsgDigest;
 	
@@ -66,9 +68,23 @@ public class BleMessage {
 		messageNumber = MessageNumber;
 	}
 	
-	// simply returns all the BlePackets that make up this message
+	// returns all the BlePackets that make up this message
 	public SparseArray<BlePacket> GetAllPackets() {
 		return messagePackets;
+	}
+	
+	//  returns all the pending BlePackets that make up this message
+	public SparseArray<BlePacket> GetPendingPackets() {
+		return pendingPackets;
+	}
+	
+	public void PacketSent(int i) {
+		pendingPackets.removeAt(i);
+	}
+	
+	public void PacketReQueue(int i) {
+		BlePacket p = messagePackets.get(i);
+		pendingPackets.put(i, p);
 	}
 	
 	// from our array of packets, return a particular packet
@@ -81,7 +97,7 @@ public class BleMessage {
 	public BlePacket GetPacket() {
 			
 		// as long as you've got packets to send, send them; if no more packets to send, send 0x00
-		if (currentPacketCounter <= messagePackets.size()-1) {
+		if (currentPacketCounter <= pendingPackets.size()-1) {
 			return GetPacket(currentPacketCounter++);
 		} else {
 			pendingPacketStatus = false;
@@ -287,6 +303,9 @@ public class BleMessage {
 	        msgSequence++;
 			
 		}
+		
+		// now that we've built up what all our packets are, clone these into a pending packets array
+		pendingPackets = messagePackets.clone();
 
 		// once we've built all the packets up, indicate we have packets pending send
 		pendingPacketStatus = true;
@@ -317,7 +336,7 @@ public class BleMessage {
 	
 	/**
 	 * Before calling BuildMessageFromPackets(int packetCounter, byte[] packetPayload), call this
-	 * while passing in messageSize.  This initializes our messagePackets ArrayList<BlePacket>,
+	 * while passing in messageSize.  This initializes our messagePackets SparseArray<BlePacket> (and pendingPackets),
 	 * sets BlePacketCount = messageSize, sets our flag for pendingPacketStatus=true, and then 
 	 * calls BuildMessageFromPackets(int packetCounter, byte[] packetPayload) to add the first BlePacket
 	 * 
@@ -366,8 +385,6 @@ public class BleMessage {
 
 	// make sure all the packets are there, and in the right order
 	public ArrayList<Integer> GetMissingPackets() {
-		
-		int seq = 0;
 		
 		ArrayList<Integer> l;
 		ArrayList<Integer> missing;
