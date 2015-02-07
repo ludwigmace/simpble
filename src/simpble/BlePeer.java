@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 import android.util.Log;
+import android.util.SparseArray;
 
 public class BlePeer {
 
@@ -32,7 +33,7 @@ public class BlePeer {
 	private Map<Integer, BleMessage> peerMessagesIn;
 	
 	// map of the BleMessages outgoing to this peer
-	private Map<Integer, BleMessage> peerMessagesOut;
+	private SparseArray<BleMessage> peerMessagesOut;
 	
 	// how this peer is currently connected (if at all?)
 	public String ConnectedAs;
@@ -50,7 +51,7 @@ public class BlePeer {
 		peerAddress = PeerAddress;
 		peerName="";
 		peerMessagesIn = new HashMap<Integer, BleMessage>();
-		peerMessagesOut = new HashMap<Integer, BleMessage>();
+		peerMessagesOut = new SparseArray<BleMessage>();
 		
 		ConnectedAs = "";
 		CurrentMessageIndex = 0;
@@ -100,7 +101,7 @@ public class BlePeer {
         return status;
 	}
 	
-	public Map<Integer, BleMessage> GetMessageOut() {
+	public SparseArray<BleMessage> GetMessageOut() {
 		return peerMessagesOut;
 	}
 	
@@ -159,56 +160,73 @@ public class BlePeer {
 	
 	public BleMessage getBleMessageOut(int MessageIdentifier) {
 		CurrentMessageIndex = MessageIdentifier;
+		
+		Log.v(TAG, "find message in peerMessagesOut at index " + String.valueOf(MessageIdentifier));
+		
+		for (int i = 0; i < peerMessagesOut.size(); i++) {
+			BleMessage m = peerMessagesOut.get(i);
+			
+			if (m != null) {
+				Log.v(TAG, "found message at index " + String.valueOf(i) + " with hash " + new String(m.MessageHash));
+			} else {
+				Log.v(TAG, "no message found at index " + String.valueOf(i));
+			}
+		}
+		
 		return peerMessagesOut.get(MessageIdentifier);
 	}
 	
 	public BleMessage getBleMessageOut() {
 		
-		// get the highest priority (0=highest) message to send out
-		int min = 0;
-		for (Integer i : peerMessagesOut.keySet()) {
-			if (i <= min ) {
-				min = i;
+		Log.v(TAG, "peerMessagesOut.size is " + String.valueOf(peerMessagesOut.size()));
+		
+		// get the highest priority (lowest index) message to send out
+		int i = 0;
+		
+		// get the min item in this SparseArray
+		for (i = 0; i < peerMessagesOut.size(); i++) {
+			if (peerMessagesOut.get(i) != null) {
+				break;
 			}
 		}
 		
-		Log.v(TAG, "getBleMessageOut #" + String.valueOf(min));
-		return getBleMessageOut(min);
+		Log.v(TAG, "getBleMessageOut #" + String.valueOf(i));
+		
+		return getBleMessageOut(i);
+
 	}
 	
 	public void RemoveBleMessage(int MessageIndex) {
-		// get the message based off the supplied index
-		BleMessage m = peerMessagesOut.get(MessageIndex);
+
+		// remove it
+		peerMessagesOut.delete(MessageIndex);
 		
 		Log.v(TAG, "removing message " + String.valueOf(MessageIndex) + " b/c it was sent");
-		
-		// remove it
-		peerMessagesOut.remove(m);
+
 	
 	}
 
 	public void RemoveBleMessage(BleMessage m) {
-		// remove the sent message
-		peerMessagesOut.remove(m);
+		
+		// loop over all our packets to send
+		for (int i = 0; i < peerMessagesOut.size(); i++) {
+			BleMessage bm  = peerMessagesOut.valueAt(i);
+			
+			if (bm.equals(m)) {
+				RemoveBleMessage(i);
+			}
+		}
+
 	}
 	
 	
 	public void addBleMessageOut(BleMessage m) {
+	
+		int messageidx = peerMessagesOut.size();
 		
-		// find the highest message number
-		int max = 0;
-		
-		if (peerMessagesOut.size() > 0) {
-				for (Integer i : peerMessagesOut.keySet()) {
-					if (max <= i ) {
-						max = i;
-					}
-				}
-				max++;
-		}
-		
-		Log.v(TAG, "add message to peerMessagesOut #" + String.valueOf(max));
-		peerMessagesOut.put(max, m);		
+		Log.v(TAG, "add message to peerMessagesOut #" + String.valueOf(messageidx));
+		peerMessagesOut.append(messageidx, m);
+			
 	}
 	
 	public void SetName(String PeerName) {

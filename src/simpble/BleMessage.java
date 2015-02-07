@@ -82,9 +82,30 @@ public class BleMessage {
 		pendingPackets.removeAt(i);
 	}
 	
-	public void PacketReQueue(int i) {
-		BlePacket p = messagePackets.get(i);
-		pendingPackets.put(i, p);
+	public boolean PacketReQueue(int i) {
+		
+		boolean success = true;
+		
+		BlePacket p = null;
+		
+		try {
+			p = messagePackets.get(i);
+		} catch (Exception x) {
+			success = false;
+			Log.v(TAG, "couldn't find an object at index " + String.valueOf(i) + " in messagePackets");
+		}
+		
+		if (success && p != null) {
+			try {
+				pendingPackets.put(i, p);
+			} catch (Exception x) {
+				Log.v(TAG, "couldn't add packet for index " + String.valueOf(i) + " into pendingPackets");
+				success = false;
+			}
+		}
+		
+		
+		return success;
 	}
 	
 	// from our array of packets, return a particular packet
@@ -114,6 +135,13 @@ public class BleMessage {
 	// create a BlePacket with a given sequence and payload, and add to our packets list
 	private void addPacket(int packetSequence, byte[] packetBytes) {
 		messagePackets.put(packetSequence, new BlePacket(packetSequence, packetBytes));
+		
+		// if the size of the sparsearray is >= the # of packets we're expecting then we've got the msg 
+		if (messagePackets.size() > BlePacketCount) {
+			pendingPacketStatus = false;
+		} else {
+			pendingPacketStatus = true;
+		}
 	}
 
 	public String GetPayload() {
@@ -324,10 +352,10 @@ public class BleMessage {
 	public void BuildMessageFromPackets(int packetCounter, byte[] packetPayload) {
 		this.addPacket(packetCounter, packetPayload);
 		
-		// if we've got all the packets for this message, set our pending packet flag to false
-		// this will need to be changed to account for missing packets, if we use NOTIFY to get our data, or non-reliable WRITEs
-		if (packetCounter >= BlePacketCount) {
-			pendingPacketStatus = false;
+		/* if we've got all the packets for this message,
+		 * set our pending packet flag to false (flag set in above addPacket method)
+		 */
+		if (!pendingPacketStatus) {
 			// now act on the fact this message has all its packets
 			unbundleMessage();
 		}

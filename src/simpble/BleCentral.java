@@ -205,12 +205,20 @@ public class BleCentral {
     	boolean charFound = false;
     	
     	BluetoothGatt gatt = gattS.get(remoteAddr);
-    	BluetoothGattCharacteristic readChar = gatt.getService(UUID.fromString(strSvcUuidBase)).getCharacteristic(uuidChar);
+    	BluetoothGattCharacteristic readChar = null;
+    	
+    	try {
+    		readChar = gatt.getService(UUID.fromString(strSvcUuidBase)).getCharacteristic(uuidChar);
+    	} catch (Exception e) {
+    		Log.v(TAG, "failed to get read characteristic from service for uuidChar " + uuidChar.toString());
+    	}
 
     	if (readChar != null) {
     		Log.v(TAG, "issuing read request:" + readChar.getUuid().toString());
     		gatt.readCharacteristic(readChar);
     		charFound = true;
+    	} else {
+    		
     	}
     	
     	return charFound;

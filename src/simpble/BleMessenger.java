@@ -117,9 +117,36 @@ public class BleMessenger {
 	 * Send all the messages to the passed in Peer
 	 * @param Peer
 	 */
-	public void sendMessagesToPeer(BlePeer Peer) {
-		bleStatusCallback.headsUp("sending messages meant for peer " + getFirstChars(Peer.GetFingerprint(), 20));
-		writeOut(Peer);
+	public void sendMessagesToPeer(String PeerFingerprint) {
+		BlePeer p = GetBlePeerByFingerprint(PeerFingerprint);
+		
+		if (p != null) {
+			bleStatusCallback.headsUp("sending messages meant for peer: " + PeerFingerprint);
+			writeOut(p);
+		} else {
+			bleStatusCallback.headsUp("can't locate a peer w/ fp: " + PeerFingerprint);
+		}
+	}
+	
+	public BlePeer GetBlePeerByAddress(String remoteAddress) {
+		
+		bleStatusCallback.headsUp("check peerMap for remote: " + remoteAddress);
+		
+		BlePeer p = peerMap.get(remoteAddress);
+		
+		return p;
+	}
+
+	public BlePeer GetBlePeerByFingerprint(String fingerprint) {
+		String remoteAddress = "";
+		
+		// look up the address for the fingerprint
+		remoteAddress = fpNetMap.get(fingerprint);
+		
+		bleStatusCallback.headsUp("found address: " + remoteAddress + " for fingerprint: " + fingerprint);
+		
+		// now call your normal function
+		return GetBlePeerByAddress(remoteAddress);
 	}
 	
 	private String getFirstChars(String str, int index) {
@@ -188,9 +215,9 @@ public class BleMessenger {
 		
 		// given a peer, get the first message in the queue to send out
 		BleMessage m = peer.getBleMessageOut();
+	
+		bleStatusCallback.headsUp("called from writeOut - GetMessageOut.size():" + String.valueOf(peer.GetMessageOut().size()));
 		
-		// the previous call allows us to get the current message
-		bleStatusCallback.headsUp("sending message: " + String.valueOf(peer.CurrentMessageIndex));
 		
 		// if no message found, there's a problem
 		if (m == null) {
@@ -198,6 +225,10 @@ public class BleMessenger {
 			bleStatusCallback.headsUp("no message found for peer");
 			
 			return;
+		} else {
+			// the previous call allows us to get the current message
+			bleStatusCallback.headsUp("sending message: " + String.valueOf(peer.CurrentMessageIndex));
+			
 		}
 		
 		// pull the remote address for this peer
@@ -285,6 +316,17 @@ public class BleMessenger {
 	
 	public void HideYourself() {
 		blePeripheral.advertiseOff();
+	}
+	
+    /**
+     * Adds a friend from the calling application to the list of peers that BleMessenger keeps an eye out for.  When you
+     * reference this particular peer in the future, use the method GetBlePeerByFingerprint() or GetBlePeerByRemoteAddress()
+     * 
+     * @param BlePeer instance of a BlePeer you want BleMessenger to keep an eye out for
+     * 
+     */
+	public void QueueUpFriend(BlePeer p) {
+		
 	}
 	
 	// this sends out when you're in PERIPHERAL mode
@@ -395,6 +437,8 @@ public class BleMessenger {
     		Log.v(TAG, "parent message packet total is:" + String.valueOf(parentMessagePacketTotal));
     		b.BuildMessageFromPackets(packetCounter, packetPayload, parentMessagePacketTotal);
     	} else {
+    		bleStatusCallback.headsUp("building msg with packet #" + String.valueOf(packetCounter));
+    		
     		// otherwise throw this packet payload into the message
     		b.BuildMessageFromPackets(packetCounter, packetPayload);	
     	}
@@ -438,38 +482,75 @@ public class BleMessenger {
     
     public void checkSendStatus(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
     	// get the remote peer based on the address
+    	bleStatusCallback.headsUp("hearing back from " + remoteAddress + " about a message's status");
+    	
     	BlePeer p = peerMap.get(remoteAddress);
     	
+    	bleStatusCallback.headsUp("this peer is: " + p.toString());
     	
-    	bleStatusCallback.headsUp("hearing back from " + remoteAddress + " about a message's status");
+    	for (String s: peerMap.keySet()) {
+    		bleStatusCallback.headsUp("peerMap key found: " + s);	
+    	}
+    	
+    	
     	// get the message ID to check on
     	int msg_id = incomingBytes[0] & 0xFF;
     	
     	// pass in the message id?  it should be the same as if we didn't, because the message should never have been marked as being sent
     	BleMessage m = p.getBleMessageOut(msg_id);
     	
-    	// how many missing packets?  if 0, we're all set; call it done
-    	int missing_packet_count = incomingBytes[1] & 0xFF;
+    	SparseArray<BleMessage> blms = p.GetMessageOut();
     	
-    	// if we're all done, mark this message sent
-    	if (missing_packet_count == 0) {
-    		bleStatusCallback.headsUp("all packets sent, removing msg " + String.valueOf(msg_id) + " from send queue") ;
-    		p.RemoveBleMessage(msg_id);
-    	} else {
-    		// read the missing packet numbers into an array
-    		byte[] missingPackets = Arrays.copyOfRange(incomingBytes, 2, incomingBytes.length);
-    		bleStatusCallback.headsUp(String.valueOf(missingPackets.length) + " packet(s) didn't make it");
+    	for (int i = 0; i < blms.size(); i++) {
+    		m = blms.get(i);
     		
-    		for (byte b: missingPackets) {
-    			int missing_packet = b & 0xFF;
-    			m.PacketReQueue(missing_packet);
+    		if (m != null) {
+    			bleStatusCallback.headsUp("bleMessage found at index " + String.valueOf(i));
+    		} else {
+    			bleStatusCallback.headsUp("no bleMessage found at index " + String.valueOf(i));
     		}
-    		
-    		// flag these packets for re-send
     		
     	}
     	
-
+    	
+    	if (m != null) {
+	    	
+	    	// how many missing packets?  if 0, we're all set; call it done
+	    	int missing_packet_count = incomingBytes[1] & 0xFF;
+	    	
+	    	// if we're all done, mark this message sent
+	    	if (missing_packet_count == 0) {
+	    		bleStatusCallback.headsUp("all packets sent, removing msg " + String.valueOf(msg_id) + " from send queue") ;
+	    		p.RemoveBleMessage(msg_id);
+	    		bleStatusCallback.headsUp("GetMessageOut.size():" + String.valueOf(p.GetMessageOut().size()));
+	    	} else {
+	    		// read the missing packet numbers into an array
+	    		byte[] missingPackets = Arrays.copyOfRange(incomingBytes, 2, incomingBytes.length);
+	    		bleStatusCallback.headsUp(String.valueOf(missingPackets.length) + " packet(s) didn't make it");
+	    		
+	    		for (byte b: missingPackets) {
+	    			int missing_packet = b & 0xFF;
+	    			bleStatusCallback.headsUp("re-queuing packet #" + String.valueOf(missing_packet));
+	    			try {
+	    				if (m.PacketReQueue(missing_packet)) {
+	    					bleStatusCallback.headsUp("packet re-queued");
+	    				} else {
+	    					bleStatusCallback.headsUp("packet not re-queued");
+	    				}
+	    			} catch (Exception x) {
+	    				bleStatusCallback.headsUp("error calling BleMessage.PacketRequeue(" + String.valueOf(missing_packet) + ")");
+	    				Log.v(TAG, x.getMessage());
+	    			}
+	    			
+	    		}
+	    		
+	    		// flag these packets for re-send
+	    		
+	    	}
+    	
+    	} else {
+    		bleStatusCallback.headsUp("p.getBleMessageOut(" + String.valueOf(msg_id) + ") doesn't pull up a blemessage");
+    	}
     }
     
     
@@ -501,7 +582,7 @@ public class BleMessenger {
 	    		BlePeer p = new BlePeer(device);
 	    		p.ConnectedAs = "peripheral";
 	    		peerMap.put(device, p);
-    		
+
     		}
     		
     	}

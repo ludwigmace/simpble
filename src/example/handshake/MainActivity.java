@@ -28,6 +28,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.util.Log;
+import android.util.SparseArray;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -41,8 +42,14 @@ public class MainActivity extends Activity {
 	private static final String TAG = "main";
 
 	BleMessenger bleMessenger;
+	
+	// maybe for these guys I should leave these inside of the BleMessenger class?
+	// because if I reference a BlePeer from here, I'm not hitting up the same memory address in BleMessenger 
+	
 	Map <String, BlePeer> bleFriends;  // folks whom i have previously connected to, or i have their id info
-	Map <String, BlePeer> bleFolks; // folks i'm connected to, or recently connected to, for this session of the program's memory
+	Map <String, BlePeer> bleFolks; // folks i have connected to for this session of the program's memory
+	
+	
 	String myFingerprint;
 	String myIdentifier;
 	
@@ -163,11 +170,13 @@ public class MainActivity extends Activity {
 		testBleMsg.RecipientFingerprint = ByteUtilities.hexToBytes(testFriendFP);
 		testBleMsg.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint); 
 		testBleMsg.setMessage(testMessage.getBytes());
-
-		// create our test peer, and add this message for them
+		
+		// don't make a peer here
 		BlePeer testPeer = new BlePeer(""); // constructor takes an address; since this goes
 		testPeer.addBleMessageOut(testBleMsg);
 		testPeer.SetFingerprint(testFriendFP);
+		
+		bleMessenger.QueueUpFriend(testPeer);
 		
 		bleFriends.put(testFriendFP, testPeer);
 		
@@ -389,13 +398,9 @@ public class MainActivity extends Activity {
 		logMessage("iterating over " + String.valueOf(bleFolks.keySet().size()) + " entries in our folks keyset");
 		
 		for (String fp : bleFolks.keySet()) {
-			BlePeer p = bleFriends.get(fp);
-			// if we found a friend, send a message
-			if (p != null) {
-				// send pending messages to this peer . . .
-				bleMessenger.sendMessagesToPeer(p);
-			}
-			
+			// send pending messages to this peer
+			logMessage("send messages to peer fp: " + fp);
+			bleMessenger.sendMessagesToPeer(fp);
 		}
 		
 	}
@@ -409,7 +414,7 @@ public class MainActivity extends Activity {
 	}
 	
 	public void handleButtonSendID(View view) {
-		Log.v(TAG, "Start Send ID to: " + ourMostRecentFriendsAddress);
+		Log.v(TAG, "Start Send ID to: " + ourMostRecentFriendsAddress);		
 		// now send some messages to this peer - we'll already have our Id message queued up
 		
 		// the other party should have been added to our friends list, bleFolks
@@ -419,7 +424,7 @@ public class MainActivity extends Activity {
 		// if we pull a friend from the next one in the list, send to that peer
 		if (p != null) {
 			logMessage("send to:" + ByteUtilities.bytesToHexShort(p.GetFingerprintBytes()));
-			bleMessenger.sendMessagesToPeer(p);
+			bleMessenger.sendMessagesToPeer(p.GetFingerprint());
 			
 		} else {
 			logMessage("can't get a bleFriend to send to");
