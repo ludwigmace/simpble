@@ -12,6 +12,8 @@ public interface BleStatusCallback {
 	
 	public void handleReceivedMessage(String recipientFingerprint, String senderFingerprint, byte[] payload, String msgType);
 
+	public void peerNotification(String peerIndex, String notification);
+	
 	public void advertisingStarted();
 	public void advertisingStopped();
 	

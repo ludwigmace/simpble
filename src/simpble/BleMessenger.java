@@ -56,12 +56,12 @@ public class BleMessenger {
     // keep a map of our messages for a connection session
     // also might end up being unnecessary
     private Map<Integer, BleMessage> bleMessageMap;
+
+    // peers to keep an eye out for
+    private Map<String, BlePeer> friendsFpMap;
     
     // allows us to look up peers by connected addresses
-    private Map<String, BlePeer> peerMap;
-    
-    // allows us to look up addresses based on fingerprint
-    private Map<String, String> fpNetMap;
+    public Map<String, BlePeer> peerMap;
     
     // our idmessage should stay the same, so save it in a global variable
     // allow to be set from calling functions
@@ -89,8 +89,7 @@ public class BleMessenger {
 		
 		// i need a place to put my found peers
 		peerMap = new HashMap<String, BlePeer>();
-	
-		fpNetMap = new HashMap<String, String>();
+		friendsFpMap = new HashMap<String, BlePeer>();
 		
 		// create your server for listening and your client for looking; Android can be both at the same time
 		blePeripheral = new BlePeripheral(uuidServiceBase, ctx, btAdptr, btMgr, peripheralHandler);
@@ -117,14 +116,15 @@ public class BleMessenger {
 	 * Send all the messages to the passed in Peer
 	 * @param Peer
 	 */
-	public void sendMessagesToPeer(String PeerFingerprint) {
-		BlePeer p = GetBlePeerByFingerprint(PeerFingerprint);
+	public void sendMessagesToPeer(String PeerAddress) {
+		//BlePeer p = GetBlePeerByFingerprint(PeerFingerprint);
+		BlePeer p = peerMap.get(PeerAddress);
 		
 		if (p != null) {
-			bleStatusCallback.headsUp("sending messages meant for peer: " + PeerFingerprint);
+			bleStatusCallback.headsUp("sending messages meant for peer: " + PeerAddress);
 			writeOut(p);
 		} else {
-			bleStatusCallback.headsUp("can't locate a peer w/ fp: " + PeerFingerprint);
+			bleStatusCallback.headsUp("can't locate a peer w/ fp: " + PeerAddress);
 		}
 	}
 	
@@ -216,8 +216,7 @@ public class BleMessenger {
 		// given a peer, get the first message in the queue to send out
 		BleMessage m = peer.getBleMessageOut();
 	
-		bleStatusCallback.headsUp("called from writeOut - GetMessageOut.size():" + String.valueOf(peer.GetMessageOut().size()));
-		
+		bleStatusCallback.headsUp("called from writeOut - GetMessageOut.size():" + String.valueOf(peer.GetMessageOut().size()));		
 		
 		// if no message found, there's a problem
 		if (m == null) {
@@ -325,7 +324,20 @@ public class BleMessenger {
      * @param BlePeer instance of a BlePeer you want BleMessenger to keep an eye out for
      * 
      */
-	public void QueueUpFriend(BlePeer p) {
+	public void PutMessageForFriend(String FriendFingerprint, BleMessage MessageToSend) {
+		
+		// try to get this peer by their fingerprint
+		BlePeer p = friendsFpMap.get(FriendFingerprint);
+		
+		// if this peer isn't found, then create him
+		if (p == null) {
+			p = new BlePeer("");
+			p.SetFingerprint(FriendFingerprint);
+			friendsFpMap.put(FriendFingerprint, p);
+		}
+		
+		// add the message
+		p.addBleMessageOut(MessageToSend);
 		
 	}
 	
@@ -403,7 +415,7 @@ public class BleMessenger {
 		int parentMessagePacketTotal = 0;
 		
 		//Log.v(TAG, "incoming hex bytes:" + ByteUtilities.bytesToHex(incomingBytes));
-		bleStatusCallback.headsUp("i:" + ByteUtilities.bytesToHexShort(incomingBytes));
+		//bleStatusCallback.headsUp("i:" + ByteUtilities.bytesToHexShort(incomingBytes));
 		
 		// if our msg is under a few bytes it can't be valid; return
     	if (incomingBytes.length < 5) {
@@ -449,7 +461,8 @@ public class BleMessenger {
     		
     		// if there's a fingerprint for the sender, handle this message (you should always have a sender fingerprint, else the message is malformed)
     		
-    		// add the sender's fingerprint to our map of senderfingerprint and remoteAddress - should this be elsewhere?
+    		// Add the sender's fingerprint to our map of senderfingerprint and remoteAddress
+    		// Should this be elsewhere?
     		if (b.SenderFingerprint != null) {
 	    		if (b.SenderFingerprint.length > 0) {
 	    			bleStatusCallback.headsUp("sender fp, handling msg");
@@ -461,7 +474,15 @@ public class BleMessenger {
 	    				bleStatusCallback.headsUp("shouldbe: " + ByteUtilities.bytesToHexShort(b.MessageHash));
 	    			}
 	    			
+	    			// this doesn't store pointers to peers; it's a dead simple mapping for lookups
 	    			fpNetMap.put(ByteUtilities.bytesToHex(b.SenderFingerprint), remoteAddress);
+	    			
+	    			// we don't want to overwrite the friend we put in earlier, but if it's not
+	    			// already in friendsFpMap then add
+	    			if (friendsFpMap.get(ByteUtilities.bytesToHex(b.SenderFingerprint)) == null) {
+	    				friendsFpMap.put(ByteUtilities.bytesToHex(b.SenderFingerprint), p);
+	    			}
+	    			
 	    			bleStatusCallback.handleReceivedMessage(ByteUtilities.bytesToHex(b.RecipientFingerprint), ByteUtilities.bytesToHex(b.SenderFingerprint), b.MessagePayload, b.MessageType);
 	    			
 	    		} else {
@@ -712,21 +733,18 @@ public class BleMessenger {
 		}
 		
 		@Override
-		public void parlayWithRemote(String remoteAddress) {
-			// so now we're connected  			// you don't want to subscribe YET
-			bleStatusCallback.headsUp("connected and ready to exchange w/ " + remoteAddress, "subscribe=" + remoteAddress);
+		public void connectedServiceGood(String remoteAddress) {
+			// so now we're connected; not going to do anything else yet
+			// so we literally have no info about this particular person
+			bleStatusCallback.headsUp("connected and ready to exchange w/ " + remoteAddress);
 			BlePeer p = peerMap.get(remoteAddress);
 			
+			// since we're parlaying, reset our timeout timer
 			p.MarkActive();
 			
-			// get the PuF?
-			// You can't do that unless you've already done the ID dance
+			bleStatusCallback.peerNotification(remoteAddress, "new_contract");
 			
-		    // look up peer by connected address
-			//BlePeer remoteGuy = peerMap.get(remoteAddress);
-		    
-
-			
+			// can't get the PuF because we haven't done the ID dance
 		}
 		
 		
@@ -746,6 +764,8 @@ public class BleMessenger {
 		// so at this point we should still be connected with our remote device
 		// and we wouldn't have gotten here if the remote device didn't meet our service spec
 
+		
+		// why am i adding this blank message to my messagemap?
 		// so now let's ask for identification information - SUBSEQUENTLY we may transfer other data
 		BleMessage b = new BleMessage();
 		

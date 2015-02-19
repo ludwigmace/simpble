@@ -136,7 +136,8 @@ public class BleMessage {
 	private void addPacket(int packetSequence, byte[] packetBytes) {
 		messagePackets.put(packetSequence, new BlePacket(packetSequence, packetBytes));
 		
-		// if the size of the sparsearray is >= the # of packets we're expecting then we've got the msg 
+		// if the size of the sparsearray is >= the # of packets we're expecting then we've got the msg
+		// we're going strictly off the number of packets here, and i'm not sure if that's the best way to go about this
 		if (messagePackets.size() > BlePacketCount) {
 			pendingPacketStatus = false;
 		} else {

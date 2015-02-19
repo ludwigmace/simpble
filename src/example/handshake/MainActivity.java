@@ -171,14 +171,13 @@ public class MainActivity extends Activity {
 		testBleMsg.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint); 
 		testBleMsg.setMessage(testMessage.getBytes());
 		
-		// don't make a peer here
-		BlePeer testPeer = new BlePeer(""); // constructor takes an address; since this goes
-		testPeer.addBleMessageOut(testBleMsg);
-		testPeer.SetFingerprint(testFriendFP);
-		
-		bleMessenger.QueueUpFriend(testPeer);
-		
-		bleFriends.put(testFriendFP, testPeer);
+		// don't make a peer here - make something else!
+		BlePeer testFriend = new BlePeer(""); // constructor takes an address; since this goes
+		testFriend.addBleMessageOut(testBleMsg);
+		testFriend.SetFingerprint(testFriendFP);
+			
+		// let's add this friend
+		bleFriends.put(testFriendFP, testFriend);
 		
 		if (myFingerprint != null) {
 			logMessage("our fp is:" + myFingerprint.substring(0, 20) + " . . .");
@@ -235,6 +234,17 @@ public class MainActivity extends Activity {
 		
 	BleStatusCallback bleMessageStatus = new BleStatusCallback() {
 
+		// we just got a notification
+		public void peerNotification(String peerIndex, String notification) {
+			
+			// this notification is that BleMessenger just found a peer that met the service contract
+			// 
+			if (notification.equalsIgnoreCase("new_contract")) {
+				 ourMostRecentFriendsAddress = peerIndex;
+				 runOnUiThread(new Runnable() { public void run() { btnGetId.setEnabled(true); } });
+			}
+		}
+		
 		// this is when all the packets have come in, and a message is received in its entirety (hopefully)
 		@Override
 		public void handleReceivedMessage(String recipientFingerprint, String senderFingerprint, byte[] payload, String msgType) {
@@ -253,7 +263,7 @@ public class MainActivity extends Activity {
 				} else if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
 					logMessage("msg intended for us");
 				} else {
-					// TODO: something
+					// TODO: what if it's being forwarded?
 				}
 				
 				// if the sender is in our friends list
@@ -370,22 +380,7 @@ public class MainActivity extends Activity {
 
 		@Override
 		public void headsUp(String msg, String action) {
-			logMessage(msg);
-			
-			// quick and dirty way to call actions passed from other object
-			String task = action.substring(0, action.indexOf("="));
-			String target = action.substring(action.indexOf("=")+1, action.length());
-			
-			Log.v(TAG, "task=" + task + ";target=" + target);
-			
-			if (task.equalsIgnoreCase("subscribe")) {
-				// now that we've got a target to subscribe to, enable our start Id button
-				 ourMostRecentFriendsAddress = target;
-				  
-				 // enable the Get Id button
-				runOnUiThread(new Runnable() { public void run() { btnGetId.setEnabled(true); } });
-			}
-			
+			logMessage(msg);			
 		}
 		
 		
@@ -395,9 +390,9 @@ public class MainActivity extends Activity {
 		Log.v(TAG, "Xfer Toggle Pressed");
 
 		// iterate over our currently connected folks and see if anybody needs a message we have
-		logMessage("iterating over " + String.valueOf(bleFolks.keySet().size()) + " entries in our folks keyset");
+		logMessage("iterating over " + String.valueOf(bleMessenger.peerMap.keySet().size()) + " connected peers");
 		
-		for (String fp : bleFolks.keySet()) {
+		for (String fp : bleMessenger.peerMap.keySet()) {
 			// send pending messages to this peer
 			logMessage("send messages to peer fp: " + fp);
 			bleMessenger.sendMessagesToPeer(fp);
@@ -408,7 +403,7 @@ public class MainActivity extends Activity {
 	public void handleButtonGetID(View view) {
 		Log.v(TAG, "Start Get ID");
 		
-		// right now this is a public method, but will end up being private
+		// should this be available for both central and peripheral, or just central?
 		bleMessenger.getPeripheralIdentifyingInfo(ourMostRecentFriendsAddress);
 		
 	}
@@ -419,13 +414,14 @@ public class MainActivity extends Activity {
 		
 		// the other party should have been added to our friends list, bleFolks
 		// just get one
-		BlePeer p = bleFolks.values().iterator().next();
+		String peerAddress = bleMessenger.peerMap.keySet().iterator().next();
+		BlePeer p = bleMessenger.peerMap.values().iterator().next();
 		
-		// if we pull a friend from the next one in the list, send to that peer
+		// we speak to bleMessenger in terms of addresses that it knows
 		if (p != null) {
-			logMessage("send to:" + ByteUtilities.bytesToHexShort(p.GetFingerprintBytes()));
-			bleMessenger.sendMessagesToPeer(p.GetFingerprint());
-			
+			//logMessage("send to:" + ByteUtilities.bytesToHexShort(p.GetFingerprintBytes()));
+			logMessage("send to address:" + peerAddress);
+			bleMessenger.sendMessagesToPeer(peerAddress);
 		} else {
 			logMessage("can't get a bleFriend to send to");
 		}

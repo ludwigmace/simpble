@@ -12,7 +12,7 @@ import android.bluetooth.BluetoothGattServer;
 public interface BleCentralHandler {
 	
 	public void intakeFoundDevices(ArrayList<BluetoothDevice> devices);
-	public void parlayWithRemote(String remoteAddress);
+	public void connectedServiceGood(String remoteAddress);
 	public void incomingMissive(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes);
 	public void reportDisconnect();
 	

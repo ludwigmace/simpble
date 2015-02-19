@@ -394,7 +394,7 @@ public class BleCentral {
         		if (bServiceGood) {
         			Log.v(TAG, "service definition found; stay connected");
         			//gattClientHandler.getFoundCharacteristics(gatt, s.getCharacteristics());
-        			gattClientHandler.parlayWithRemote(gatt.getDevice().getAddress());
+        			gattClientHandler.connectedServiceGood(gatt.getDevice().getAddress());
         			// initiate identification phase, and then data transfer phase!
         			
         		} else {
