@@ -101,7 +101,7 @@ public class BlePeer {
         return status;
 	}
 	
-	public SparseArray<BleMessage> GetMessageOut() {
+	public SparseArray<BleMessage> GetMessagesOut() {
 		return peerMessagesOut;
 	}
 	

@@ -238,16 +238,21 @@ public class MainActivity extends Activity {
 		public void peerNotification(String peerIndex, String notification) {
 			
 			// this notification is that BleMessenger just found a peer that met the service contract
-			// 
+			// this is where I need to add messages for this person?
 			if (notification.equalsIgnoreCase("new_contract")) {
 				 ourMostRecentFriendsAddress = peerIndex;
+				 
+				 // you don't have the fingerprint yet, you just know that this person meets the contract
 				 runOnUiThread(new Runnable() { public void run() { btnGetId.setEnabled(true); } });
 			}
+			
+			
 		}
 		
 		// this is when all the packets have come in, and a message is received in its entirety (hopefully)
+		// the secret sauce
 		@Override
-		public void handleReceivedMessage(String recipientFingerprint, String senderFingerprint, byte[] payload, String msgType) {
+		public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, String msgType) {
 
 			//Log.v(TAG, "received msg of type:"+ msgType);
 			logMessage("received msg of type:" + msgType);
@@ -266,30 +271,43 @@ public class MainActivity extends Activity {
 					// TODO: what if it's being forwarded?
 				}
 				
+				// since the incoming message is Identity, go ahead and queue up an identity message to send to them 
+				BleMessage idenM = identityMessage();
+				
+				if (idenM != null) {
+					bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(idenM);
+				}
+				
 				// if the sender is in our friends list
 				if (bleFriends.containsKey(senderFingerprint)) {
+					
+					// we know that we have this peer as a friend
+					// so now we can either get the message we have for this friend
+					// and add to the peer in the BleMessenger list,
+					// or we can pass in the peer object, overwriting what we have there
+					
+					// let's keep them separate, and pass it in
+					BleMessage m = bleFriends.get(senderFingerprint).getBleMessageOut();
+					
+					// if we've got a message, add it in
+					if (m != null) {
+						bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(m);
+					}
+					
 					logMessage("known peer: " + senderFingerprint.substring(0,20));
-
+					
 					
 					 // enable the Xfer button
 					runOnUiThread(new Runnable() { public void run() { btnXfer.setEnabled(true); } });
 					
-					// now send some messages to this peer - we'll already have our Id message queued up
-					//bleMessenger.sendMessagesToPeer(bleFolks.get(senderFingerprint));
+					// TODO: queue up any messages for this fingerprint
+					// and then send up queue requests using the address that's been passed in
 					
-					// pull our peer's info from our friends group, put in Folks (friends are forever, folks are around now)
-					bleFolks.put(senderFingerprint, bleFriends.get(senderFingerprint));
-				} else {
-					logMessage("new peer: " + senderFingerprint.substring(0,20));
-					
-					BlePeer b = new BlePeer("");
-					b.SetFingerprint(senderFingerprint);
-					b.addBleMessageOut(identityMessage());
 
-					bleFolks.put(senderFingerprint, b);
-					
-					//Log.v(TAG, "received msg from new friend, payload size:"+ String.valueOf(payload.length));
-					// we don't know the sender and should add them;
+				} else {
+					logMessage("this guy's FP isn't known to me: " + senderFingerprint.substring(0,20));
+										
+					// we don't know the sender and maybe should add them?
 					// parse the public key & friendly name out of the payload, and add this as a new person
 				}
 				
@@ -303,7 +321,7 @@ public class MainActivity extends Activity {
 				logMessage("received data msg of size:" + String.valueOf(payload.length));
 				
 				if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
-					logMessage("message is for us (as follows):");
+					logMessage("message is for us (as follows, next line):");
 					logMessage(new String(payload));
 				} else {
 					logMessage("message isn't for us");
@@ -392,10 +410,10 @@ public class MainActivity extends Activity {
 		// iterate over our currently connected folks and see if anybody needs a message we have
 		logMessage("iterating over " + String.valueOf(bleMessenger.peerMap.keySet().size()) + " connected peers");
 		
-		for (String fp : bleMessenger.peerMap.keySet()) {
+		for (String remoteAddress : bleMessenger.peerMap.keySet()) {
 			// send pending messages to this peer
-			logMessage("send messages to peer fp: " + fp);
-			bleMessenger.sendMessagesToPeer(fp);
+			logMessage("send messages to peer (remote address): " + remoteAddress);
+			bleMessenger.sendMessagesToPeer(remoteAddress);
 		}
 		
 	}

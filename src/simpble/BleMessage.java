@@ -127,6 +127,10 @@ public class BleMessage {
 		
 	}
 	
+	public void ClearPendingPackets() {
+		pendingPackets = new SparseArray<BlePacket>();
+	}
+	
 	// are there still packets left to send?
 	public boolean PendingPacketStatus() {
 		return pendingPacketStatus;
@@ -454,17 +458,25 @@ public class BleMessage {
 			// get the packet corresponding to the current index
 			BlePacket b = messagePackets.valueAt(i);
         	
-			//Log.v(TAG, "packet" + String.valueOf(i) + ", msgseq:" + String.valueOf(b.MessageSequence) + ":" + bytesToHex(b.MessageBytes));
-        	if (b.MessageSequence == 0) {
-        		MessageHash = Arrays.copyOfRange(b.MessageBytes, 2, b.MessageBytes.length);
-        	} else {
-        		try {
-					os.write(b.MessageBytes);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+			if (b != null ){
+				try {
+		        	if (b.MessageSequence == 0) {
+		        		MessageHash = Arrays.copyOfRange(b.MessageBytes, 2, b.MessageBytes.length);
+		        	} else {
+		        		try {
+							os.write(b.MessageBytes);
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+		        	}
+				} catch (Exception e) {
+					Log.v(TAG, "err:" + e.getMessage());
+					Log.v(TAG, "b.MessageSequence didn't return anything, or couldn't build MessageHash");
 				}
-        	}
+			} else {
+				Log.v(TAG, "no packet returned for messagePackets.valueAt(" + String.valueOf(i) + ")");
+			}
         	
         }
 		

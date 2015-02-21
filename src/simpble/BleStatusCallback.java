@@ -10,7 +10,7 @@ public interface BleStatusCallback {
 	
 	public void foundPeer(BlePeer blePeer);
 	
-	public void handleReceivedMessage(String recipientFingerprint, String senderFingerprint, byte[] payload, String msgType);
+	public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, String msgType);
 
 	public void peerNotification(String peerIndex, String notification);
 	
