@@ -36,6 +36,10 @@ public class BlePeer {
 	private SparseArray<BleMessage> peerMessagesOut;
 	
 	// how this peer is currently connected (if at all?)
+	
+	/**
+	 * How this peer is currently connected to you 
+	 */
 	public String ConnectedAs;
 	
 	public int CurrentMessageIndex;

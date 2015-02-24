@@ -123,7 +123,17 @@ public class BleMessenger {
 		if (p != null) {
 			if (p.PendingMessageCount() > 0) {
 				bleStatusCallback.headsUp("m: found " + String.valueOf(p.PendingMessageCount()) + " msgs for " + PeerAddress);
-				writeOut(PeerAddress);
+				
+				// is your peer connected as a peripheral or a central?
+				if (p.ConnectedAs.equalsIgnoreCase("peripheral")) {
+					// if they're a peripheral, you're a central, so send out as such
+					writeOut(PeerAddress);
+				} else if (p.ConnectedAs.equalsIgnoreCase("central")) {
+					// if they're a central, you're a peripheral, so send out as such
+					/* you'll need to know which attribute to write on
+					 * if you're hoping to use a notify characteristic, they'll need to be subscribed to it
+					*/ 
+				}
 			} else {
 				bleStatusCallback.headsUp("m: no more messages for peer: " + PeerAddress);
 			}
