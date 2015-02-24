@@ -230,6 +230,10 @@ public class BleMessage {
         
 	}
 	
+	public void setPayload(byte[] Payload) {
+		MessagePayload = Payload; 
+	}
+	
 	/**
 	 * Takes the message payload from the calling method and builds the list
 	 * of BlePackets
@@ -237,7 +241,7 @@ public class BleMessage {
 	 * @param Payload Body of the message you want to send in bytes
 	 * @param MessagePacketSize The size of the message packets
 	 */
-	public void setMessage(byte[] Payload) {
+	private void constructPackets() {
 
 		// for an id message:
 		// first byte, 0x01, indicates an identity message
@@ -255,10 +259,8 @@ public class BleMessage {
 			MsgType = new byte[]{(byte)(0x02)};
 		}
 		
-		MessagePayload = Payload;
-		
 		// Message Type, RFP, SFP, and payload
-		byte[] MessageBytes = Bytes.concat(MsgType, RecipientFingerprint, SenderFingerprint, Payload);
+		byte[] MessageBytes = Bytes.concat(MsgType, RecipientFingerprint, SenderFingerprint, MessagePayload);
 		
 		// clear the list of packets; we're building a new message using packets!
         messagePackets.clear();

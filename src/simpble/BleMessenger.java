@@ -241,7 +241,6 @@ public class BleMessenger {
 		} else {
 			// the previous call allows us to get the current message
 			bleStatusCallback.headsUp("m: sending message: " + String.valueOf(peer.CurrentMessageIndex));
-			
 		}
 		
 		// get a sparsearray of the packets pending send for the message m
@@ -252,7 +251,7 @@ public class BleMessenger {
 		// loop over all our packets to send
 		for (int i = 0; i < bps.size(); i++) {
 			
-			BlePacket p  = bps.valueAt(i);
+			BlePacket p = bps.valueAt(i);
 			
 			try {
 		
@@ -453,6 +452,7 @@ public class BleMessenger {
     	
     	// find the message we're building, identified by the first byte (cast to an integer 0-255)
     	// if this message wasn't already created, then the getBleMessageIn method will create it
+    	bleStatusCallback.headsUp("m: msg " + String.valueOf(parentMessage) + ", pckt " + String.valueOf(packetCounter));
     	BleMessage b = p.getBleMessageIn(parentMessage);
     	
     	// your packet payload will be the size of the incoming bytes less our 3 needed for the header (ref'd above)

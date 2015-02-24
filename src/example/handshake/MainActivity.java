@@ -169,10 +169,10 @@ public class MainActivity extends Activity {
 		testBleMsg.MessageType = "datatext";
 		testBleMsg.RecipientFingerprint = ByteUtilities.hexToBytes(testFriendFP);
 		testBleMsg.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint); 
-		testBleMsg.setMessage(testMessage.getBytes());
+		testBleMsg.setPayload(testMessage.getBytes());
 		
 		// don't make a peer here - make something else!
-		BlePeer testFriend = new BlePeer(""); // constructor takes an address; since this goes
+		BlePeer testFriend = new BlePeer(""); // constructor takes an address; may want to have BleFriends and BlePeers as different classes
 		testFriend.addBleMessageOut(testBleMsg);
 		testFriend.SetFingerprint(testFriendFP);
 			
@@ -459,7 +459,7 @@ public class MainActivity extends Activity {
 			m.RecipientFingerprint = new byte[20]; // blank recipient for Id message
 			
 			// since this is an identity message, the payload is my public key
-			m.setMessage(rsaKey.PublicKey());
+			m.setPayload(rsaKey.PublicKey());
 	
 			// now add this message as our identifier to BleMessenger to send upon any new connection
 			bleMessenger.idMessage = m;
@@ -597,7 +597,7 @@ public class MainActivity extends Activity {
 		m.SenderFingerprint = rsaKey.PuFingerprint();
 		m.RecipientFingerprint = new byte[20];
 		
-		m.setMessage(rsaKey.PublicKey());
+		m.setPayload(rsaKey.PublicKey());
 		
 		return m;
 	}

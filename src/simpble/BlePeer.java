@@ -178,7 +178,7 @@ public class BlePeer {
 			BleMessage m = peerMessagesOut.get(i);
 			
 			if (m != null) {
-				Log.v(TAG, "found message at index " + String.valueOf(i) + " with hash " + new String(m.MessageHash));
+				Log.v(TAG, "found message at index " + String.valueOf(i) + " with hash " + ByteUtilities.bytesToHex(m.MessageHash));
 			} else {
 				Log.v(TAG, "no message found at index " + String.valueOf(i));
 			}
@@ -235,7 +235,8 @@ public class BlePeer {
 	
 		int messageidx = peerMessagesOut.size();
 		
-		Log.v(TAG, "add message to peerMessagesOut #" + String.valueOf(messageidx));
+		Log.v(TAG, "added message #" + String.valueOf(messageidx) + " (" + ByteUtilities.bytesToHex(m.MessageHash) + "), peer " + this.toString());
+		m.SetMessageNumber(messageidx);
 		peerMessagesOut.append(messageidx, m);
 			
 	}
