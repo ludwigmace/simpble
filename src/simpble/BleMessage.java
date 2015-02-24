@@ -55,12 +55,15 @@ public class BleMessage {
 	
 	// body of message in bytes
 	public byte[] MessagePayload;
+	
+	public boolean ReceiptAcknowledged;
 
 	// initializes our list of BlePackets, current counter, and sent status
 	public BleMessage() {
 		messagePackets = new SparseArray<BlePacket>();
 		currentPacketCounter = 0;
 		pendingPacketStatus = false;
+		ReceiptAcknowledged = false;
 	}
 	
 	// allows calling program to set which number identifies this message

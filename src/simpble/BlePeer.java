@@ -105,6 +105,17 @@ public class BlePeer {
 		return peerMessagesOut;
 	}
 	
+	public int PendingMessageCount() {
+		int c = 0;
+		
+		for (int i = 0; i < peerMessagesOut.size(); i++) {
+			if (peerMessagesOut.valueAt(i) != null) {
+				c++;
+			}
+		}
+		return c;
+	}
+	
 	public Map<Integer, BleMessage> GetMessageIn() {
 		return peerMessagesIn;
 	}

@@ -121,16 +121,20 @@ public class BleMessenger {
 		BlePeer p = peerMap.get(PeerAddress);
 		
 		if (p != null) {
-			bleStatusCallback.headsUp("sending messages meant for peer: " + PeerAddress);
-			writeOut(PeerAddress);
+			if (p.PendingMessageCount() > 0) {
+				bleStatusCallback.headsUp("m: found " + String.valueOf(p.PendingMessageCount()) + " msgs for " + PeerAddress);
+				writeOut(PeerAddress);
+			} else {
+				bleStatusCallback.headsUp("m: no more messages for peer: " + PeerAddress);
+			}
 		} else {
-			bleStatusCallback.headsUp("can't locate a peer w/ fp: " + PeerAddress);
+			bleStatusCallback.headsUp("m: can't locate a peer w/ fp: " + PeerAddress);
 		}
 	}
 	
 	public BlePeer GetBlePeerByAddress(String remoteAddress) {
 		
-		bleStatusCallback.headsUp("check peerMap for remote: " + remoteAddress);
+		bleStatusCallback.headsUp("m: check peerMap for remote: " + remoteAddress);
 		
 		BlePeer p = peerMap.get(remoteAddress);
 		
@@ -150,7 +154,7 @@ public class BleMessenger {
 			}
 		}
 		
-		bleStatusCallback.headsUp("found address: " + remoteAddress + " for fingerprint: " + fingerprint);
+		bleStatusCallback.headsUp("m: found address: " + remoteAddress + " for fingerprint: " + fingerprint);
 		
 		// now call your normal function
 		return GetBlePeerByAddress(remoteAddress);
@@ -188,14 +192,14 @@ public class BleMessenger {
 	}
 	
 	private void checkForStaleConnections() {
-		//bleStatusCallback.headsUp("check for stale connection!");
+		//bleStatusCallback.headsUp("m: check for stale connection!");
 		// reset our stale-checker
 		setupStaleChecker(INACTIVE_TIMEOUT); // 1 minute
 		
 		// loop over peers and check for staleness!
 		for (Map.Entry<String, BlePeer> entry : peerMap.entrySet()) {
 			BlePeer p = entry.getValue();
-			bleStatusCallback.headsUp("is this guy current? connected as: " + p.ConnectedAs);
+			bleStatusCallback.headsUp("m: is this guy current? connected as: " + p.ConnectedAs);
 			
 			// right here it's easy to disconnect a particular peripheral if you're the central
 			// how to identify if the device you want to disconnect 
@@ -208,7 +212,7 @@ public class BleMessenger {
 					bleCentral.disconnectAddress(entry.getKey());
 				}
 				
-				bleStatusCallback.headsUp("closing stale connection");
+				bleStatusCallback.headsUp("m: closing stale connection");
 				peerMap.remove(entry.getKey()); // because we've disconnected, remove from our peerlist
 			}
 			
@@ -226,30 +230,29 @@ public class BleMessenger {
 		// given a peer, get the first message in the queue to send out
 		BleMessage m = peer.getBleMessageOut();
 	
-		bleStatusCallback.headsUp("(writeOut) - GetMessageOut.size():" + String.valueOf(peer.GetMessagesOut().size()));		
+		bleStatusCallback.headsUp("m: (writeOut) - pending msgs: " + String.valueOf(peer.PendingMessageCount()));		
 		
 		// if no message found, there's a problem
 		if (m == null) {
 			Log.v(TAG, "cannot 'writeOut' - peer.getBleMessageOut returned null");
-			bleStatusCallback.headsUp("(writeOut) no message found for peer");
+			bleStatusCallback.headsUp("m: (writeOut) no message found for peer");
 			
 			return;
 		} else {
 			// the previous call allows us to get the current message
-			bleStatusCallback.headsUp("sending message: " + String.valueOf(peer.CurrentMessageIndex));
+			bleStatusCallback.headsUp("m: sending message: " + String.valueOf(peer.CurrentMessageIndex));
 			
 		}
 		
 		// get a sparsearray of the packets pending send for the message m
 		SparseArray<BlePacket> bps = m.GetPendingPackets();
 		
-		bleStatusCallback.headsUp("# of pending packets: " + String.valueOf(bps.size()));
-		
+		bleStatusCallback.headsUp("m: # of pending packets: " + String.valueOf(bps.size()));
+		int sent = 0;
 		// loop over all our packets to send
 		for (int i = 0; i < bps.size(); i++) {
 			
 			BlePacket p  = bps.valueAt(i);
-			bleStatusCallback.headsUp("sending packet: " + String.valueOf(p.MessageSequence) + " w/ bps ctr: " + String.valueOf(i));
 			
 			try {
 		
@@ -258,21 +261,27 @@ public class BleMessenger {
 				Log.v(TAG, "send write request to " + peerAddress);
 				
 	    		if (nextPacket != null) {
-	    			bleStatusCallback.headsUp("o:" + ByteUtilities.bytesToHexShort(nextPacket));
+	    			//bleStatusCallback.headsUp("m: o:" + ByteUtilities.bytesToHexShort(nextPacket));
+	    			Thread.sleep(100);
 		    		bleCentral.submitCharacteristicWriteRequest(peerAddress, uuidFromBase("101"), nextPacket);
 	    		}
 	    		
 			}  catch (Exception e) {
     			Log.v(TAG, "packet send error: " + e.getMessage());
-    			bleStatusCallback.headsUp("packet send error");
+    			bleStatusCallback.headsUp("m: packet send error");
     		}
 			
+			sent = i;
 		}
+		
+		bleStatusCallback.headsUp("m: " + String.valueOf(sent+1) + " packets sent");
 		
 		m.ClearPendingPackets();
 		
 		
-		bleStatusCallback.headsUp("finishing trying to send packets; checking if sent");
+		// need to make sure I requeue all the packets if the other message doesn't know what happened
+		bleStatusCallback.headsUp("m: finished send; checking if rcvd");
+		
 		bleCentral.submitCharacteristicReadRequest(peerAddress, uuidFromBase("105"));
 		
 		// should only call this after we're sure the message was sent
@@ -361,7 +370,7 @@ public class BleMessenger {
 	    	
 			if (b == null) {
 				Log.v(TAG, "cannot 'sendOutgoing' - bleMessageMap.get(CurrentParentMessage) returned null");
-				bleStatusCallback.headsUp("(sendOutgoing) no message found for peer");
+				bleStatusCallback.headsUp("m: (sendOutgoing) no message found for peer");
 				
 				return;
 			}
@@ -369,7 +378,7 @@ public class BleMessenger {
 			// get an array of all our packets
 			SparseArray<BlePacket> bps = b.GetAllPackets();
 			
-			bleStatusCallback.headsUp("start sending packets for msg " + String.valueOf(CurrentParentMessage));
+			bleStatusCallback.headsUp("m: start sending packets for msg " + String.valueOf(CurrentParentMessage));
 			
 			// loop over all our packets to send
 			for (int i = 0; i < bps.size(); i++) {
@@ -384,7 +393,7 @@ public class BleMessenger {
 					Log.v(TAG, "send write request via " + uuid.toString());
 					
 		    		if (nextPacket != null) {
-		    			//bleStatusCallback.headsUp("o:" + ByteUtilities.bytesToHexShort(nextPacket));
+		    			//bleStatusCallback.headsUp("m: o:" + ByteUtilities.bytesToHexShort(nextPacket));
 
 		    			// update the value of this characteristic, which will send to subscribers
 				    	blePeripheral.updateCharValue(uuid, nextPacket);
@@ -392,14 +401,14 @@ public class BleMessenger {
 		    		
 				}  catch (Exception e) {
 	    			Log.v(TAG, "packet send error: " + e.getMessage());
-	    			bleStatusCallback.headsUp("packet send error");
+	    			bleStatusCallback.headsUp("m: packet send error");
 	    		}
 				
 			}
 			
 			bleMessageMap.remove(CurrentParentMessage);
 
-			bleStatusCallback.headsUp("message " + ByteUtilities.bytesToHex(b.MessageHash) + " sent, remove from map");
+			bleStatusCallback.headsUp("m: message " + ByteUtilities.bytesToHex(b.MessageHash) + " sent, remove from map");
 
 			/*
 			byte[] MsgType;
@@ -410,7 +419,7 @@ public class BleMessenger {
 				MsgType = new byte[]{(byte)(0x02)};
 			}
 			
-			bleStatusCallback.headsUp("message " + ByteUtilities.bytesToHex(MsgType) + ByteUtilities.bytesToHex(b.RecipientFingerprint) + ByteUtilities.bytesToHex(b.SenderFingerprint) + ByteUtilities.bytesToHex(b.MessagePayload) + " sent, remove from map");
+			bleStatusCallback.headsUp("m: message " + ByteUtilities.bytesToHex(MsgType) + ByteUtilities.bytesToHex(b.RecipientFingerprint) + ByteUtilities.bytesToHex(b.SenderFingerprint) + ByteUtilities.bytesToHex(b.MessagePayload) + " sent, remove from map");
 			*/
 	    	CurrentParentMessage++;
 	
@@ -424,7 +433,7 @@ public class BleMessenger {
 		int parentMessagePacketTotal = 0;
 		
 		//Log.v(TAG, "incoming hex bytes:" + ByteUtilities.bytesToHex(incomingBytes));
-		//bleStatusCallback.headsUp("i:" + ByteUtilities.bytesToHexShort(incomingBytes));
+		//bleStatusCallback.headsUp("m: i:" + ByteUtilities.bytesToHexShort(incomingBytes));
 		
 		// if our msg is under a few bytes it can't be valid; return
     	if (incomingBytes.length < 5) {
@@ -458,7 +467,7 @@ public class BleMessenger {
     		Log.v(TAG, "parent message packet total is:" + String.valueOf(parentMessagePacketTotal));
     		b.BuildMessageFromPackets(packetCounter, packetPayload, parentMessagePacketTotal);
     	} else {
-    		bleStatusCallback.headsUp("building msg with packet #" + String.valueOf(packetCounter));
+    		//bleStatusCallback.headsUp("m: building msg with packet #" + String.valueOf(packetCounter));
     		
     		// otherwise throw this packet payload into the message
     		b.BuildMessageFromPackets(packetCounter, packetPayload);	
@@ -466,7 +475,7 @@ public class BleMessenger {
     	
     	// if this particular message is done; ie, is it still pending packets?
     	if (b.PendingPacketStatus() == false) {
-    		bleStatusCallback.headsUp("pending packet status now false");
+    		bleStatusCallback.headsUp("m: pending packet status now false, all packets rcvd");
     		
     		// if there's a fingerprint for the sender, handle this message (you should always have a sender fingerprint, else the message is malformed)
     		
@@ -474,13 +483,13 @@ public class BleMessenger {
     		// Should this be elsewhere?
     		if (b.SenderFingerprint != null) {
 	    		if (b.SenderFingerprint.length > 0) {
-	    			bleStatusCallback.headsUp("sender fp, handling msg");
+	    			bleStatusCallback.headsUp("m: sender has fp, handling msg");
 	    			
 	    			if (b.checkHash()) {
-	    				bleStatusCallback.headsUp("hash good");
+	    				bleStatusCallback.headsUp("m: hash good");
 	    			} else {
-	    				bleStatusCallback.headsUp("hash bad: " + b.GetCalcHash());
-	    				bleStatusCallback.headsUp("shouldbe: " + ByteUtilities.bytesToHexShort(b.MessageHash));
+	    				bleStatusCallback.headsUp("m: hash bad: " + b.GetCalcHash());
+	    				bleStatusCallback.headsUp("m: shouldbe: " + ByteUtilities.bytesToHexShort(b.MessageHash));
 	    			}
 	    			
 	    			// we don't want to overwrite the friend we put in earlier, but if it's not
@@ -492,10 +501,10 @@ public class BleMessenger {
 	    			bleStatusCallback.handleReceivedMessage(remoteAddress, ByteUtilities.bytesToHex(b.RecipientFingerprint), ByteUtilities.bytesToHex(b.SenderFingerprint), b.MessagePayload, b.MessageType);
 	    			
 	    		} else {
-	    			bleStatusCallback.headsUp("msg error: SenderFingerprint.length=0");	
+	    			bleStatusCallback.headsUp("m: msg error: SenderFingerprint.length=0");	
 	    		}
     		} else {
-    			bleStatusCallback.headsUp("msg error: SenderFingerprint NULL");
+    			bleStatusCallback.headsUp("m: msg error: SenderFingerprint NULL");
     		}
     		
     		// check message integrity here?
@@ -509,76 +518,76 @@ public class BleMessenger {
     
     public void checkSendStatus(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
     	// get the remote peer based on the address
-    	bleStatusCallback.headsUp("hearing back from " + remoteAddress + " about a message's status");
+    	//bleStatusCallback.headsUp("m: hearing back from " + remoteAddress + " about a message's status");
     	
     	BlePeer p = peerMap.get(remoteAddress);
     	
-    	bleStatusCallback.headsUp("this peer is: " + p.toString());
-    	
-    	for (String s: peerMap.keySet()) {
-    		bleStatusCallback.headsUp("peerMap key found: " + s);	
+    	if (p==null) {
+    		bleStatusCallback.headsUp("m: no peer found for address " + remoteAddress);
+    		return;
     	}
     	
+    	/*
+    	for (String s: peerMap.keySet()) {
+    		bleStatusCallback.headsUp("m: peerMap key found: " + s);	
+    	}*/
     	
     	// get the message ID to check on
     	int msg_id = incomingBytes[0] & 0xFF;
     	
-    	// pass in the message id?  it should be the same as if we didn't, because the message should never have been marked as being sent
-    	BleMessage m = p.getBleMessageOut(msg_id);
+    	bleStatusCallback.headsUp("m: hearing from " + remoteAddress + " re msg#" + String.valueOf(msg_id));
     	
+    	// instantiate a message object
+    	BleMessage m = null;
+    	
+    	// get all the outbound messages in an array
     	SparseArray<BleMessage> blms = p.GetMessagesOut();
     	
-    	for (int i = 0; i < blms.size(); i++) {
-    		m = blms.get(i);
-    		
-    		if (m != null) {
-    			bleStatusCallback.headsUp("bleMessage found at index " + String.valueOf(i));
-    		} else {
-    			bleStatusCallback.headsUp("no bleMessage found at index " + String.valueOf(i));
-    		}
-    		
-    	}
+    	// get the message corresponding to this msgid
+    	m = blms.get(msg_id);
     	
-    	
-    	if (m != null) {
-	    	
-	    	// how many missing packets?  if 0, we're all set; call it done
+    	bleStatusCallback.headsUp("m: msg currently has " + String.valueOf(m.GetPendingPackets().size()) + " packets to send");
+
+		if (m != null) {
+			bleStatusCallback.headsUp("m: bleMessage found at index " + String.valueOf(msg_id));
+
+			// how many missing packets?  if 0, we're all set; call it done
 	    	int missing_packet_count = incomingBytes[1] & 0xFF;
 	    	
 	    	// if we're all done, mark this message sent
 	    	if (missing_packet_count == 0) {
-	    		bleStatusCallback.headsUp("all packets sent, removing msg " + String.valueOf(msg_id) + " from send queue") ;
+	    		bleStatusCallback.headsUp("m: all sent, removing msg " + String.valueOf(msg_id) + " from queue") ;
 	    		p.RemoveBleMessage(msg_id);
-	    		bleStatusCallback.headsUp("GetMessageOut.size():" + String.valueOf(p.GetMessagesOut().size()));
+	    		//bleStatusCallback.headsUp("m: GetMessageOut.size():" + String.valueOf(p.GetMessagesOut().size()));
 	    	} else {
 	    		// read the missing packet numbers into an array
 	    		byte[] missingPackets = Arrays.copyOfRange(incomingBytes, 2, incomingBytes.length);
-	    		bleStatusCallback.headsUp(String.valueOf(missingPackets.length) + " packet(s) didn't make it");
+	    		bleStatusCallback.headsUp("m: " + String.valueOf(missingPackets.length) + " packet(s) didn't make it");
 	    		
 	    		for (byte b: missingPackets) {
 	    			int missing_packet = b & 0xFF;
-	    			bleStatusCallback.headsUp("re-queuing packet #" + String.valueOf(missing_packet));
+	    			bleStatusCallback.headsUp("m: re-queuing packet #" + String.valueOf(missing_packet));
 	    			try {
 	    				if (m.PacketReQueue(missing_packet)) {
-	    					bleStatusCallback.headsUp("packet re-queued");
+	    					bleStatusCallback.headsUp("m: packet re-queued");
 	    				} else {
-	    					bleStatusCallback.headsUp("packet not re-queued");
+	    					bleStatusCallback.headsUp("m: packet not re-queued");
 	    				}
 	    			} catch (Exception x) {
-	    				bleStatusCallback.headsUp("error calling BleMessage.PacketRequeue(" + String.valueOf(missing_packet) + ")");
+	    				bleStatusCallback.headsUp("m: error calling BleMessage.PacketRequeue(" + String.valueOf(missing_packet) + ")");
 	    				Log.v(TAG, x.getMessage());
 	    			}
 	    			
 	    		}
 	    		
-	    		bleStatusCallback.headsUp("message now has " + String.valueOf(m.GetPendingPackets().size()) + " packets to send");
+	    		bleStatusCallback.headsUp("m: message now has " + String.valueOf(m.GetPendingPackets().size()) + " packets to send");
 	    		
 	    		// flag these packets for re-send
 	    		
 	    	}
     	
     	} else {
-    		bleStatusCallback.headsUp("p.getBleMessageOut(" + String.valueOf(msg_id) + ") doesn't pull up a blemessage");
+    		bleStatusCallback.headsUp("m: p.getBleMessageOut(" + String.valueOf(msg_id) + ") doesn't pull up a blemessage");
     	}
     }
     
@@ -605,7 +614,7 @@ public class BleMessenger {
 	    		
 	    		Log.v(TAG, "id message added to connection's message map");
 	    		
-	    		bleStatusCallback.headsUp("accepted connection from a central");
+	    		bleStatusCallback.headsUp("m: accepted connection from a central");
 	    		
 	    		 // create a new peer to hold messages and such for this network device
 	    		BlePeer p = new BlePeer(device);
@@ -629,7 +638,7 @@ public class BleMessenger {
     		Log.v(TAG, "from handleNotifyRequest, initiate sending messages");
     		
     		// we've got a notify request, so let's reset this peer's inactivity timeout
-    		bleStatusCallback.headsUp("notify request from " + device + "; reset timeout");
+    		bleStatusCallback.headsUp("m: notify request from " + device + "; reset timeout");
     		BlePeer p = peerMap.get(device);
     		p.MarkActive();
     		
@@ -648,14 +657,16 @@ public class BleMessenger {
 		@Override
 		public void prepReadCharacteristic(String remoteAddress, UUID remoteCharUUID) {
 			// figure out whom i'm talking to based on remoteAddress
-			// BT 4.1 allows multiple centrals (so i've read), so you need to keep remoteAddress
+			// BT 4.1 allows multiple centrals, so you need to keep remoteAddress to tell which one
 			
 			// if somebody's hitting 105 they're gonna wanna know if their msg is sent or not
 			if (remoteCharUUID.toString().equalsIgnoreCase(uuidFromBase("105").toString())) {
+				
+				// get the peer who just asked us if we have any incomplete messages
 				BlePeer p = peerMap.get(remoteAddress);
 				
 				// iterate over all the messages we have
-				bleStatusCallback.headsUp("checking on " + String.valueOf(p.GetMessageIn().size()) + " message(s) we should have incoming");
+				bleStatusCallback.headsUp("m: checking " + String.valueOf(p.GetMessageIn().size()) + " message(s) from this peer");
 				
 				// loop over the inbound message numbers (even though we're only doing the first)
 				for (int k: p.GetMessageIn().keySet()) {
@@ -663,31 +674,44 @@ public class BleMessenger {
 					// get the first message
 					BleMessage m = p.getBleMessageIn(k);
 
-					// see if we've got any missing packets
-					ArrayList<Integer> missing = m.GetMissingPackets();
-					
-					// create an array
-					byte[] missingPackets = new byte[missing.size()+2];
-					
-					// first byte will be message identifier
-					missingPackets[0] = Integer.valueOf(k).byteValue();
-					
-					// second byte will be number of missing packets
-					missingPackets[1] = Integer.valueOf(missing.size()).byteValue();
-					
-					// subsequent bytes are those that are missing!
-					int counter = 2;
-					for (Integer i: missing) {
-						missingPackets[counter] = i.byteValue();
-						counter++;
+					if (!m.ReceiptAcknowledged) {
+						// see if we've got any missing packets
+						ArrayList<Integer> missing = m.GetMissingPackets();
+						
+						// create an array
+						byte[] missingPackets = new byte[missing.size()+2];
+						
+						// first byte will be message identifier
+						missingPackets[0] = Integer.valueOf(k).byteValue();
+						
+						// second byte will be number of missing packets
+						missingPackets[1] = Integer.valueOf(missing.size()).byteValue();
+						
+						bleStatusCallback.headsUp("m: msg #" + String.valueOf(k) + " lacks " + String.valueOf(missing.size()) + " packets");
+						
+						// subsequent bytes are those that are missing!
+						int counter = 2;
+						for (Integer i: missing) {
+							missingPackets[counter] = i.byteValue();
+							counter++;
+						}
+						
+						// if we still need packets
+						blePeripheral.updateCharValue(remoteCharUUID, missingPackets);
+						
+						// should we do this here - to support one message going to multiple folks,
+						// you may want to have a different array/map to check
+						// however we could presribe this to be for only single-destination messages
+						
+						if (missing.size() == 0) { 
+							m.ReceiptAcknowledged = true;
+						}
+						
+						break;
+					} else {
+						bleStatusCallback.headsUp("m: msg " + String.valueOf(k) + " has already been ack'd");
 					}
-					
-					// if we still need packets
-					blePeripheral.updateCharValue(remoteCharUUID, missingPackets);
-					
-					
-					// we're done checking this message
-					break;
+
 				}
 			}
 		}
@@ -711,7 +735,7 @@ public class BleMessenger {
     	
 		@Override
 		public void intakeFoundDevices(ArrayList<BluetoothDevice> devices) {
-			bleStatusCallback.headsUp("stopped scanning");
+			bleStatusCallback.headsUp("m: stopped scanning");
 			// loop over all the found devices
 			// add them 
 			for (BluetoothDevice b: devices) {
@@ -728,7 +752,7 @@ public class BleMessenger {
 				}
 				
 				// this could possibly be moved into an exterior loop
-				bleStatusCallback.headsUp("connecting to " + peerAddress);
+				bleStatusCallback.headsUp("m: connecting to " + peerAddress);
 				
 				// initiate a connection to the remote address, which checks to see if it's a valid peer
 				// if it's not, then you won't be connected
@@ -742,7 +766,7 @@ public class BleMessenger {
 		public void connectedServiceGood(String remoteAddress) {
 			// so now we're connected; not going to do anything else yet
 			// so we literally have no info about this particular person
-			bleStatusCallback.headsUp("connected and ready to exchange w/ " + remoteAddress);
+			bleStatusCallback.headsUp("m: connected and ready to exchange w/ " + remoteAddress);
 			BlePeer p = peerMap.get(remoteAddress);
 			
 			// since we're parlaying, reset our timeout timer
@@ -781,7 +805,7 @@ public class BleMessenger {
 
 		// pass our remote address and desired uuid to our gattclient
 		// who will look up the gatt object and uuid and issue the read request
-		bleStatusCallback.headsUp("subscribing to 102 on " + remoteAddress);
+		bleStatusCallback.headsUp("m: subscribing to 102 on " + remoteAddress);
 		bleCentral.submitSubscription(remoteAddress, uuidFromBase("102"));
 
 		// we should be expecting data on 102 now

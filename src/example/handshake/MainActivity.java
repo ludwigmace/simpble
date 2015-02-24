@@ -180,10 +180,10 @@ public class MainActivity extends Activity {
 		bleFriends.put(testFriendFP, testFriend);
 		
 		if (myFingerprint != null) {
-			logMessage("our fp is:" + myFingerprint.substring(0, 20) + " . . .");
+			logMessage("a: our fp is:" + myFingerprint.substring(0, 20) + " . . .");
 			Log.v(TAG, "our fp:" + myFingerprint);
 		} else {
-			logMessage("global myFingerprint is null");
+			logMessage("a: global myFingerprint is null");
 		}
 		
 	}
@@ -255,8 +255,7 @@ public class MainActivity extends Activity {
 		public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, String msgType) {
 
 			//Log.v(TAG, "received msg of type:"+ msgType);
-			logMessage("received msg of type:" + msgType);
-			logMessage("msg intended for " + recipientFingerprint);
+			logMessage("a: msg type " + msgType + " intended for " + recipientFingerprint.substring(0, 10) + "...");
 			
 			// this is an identity message so handle it as such
 			if (msgType.equalsIgnoreCase("identity")) {
@@ -264,9 +263,9 @@ public class MainActivity extends Activity {
 								
 				if (recipientFingerprint.length() == 0) {
 					// there is no recipient; this is just an identifying message
-					logMessage("no particular recipient for this msg");
+					logMessage("a: no particular recipient for this msg");
 				} else if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
-					logMessage("msg intended for us");
+					logMessage("a: msg intended for us");
 				} else {
 					// TODO: what if it's being forwarded?
 				}
@@ -294,7 +293,7 @@ public class MainActivity extends Activity {
 						bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(m);
 					}
 					
-					logMessage("known peer: " + senderFingerprint.substring(0,20));
+					logMessage("a: known peer: " + senderFingerprint.substring(0,20));
 					
 					
 					 // enable the Xfer button
@@ -305,7 +304,7 @@ public class MainActivity extends Activity {
 					
 
 				} else {
-					logMessage("this guy's FP isn't known to me: " + senderFingerprint.substring(0,20));
+					logMessage("a: this guy's FP isn't known to me: " + senderFingerprint.substring(0,20));
 										
 					// we don't know the sender and maybe should add them?
 					// parse the public key & friendly name out of the payload, and add this as a new person
@@ -318,13 +317,13 @@ public class MainActivity extends Activity {
 				
 				
 			} else {
-				logMessage("received data msg of size:" + String.valueOf(payload.length));
+				logMessage("a: received data msg of size:" + String.valueOf(payload.length));
 				
 				if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
-					logMessage("message is for us (as follows, next line):");
+					logMessage("a: message is for us (as follows, next line):");
 					logMessage(new String(payload));
 				} else {
-					logMessage("message isn't for us");
+					logMessage("a: message isn't for us");
 				}
 				
 				Log.v(TAG, "received data msg, payload size:"+ String.valueOf(payload.length));
@@ -334,7 +333,7 @@ public class MainActivity extends Activity {
 		
 		@Override
 		public void messageSent(byte[] MessageHash, BlePeer blePeer) {
-			logMessage("message sent to " + blePeer.GetFingerprint().substring(0,20));
+			logMessage("a: message sent to " + blePeer.GetFingerprint().substring(0,20));
 			
 			// maybe add re-check of sending next message on UI thread?
 		}
@@ -360,7 +359,7 @@ public class MainActivity extends Activity {
 
 		@Override
 		public void advertisingStarted() {
-			logMessage("advertising started");
+			logMessage("a: advertising started");
 			
 			runOnUiThread(new Runnable() {
 				  public void run() {
@@ -373,7 +372,7 @@ public class MainActivity extends Activity {
 
 		@Override
 		public void advertisingStopped() {
-			logMessage("advertising stopped");
+			logMessage("a: advertising stopped");
 			
 			runOnUiThread(new Runnable() {
 				  public void run() {
@@ -408,11 +407,10 @@ public class MainActivity extends Activity {
 		Log.v(TAG, "Xfer Toggle Pressed");
 
 		// iterate over our currently connected folks and see if anybody needs a message we have
-		logMessage("iterating over " + String.valueOf(bleMessenger.peerMap.keySet().size()) + " connected peers");
+		logMessage("a: iterating over " + String.valueOf(bleMessenger.peerMap.keySet().size()) + " connected peers");
 		
 		for (String remoteAddress : bleMessenger.peerMap.keySet()) {
 			// send pending messages to this peer
-			logMessage("send messages to peer (remote address): " + remoteAddress);
 			bleMessenger.sendMessagesToPeer(remoteAddress);
 		}
 		
@@ -437,11 +435,11 @@ public class MainActivity extends Activity {
 		
 		// we speak to bleMessenger in terms of addresses that it knows
 		if (p != null) {
-			//logMessage("send to:" + ByteUtilities.bytesToHexShort(p.GetFingerprintBytes()));
-			logMessage("send to address:" + peerAddress);
+			//logMessage("a: send to:" + ByteUtilities.bytesToHexShort(p.GetFingerprintBytes()));
+			logMessage("a: send to address:" + peerAddress);
 			bleMessenger.sendMessagesToPeer(peerAddress);
 		} else {
-			logMessage("can't get a bleFriend to send to");
+			logMessage("a: can't get a bleFriend to send to");
 		}
 	}
     
@@ -550,7 +548,7 @@ public class MainActivity extends Activity {
     }
     
 	public void handleButtonFindAFriend(View view) {
-		logMessage("look around");
+		logMessage("a: look around");
 
 		// calls back bleMessageStatus when peers are found
 		bleMessenger.ShowFound();
