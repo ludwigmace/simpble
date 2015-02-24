@@ -38,7 +38,7 @@ public class BlePeer {
 	// how this peer is currently connected (if at all?)
 	
 	/**
-	 * How this peer is currently connected to you 
+	 * How your are currently connected to your peer 
 	 */
 	public String ConnectedAs;
 	
