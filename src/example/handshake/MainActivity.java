@@ -47,9 +47,7 @@ public class MainActivity extends Activity {
 	// maybe for these guys I should leave these inside of the BleMessenger class?
 	// because if I reference a BlePeer from here, I'm not hitting up the same memory address in BleMessenger 
 	
-	Map <String, BlePeer> bleFriends;  // folks whom i have previously connected to, or i have their id info
-	Map <String, BlePeer> bleFolks; // folks i have connected to for this session of the program's memory
-	
+	Map <String, BlePeer> bleFriends;  // folks whom i have previously connected to, or i have their id info	
 	
 	String myFingerprint;
 	String myIdentifier;
@@ -158,17 +156,31 @@ public class MainActivity extends Activity {
 		if (myFingerprint.equalsIgnoreCase("BC966C8DB89F0EBB91C82C97E561DF631DB96DC3")) {
 			testMessage = "i'm a nexus 5 and i love you SO MUCHCHCHCHCH - it's creepy";
 			testFriendFP = "D6DB868F6260FB74ADFE6E340288E77FCA3BA9E5";
+			
+			mDbHelper.createFriend("gnex", testFriendFP);
+			
 		} else if (myFingerprint.equalsIgnoreCase("D6DB868F6260FB74ADFE6E340288E77FCA3BA9E5")) {
 			testMessage = "i'm a GNEX and i'm tolerant of your existence";
 			testFriendFP = "BC966C8DB89F0EBB91C82C97E561DF631DB96DC3";
+			
+			mDbHelper.createFriend("nex5", testFriendFP);
+			
 		} else {
 			Log.v(TAG, "myFingerprint matches nothing!!!!");
 		}
-		 		
-		// generate message of particular byte size
-		//byte[] bytesMessage = benchGenerateMessage(45);
-
-		bleFolks = new HashMap<String, BlePeer>();
+		
+		mFriendsCursor = mDbHelper.fetchAllFriends();
+		
+		while (mFriendsCursor.moveToNext()) {
+			String friend_name = mFriendsCursor.getString(mFriendsCursor.getColumnIndex("friend_name"));
+			String friend_fp = mFriendsCursor.getString(mFriendsCursor.getColumnIndex("friend_fp"));
+			
+			logMessage("a: friend " + friend_name + " w/ fp " + friend_fp);
+		}
+		
+		mFriendsCursor.close();
+		
+		
 		bleFriends = new HashMap<String, BlePeer>();
 
 		// create the test message, identified as being sent by me
@@ -194,11 +206,7 @@ public class MainActivity extends Activity {
 		}
 		
 	}
-	
-	private void scaffoldFriends() {
 		
-	}
-	
 	private void SetUpBle() {
 		if (btAdptr != null) {
 			if (btAdptr.isEnabled()) {
@@ -460,14 +468,12 @@ public class MainActivity extends Activity {
 		Log.v(TAG, "Start Send ID to: " + ourMostRecentFriendsAddress);		
 		// now send some messages to this peer - we'll already have our Id message queued up
 		
-		// the other party should have been added to our friends list, bleFolks
 		// just get one
 		String peerAddress = bleMessenger.peerMap.keySet().iterator().next();
 		BlePeer p = bleMessenger.peerMap.values().iterator().next();
 		
 		// we speak to bleMessenger in terms of addresses that it knows
 		if (p != null) {
-			//logMessage("a: send to:" + ByteUtilities.bytesToHexShort(p.GetFingerprintBytes()));
 			logMessage("a: send to address:" + peerAddress);
 			bleMessenger.sendMessagesToPeer(peerAddress);
 		} else {
