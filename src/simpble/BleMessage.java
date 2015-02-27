@@ -74,6 +74,11 @@ public class BleMessage {
 		constructPackets();
 	}
 	
+	// get the message sequence number
+	public int GetMessageNumber() {
+		return messageNumber;
+	}
+	
 	// returns all the BlePackets that make up this message
 	public SparseArray<BlePacket> GetAllPackets() {
 		return messagePackets;

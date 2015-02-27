@@ -235,13 +235,15 @@ public class BlePeer {
 	}
 	
 	
-	public void addBleMessageOut(BleMessage m) {
+	public String addBleMessageOut(BleMessage m) {
 	
 		int messageidx = peerMessagesOut.size();
 		
 		Log.v(TAG, "added message #" + String.valueOf(messageidx) + " (" + ByteUtilities.bytesToHex(m.MessageHash) + "), peer " + this.toString());
 		m.SetMessageNumber(messageidx);
 		peerMessagesOut.append(messageidx, m);
+		
+		return ByteUtilities.bytesToHexShort(m.MessageHash);
 			
 	}
 	

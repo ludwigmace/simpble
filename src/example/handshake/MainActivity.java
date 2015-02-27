@@ -238,9 +238,30 @@ public class MainActivity extends Activity {
 		public void peerNotification(String peerIndex, String notification) {
 			
 			// this notification is that BleMessenger just found a peer that met the service contract
-			// this is where I need to add messages for this person?
+			// only central mode gets this
 			if (notification.equalsIgnoreCase("new_contract")) {
 				 ourMostRecentFriendsAddress = peerIndex;
+				 
+				BleMessage idenM = identityMessage();
+				String queuedMsg = "";
+				if (idenM != null) {
+					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM);
+					logMessage("a: queued " + queuedMsg + " for " + peerIndex);
+				}
+				 
+				 // you don't have the fingerprint yet, you just know that this person meets the contract
+				 runOnUiThread(new Runnable() { public void run() { btnGetId.setEnabled(true); } });
+			}
+			
+			// only peripheral mode gets this
+			if (notification.equalsIgnoreCase("accepted_connection")) {
+				// since i've just accepted a connection, queue up an identity message 
+				BleMessage idenM = identityMessage();
+				String queuedMsg = "";
+				if (idenM != null) {
+					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM);
+					logMessage("a: queued " + queuedMsg + " for " + peerIndex);
+				} 
 				 
 				 // you don't have the fingerprint yet, you just know that this person meets the contract
 				 runOnUiThread(new Runnable() { public void run() { btnGetId.setEnabled(true); } });
@@ -270,12 +291,13 @@ public class MainActivity extends Activity {
 					// TODO: what if it's being forwarded?
 				}
 				
-				// since the incoming message is Identity, go ahead and queue up an identity message to send to them 
+				/*
 				BleMessage idenM = identityMessage();
 				
 				if (idenM != null) {
 					bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(idenM);
 				}
+				*/
 				
 				// if the sender is in our friends list
 				if (bleFriends.containsKey(senderFingerprint)) {
@@ -289,12 +311,14 @@ public class MainActivity extends Activity {
 					BleMessage m = bleFriends.get(senderFingerprint).getBleMessageOut();
 					
 					// if we've got a message, add it in
-					if (m != null) {
-						bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(m);
-					}
-					
 					logMessage("a: known peer: " + senderFingerprint.substring(0,20));
 					
+					String queuedMsg = "";
+					if (m != null) {
+						queuedMsg = bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(m);
+						logMessage("a: queued " + queuedMsg + " for " + remoteAddress);
+						
+					}
 					
 					 // enable the Xfer button
 					runOnUiThread(new Runnable() { public void run() { btnXfer.setEnabled(true); } });
@@ -451,7 +475,7 @@ public class MainActivity extends Activity {
 		if (!visible) {
 			Log.v(TAG, "Not currently visible, begin stuff");
 
-			
+			/*
 			BleMessage m = new BleMessage();
 			
 			m.MessageType = "identity";
@@ -463,7 +487,7 @@ public class MainActivity extends Activity {
 	
 			// now add this message as our identifier to BleMessenger to send upon any new connection
 			bleMessenger.idMessage = m;
-			
+			*/
 			if (bleMessenger.BeFound()) {
 				Log.v(TAG, "advertising supported");
 			} else {

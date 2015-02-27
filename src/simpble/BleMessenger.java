@@ -28,7 +28,7 @@ import android.widget.Toast;
 
 public class BleMessenger {
 	private static String TAG = "blemessenger";
-	private static int INACTIVE_TIMEOUT = 120000; // 2 minute timeout
+	private static int INACTIVE_TIMEOUT = 600000; // 5 minute timeout
 	
 	private Timer longTimer;
 	
@@ -48,14 +48,6 @@ public class BleMessenger {
     
     // callback for handling events from BleCentral and BlePeripheral
     private BleStatusCallback bleStatusCallback;
-    
-    // index of the current BleMessage that we're sending from peripheral mode
-    // this may end up being unnecessary
-    private int CurrentParentMessage;
-
-    // keep a map of our messages for a connection session
-    // also might end up being unnecessary
-    private Map<Integer, BleMessage> bleMessageMap;
 
     // peers to keep an eye out for
     private Map<String, BlePeer> friendsFpMap;
@@ -103,9 +95,7 @@ public class BleMessenger {
 		//serviceDef.add(new BleCharacteristic("data_write", uuidFromBase("104"), MyAdvertiser.GATT_WRITE));
 
 		bleCentral.setRequiredServiceDef(serviceDef);
-		
-		bleMessageMap = new HashMap<Integer, BleMessage>();
-		
+
 		setupStaleChecker(INACTIVE_TIMEOUT);  // setup timeout
 		
 	
@@ -133,8 +123,11 @@ public class BleMessenger {
 					// if you're a peripheral send as such
 					/* you'll need to know which attribute to write on
 					 * if you're hoping to use a notify characteristic, they'll need to be subscribed to it
-					*/ 
-					bleStatusCallback.headsUp("m: sorry, you're a peripheral and can't initiate a send right now ...");	
+					*/
+					// how to tell if this peer is subscribed?
+					bleStatusCallback.headsUp("m: begin peripheral send to " + PeerAddress);
+					sendOutgoing(PeerAddress, uuidFromBase("102"));
+					
 				}
 			} else {
 				bleStatusCallback.headsUp("m: no more messages for peer: " + PeerAddress);
@@ -373,71 +366,61 @@ public class BleMessenger {
 	// this sends out when you're in PERIPHERAL mode
     private void sendOutgoing(String remote, UUID uuid) {
     	
-    	// if we've got messages to send
-    	if (bleMessageMap.size() > 0) {
+		// look up the peer by their address (aka index)
+		BlePeer peer = peerMap.get(remote);
+		
+		// given a peer, get the first message in the queue to send out
+		BleMessage m = peer.getBleMessageOut();
     	
-    		// get the current message to send
-	    	BleMessage b = bleMessageMap.get(CurrentParentMessage);
-	    	
-			if (b == null) {
-				Log.v(TAG, "cannot 'sendOutgoing' - bleMessageMap.get(CurrentParentMessage) returned null");
-				bleStatusCallback.headsUp("m: (sendOutgoing) no message found for peer");
-				
-				return;
-			}
-	    	
-			// get an array of all our packets
-			SparseArray<BlePacket> bps = b.GetAllPackets();
+		bleStatusCallback.headsUp("m: (sendOutgoing) - pending msgs: " + String.valueOf(peer.PendingMessageCount()));		
+		
+		// if no message found, there's a problem
+		if (m == null) {
+			Log.v(TAG, "cannot 'sendOutgoing' - peer.getBleMessageOut returned null");
+			bleStatusCallback.headsUp("m: (sendOutgoing) no message found for peer");
 			
-			bleStatusCallback.headsUp("m: start sending packets for msg " + String.valueOf(CurrentParentMessage));
+			return;
+		} else {
+			// the previous call allows us to get the current message
+			bleStatusCallback.headsUp("m: sending message: " + String.valueOf(peer.CurrentMessageIndex));
+		}
+		
+		// get a sparsearray of the packets pending send for the message m
+		SparseArray<BlePacket> bps = m.GetPendingPackets();
 			
-			// loop over all our packets to send
-			for (int i = 0; i < bps.size(); i++) {
+		bleStatusCallback.headsUp("m: # of pending packets: " + String.valueOf(bps.size()));
+		int sent = 0;
+		int i = 0;
+			
+		// loop over all our packets to send
+		for (i = 0; i < bps.size(); i++) {
 				
-				BlePacket p  = bps.valueAt(i);
-
+			BlePacket p  = bps.valueAt(i);
 				
-				try {
+			try {
 					
-					byte[] nextPacket = p.MessageBytes;
+				byte[] nextPacket = p.MessageBytes;
 					
-					Log.v(TAG, "send write request via " + uuid.toString());
-					
-		    		if (nextPacket != null) {
-		    			//bleStatusCallback.headsUp("m: o:" + ByteUtilities.bytesToHexShort(nextPacket));
-
-		    			// update the value of this characteristic, which will send to subscribers
-				    	blePeripheral.updateCharValue(uuid, nextPacket);
-		    		}
-		    		
-				}  catch (Exception e) {
-	    			Log.v(TAG, "packet send error: " + e.getMessage());
-	    			bleStatusCallback.headsUp("m: packet send error");
+	    		if (nextPacket != null) {
+	    			// update the value of this characteristic, which will send to subscribers
+			    	blePeripheral.updateCharValue(uuid, nextPacket);
 	    		}
+		    		
+			}  catch (Exception e) {
+    			Log.v(TAG, "packet send error: " + e.getMessage());
+    			bleStatusCallback.headsUp("m: (sendOutgoing) packet send error");
+    		}
 				
-			}
-			
-			bleMessageMap.remove(CurrentParentMessage);
-
-			bleStatusCallback.headsUp("m: message " + ByteUtilities.bytesToHex(b.MessageHash) + " sent, remove from map");
-
-			/*
-			byte[] MsgType;
-			
-			if (b.MessageType == "identity") {
-				MsgType = new byte[]{(byte)(0x01)};
-			} else {
-				MsgType = new byte[]{(byte)(0x02)};
-			}
-			
-			bleStatusCallback.headsUp("m: message " + ByteUtilities.bytesToHex(MsgType) + ByteUtilities.bytesToHex(b.RecipientFingerprint) + ByteUtilities.bytesToHex(b.SenderFingerprint) + ByteUtilities.bytesToHex(b.MessagePayload) + " sent, remove from map");
-			*/
-	    	CurrentParentMessage++;
+		}
 	
-	    	
-    	}
-    	// TODO: consider when to disconnect
-    	
+		sent = i;
+		
+		bleStatusCallback.headsUp("m: " + String.valueOf(sent) + " packets sent");
+		
+		m.ClearPendingPackets();
+		
+		peer.RemoveBleMessage(m.GetMessageNumber());
+		    	
     }
 
     private void incomingMessage(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
@@ -611,27 +594,19 @@ public class BleMessenger {
     		
     		// if connected
     		if (newStatus == 2) {
-    		
-	    		// create/reset our message map for our connection
-	    		bleMessageMap =  new HashMap<Integer, BleMessage>();
-	    		
-	    		// this global "CurrentParentMessage" thing only works when sending in peripheral mode
-	    		CurrentParentMessage = 0;
-	    		
-	    		// the message itself needs to know what its sequence is when sent to recipient
-	    		idMessage.SetMessageNumber(CurrentParentMessage);
-	    		
-	    		// add our id message to this message map
-	    		bleMessageMap.put(0, idMessage);
-	    		
-	    		Log.v(TAG, "id message added to connection's message map");
+    			
+	    		Log.v(TAG, "add id message to connection's message map");
 	    		
 	    		bleStatusCallback.headsUp("m: accepted connection from a central");
 	    		
 	    		 // create a new peer to hold messages and such for this network device
 	    		BlePeer p = new BlePeer(device);
 	    		p.ConnectedAs = "peripheral";
+	    		
 	    		peerMap.put(device, p);
+	    		
+	    		// let the calling activity know we've been connected to by a dude
+	    		bleStatusCallback.peerNotification(device, "accepted_connection");
 
     		}
     		
@@ -803,22 +778,22 @@ public class BleMessenger {
     // this function probably won't be called directly
 	public void getPeripheralIdentifyingInfo(String remoteAddress) {
 		
-		// so at this point we should still be connected with our remote device
-		// and we wouldn't have gotten here if the remote device didn't meet our service spec
-
+		BlePeer p = peerMap.get(remoteAddress);
 		
-		// why am i adding this blank message to my messagemap?
-		// so now let's ask for identification information - SUBSEQUENTLY we may transfer other data
-		BleMessage b = new BleMessage();
+		if (p.ConnectedAs.equalsIgnoreCase("central")) {
 		
-		// add this new message to our message map
-		// ONLY WORKS FOR ONE CONNECTED PERIPHERAL; need to make per remoteAddress
-		bleMessageMap.put(0, b);
-
-		// pass our remote address and desired uuid to our gattclient
-		// who will look up the gatt object and uuid and issue the read request
-		bleStatusCallback.headsUp("m: subscribing to 102 on " + remoteAddress);
-		bleCentral.submitSubscription(remoteAddress, uuidFromBase("102"));
+			// so at this point we should still be connected with our remote device
+			// and we wouldn't have gotten here if the remote device didn't meet our service spec
+	
+			
+	
+			// pass our remote address and desired uuid to our gattclient
+			// who will look up the gatt object and uuid and issue the read request
+			bleStatusCallback.headsUp("m: subscribing to 102 on " + remoteAddress);
+			bleCentral.submitSubscription(remoteAddress, uuidFromBase("102"));
+		} else {
+			bleStatusCallback.headsUp("m: you're not connected as a central");	
+		}
 
 		// we should be expecting data on 102 now
 		
