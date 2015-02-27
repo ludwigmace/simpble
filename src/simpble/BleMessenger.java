@@ -126,7 +126,8 @@ public class BleMessenger {
 					*/
 					// how to tell if this peer is subscribed?
 					bleStatusCallback.headsUp("m: begin peripheral send to " + PeerAddress);
-					sendOutgoing(PeerAddress, uuidFromBase("102"));
+
+					writeOut(PeerAddress);
 					
 				}
 			} else {
@@ -199,7 +200,7 @@ public class BleMessenger {
 	private void checkForStaleConnections() {
 		//bleStatusCallback.headsUp("m: check for stale connection!");
 		// reset our stale-checker
-		setupStaleChecker(INACTIVE_TIMEOUT); // 1 minute
+		setupStaleChecker(INACTIVE_TIMEOUT);
 		
 		// loop over peers and check for staleness!
 		for (Map.Entry<String, BlePeer> entry : peerMap.entrySet()) {
@@ -225,9 +226,14 @@ public class BleMessenger {
 
 	}
 
-	
-	// this is called when in CENTRAL mode
 	private void writeOut(String peerAddress) {
+		UUID uuid = uuidFromBase("102");
+		writeOut(peerAddress, uuid);
+	}
+	
+	
+	private void writeOut(String peerAddress, UUID uuid) {
+
 		
 		// look up the peer by their address (aka index)
 		BlePeer peer = peerMap.get(peerAddress);
@@ -253,8 +259,10 @@ public class BleMessenger {
 		
 		bleStatusCallback.headsUp("m: # of pending packets: " + String.valueOf(bps.size()));
 		int sent = 0;
+		int i = 0;
+		
 		// loop over all our packets to send
-		for (int i = 0; i < bps.size(); i++) {
+		for (i = 0; i < bps.size(); i++) {
 			
 			BlePacket p = bps.valueAt(i);
 			
@@ -262,12 +270,13 @@ public class BleMessenger {
 		
 				byte[] nextPacket = p.MessageBytes;
 				
-				Log.v(TAG, "send write request to " + peerAddress);
-				
 	    		if (nextPacket != null) {
-	    			//bleStatusCallback.headsUp("m: o:" + ByteUtilities.bytesToHexShort(nextPacket));
-	    			Thread.sleep(100);
-		    		bleCentral.submitCharacteristicWriteRequest(peerAddress, uuidFromBase("101"), nextPacket);
+	    			if (peer.ConnectedAs.equalsIgnoreCase("central")) {
+	    				Thread.sleep(100);
+	    				bleCentral.submitCharacteristicWriteRequest(peerAddress, uuidFromBase("101"), nextPacket);
+	    			} else {
+	    				blePeripheral.updateCharValue(uuid, nextPacket);
+	    			}
 	    		}
 	    		
 			}  catch (Exception e) {
@@ -275,21 +284,26 @@ public class BleMessenger {
     			bleStatusCallback.headsUp("m: packet send error");
     		}
 			
-			sent = i;
 		}
 		
-		bleStatusCallback.headsUp("m: " + String.valueOf(sent+1) + " packets sent");
+		sent = i;
 		
+		bleStatusCallback.headsUp("m: " + String.valueOf(sent) + " packets sent");
+		
+		// we sent packets out, so clear our pending list (we'll requeue missing later)
 		m.ClearPendingPackets();
 		
+		if (peer.ConnectedAs.equalsIgnoreCase("central")) {
+			// need to make sure I requeue all the packets if the other message doesn't know what happened
+			bleStatusCallback.headsUp("m: finished send; checking if rcvd");
 		
-		// need to make sure I requeue all the packets if the other message doesn't know what happened
-		bleStatusCallback.headsUp("m: finished send; checking if rcvd");
+			// see if we're missing any pending packets
+			bleCentral.submitCharacteristicReadRequest(peerAddress, uuidFromBase("105"));
+		} else {
+			bleStatusCallback.headsUp("m: connected as Perph, assuming send success");
+			peer.RemoveBleMessage(m.GetMessageNumber());
+		}
 		
-		bleCentral.submitCharacteristicReadRequest(peerAddress, uuidFromBase("105"));
-		
-		// should only call this after we're sure the message was sent
-		//bleStatusCallback.messageSent(b.MessageHash, peer);
 		
 	}
 
@@ -314,12 +328,6 @@ public class BleMessenger {
 	public boolean BeFound() {
 		
 		try {
-		
-			/*
-			blePeripheral.addChar(BleGattCharacteristics.GATT_READ, uuidFromBase("100"), peripheralHandler);
-			blePeripheral.addChar(BleGattCharacteristics.GATT_WRITE, uuidFromBase("101"), peripheralHandler);
-			blePeripheral.addChar(BleGattCharacteristics.GATT_NOTIFY, uuidFromBase("102"), peripheralHandler);
-			*/
 			
 			// pull from the service definition
 			for (BleCharacteristic c: serviceDef) {
@@ -362,72 +370,9 @@ public class BleMessenger {
 		p.addBleMessageOut(MessageToSend);
 		
 	}
-	
-	// this sends out when you're in PERIPHERAL mode
-    private void sendOutgoing(String remote, UUID uuid) {
-    	
-		// look up the peer by their address (aka index)
-		BlePeer peer = peerMap.get(remote);
-		
-		// given a peer, get the first message in the queue to send out
-		BleMessage m = peer.getBleMessageOut();
-    	
-		bleStatusCallback.headsUp("m: (sendOutgoing) - pending msgs: " + String.valueOf(peer.PendingMessageCount()));		
-		
-		// if no message found, there's a problem
-		if (m == null) {
-			Log.v(TAG, "cannot 'sendOutgoing' - peer.getBleMessageOut returned null");
-			bleStatusCallback.headsUp("m: (sendOutgoing) no message found for peer");
-			
-			return;
-		} else {
-			// the previous call allows us to get the current message
-			bleStatusCallback.headsUp("m: sending message: " + String.valueOf(peer.CurrentMessageIndex));
-		}
-		
-		// get a sparsearray of the packets pending send for the message m
-		SparseArray<BlePacket> bps = m.GetPendingPackets();
-			
-		bleStatusCallback.headsUp("m: # of pending packets: " + String.valueOf(bps.size()));
-		int sent = 0;
-		int i = 0;
-			
-		// loop over all our packets to send
-		for (i = 0; i < bps.size(); i++) {
-				
-			BlePacket p  = bps.valueAt(i);
-				
-			try {
-					
-				byte[] nextPacket = p.MessageBytes;
-					
-	    		if (nextPacket != null) {
-	    			// update the value of this characteristic, which will send to subscribers
-			    	blePeripheral.updateCharValue(uuid, nextPacket);
-	    		}
-		    		
-			}  catch (Exception e) {
-    			Log.v(TAG, "packet send error: " + e.getMessage());
-    			bleStatusCallback.headsUp("m: (sendOutgoing) packet send error");
-    		}
-				
-		}
-	
-		sent = i;
-		
-		bleStatusCallback.headsUp("m: " + String.valueOf(sent) + " packets sent");
-		
-		m.ClearPendingPackets();
-		
-		peer.RemoveBleMessage(m.GetMessageNumber());
-		    	
-    }
 
     private void incomingMessage(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
 		int parentMessagePacketTotal = 0;
-		
-		//Log.v(TAG, "incoming hex bytes:" + ByteUtilities.bytesToHex(incomingBytes));
-		//bleStatusCallback.headsUp("m: i:" + ByteUtilities.bytesToHexShort(incomingBytes));
 		
 		// if our msg is under a few bytes it can't be valid; return
     	if (incomingBytes.length < 5) {
@@ -462,7 +407,6 @@ public class BleMessenger {
     		Log.v(TAG, "parent message packet total is:" + String.valueOf(parentMessagePacketTotal));
     		b.BuildMessageFromPackets(packetCounter, packetPayload, parentMessagePacketTotal);
     	} else {
-    		//bleStatusCallback.headsUp("m: building msg with packet #" + String.valueOf(packetCounter));
     		
     		// otherwise throw this packet payload into the message
     		b.BuildMessageFromPackets(packetCounter, packetPayload);	
@@ -513,7 +457,6 @@ public class BleMessenger {
     
     public void checkSendStatus(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
     	// get the remote peer based on the address
-    	//bleStatusCallback.headsUp("m: hearing back from " + remoteAddress + " about a message's status");
     	
     	BlePeer p = peerMap.get(remoteAddress);
     	
@@ -521,11 +464,6 @@ public class BleMessenger {
     		bleStatusCallback.headsUp("m: no peer found for address " + remoteAddress);
     		return;
     	}
-    	
-    	/*
-    	for (String s: peerMap.keySet()) {
-    		bleStatusCallback.headsUp("m: peerMap key found: " + s);	
-    	}*/
     	
     	// get the message ID to check on
     	int msg_id = incomingBytes[0] & 0xFF;
@@ -553,7 +491,6 @@ public class BleMessenger {
 	    	if (missing_packet_count == 0) {
 	    		bleStatusCallback.headsUp("m: all sent, removing msg " + String.valueOf(msg_id) + " from queue") ;
 	    		p.RemoveBleMessage(msg_id);
-	    		//bleStatusCallback.headsUp("m: GetMessageOut.size():" + String.valueOf(p.GetMessagesOut().size()));
 	    	} else {
 	    		// read the missing packet numbers into an array
 	    		byte[] missingPackets = Arrays.copyOfRange(incomingBytes, 2, incomingBytes.length);
@@ -629,7 +566,7 @@ public class BleMessenger {
     		BlePeer p = peerMap.get(device);
     		p.MarkActive();
     		
-    		sendOutgoing(device, uuid);
+    		writeOut(device, uuid);
 		}
 
 		@Override
@@ -784,8 +721,6 @@ public class BleMessenger {
 		
 			// so at this point we should still be connected with our remote device
 			// and we wouldn't have gotten here if the remote device didn't meet our service spec
-	
-			
 	
 			// pass our remote address and desired uuid to our gattclient
 			// who will look up the gatt object and uuid and issue the read request

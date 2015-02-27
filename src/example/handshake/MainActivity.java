@@ -291,21 +291,12 @@ public class MainActivity extends Activity {
 					// TODO: what if it's being forwarded?
 				}
 				
-				/*
-				BleMessage idenM = identityMessage();
-				
-				if (idenM != null) {
-					bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(idenM);
-				}
-				*/
-				
 				// if the sender is in our friends list
 				if (bleFriends.containsKey(senderFingerprint)) {
 					
 					// we know that we have this peer as a friend
 					// so now we can either get the message we have for this friend
-					// and add to the peer in the BleMessenger list,
-					// or we can pass in the peer object, overwriting what we have there
+					// and add to the peer in the BleMessenger list
 					
 					// let's keep them separate, and pass it in
 					BleMessage m = bleFriends.get(senderFingerprint).getBleMessageOut();
@@ -475,19 +466,6 @@ public class MainActivity extends Activity {
 		if (!visible) {
 			Log.v(TAG, "Not currently visible, begin stuff");
 
-			/*
-			BleMessage m = new BleMessage();
-			
-			m.MessageType = "identity";
-			m.SenderFingerprint = rsaKey.PuFingerprint();
-			m.RecipientFingerprint = new byte[20]; // blank recipient for Id message
-			
-			// since this is an identity message, the payload is my public key
-			m.setPayload(rsaKey.PublicKey());
-	
-			// now add this message as our identifier to BleMessenger to send upon any new connection
-			bleMessenger.idMessage = m;
-			*/
 			if (bleMessenger.BeFound()) {
 				Log.v(TAG, "advertising supported");
 			} else {
@@ -594,10 +572,6 @@ public class MainActivity extends Activity {
 	private void logMessage(String msg) {
 
 		statusLogText = "- " + msg + "\n" + statusLogText;
-		
-		// String oldText = statusText.getText().toString();
-		
-		//final String newText = oldText + "\n" + "- " + msg;
 		
 		runOnUiThread(new Runnable() {
 			  public void run() {
