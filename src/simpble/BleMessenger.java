@@ -301,6 +301,7 @@ public class BleMessenger {
 			bleCentral.submitCharacteristicReadRequest(peerAddress, uuidFromBase("105"));
 		} else {
 			bleStatusCallback.headsUp("m: connected as Perph, assuming send success");
+			bleStatusCallback.peerNotification(peerAddress, "msg_sent_" + String.valueOf(m.GetMessageNumber()));
 			peer.RemoveBleMessage(m.GetMessageNumber());
 		}
 		
@@ -490,6 +491,7 @@ public class BleMessenger {
 	    	// if we're all done, mark this message sent
 	    	if (missing_packet_count == 0) {
 	    		bleStatusCallback.headsUp("m: all sent, removing msg " + String.valueOf(msg_id) + " from queue") ;
+	    		bleStatusCallback.peerNotification(remoteAddress, "msg_sent_" + String.valueOf(msg_id));
 	    		p.RemoveBleMessage(msg_id);
 	    	} else {
 	    		// read the missing packet numbers into an array
@@ -717,20 +719,27 @@ public class BleMessenger {
 		
 		BlePeer p = peerMap.get(remoteAddress);
 		
-		if (p.ConnectedAs.equalsIgnoreCase("central")) {
+		if (p != null) {
 		
-			// so at this point we should still be connected with our remote device
-			// and we wouldn't have gotten here if the remote device didn't meet our service spec
-	
-			// pass our remote address and desired uuid to our gattclient
-			// who will look up the gatt object and uuid and issue the read request
-			bleStatusCallback.headsUp("m: subscribing to 102 on " + remoteAddress);
-			bleCentral.submitSubscription(remoteAddress, uuidFromBase("102"));
+			if (p.ConnectedAs.equalsIgnoreCase("central")) {
+			
+				// so at this point we should still be connected with our remote device
+				// and we wouldn't have gotten here if the remote device didn't meet our service spec
+		
+				// pass our remote address and desired uuid to our gattclient
+				// who will look up the gatt object and uuid and issue the read request
+				bleStatusCallback.headsUp("m: subscribing to 102 on " + remoteAddress);
+				bleCentral.submitSubscription(remoteAddress, uuidFromBase("102"));
+				
+				// we should be expecting data on 102 now
+			} else {
+				bleStatusCallback.headsUp("m: you're not connected as a central");	
+			}
+
 		} else {
-			bleStatusCallback.headsUp("m: you're not connected as a central");	
+			bleStatusCallback.headsUp("m: peerMap pulls up nobody");
 		}
 
-		// we should be expecting data on 102 now
 		
 	}
     

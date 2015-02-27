@@ -157,8 +157,16 @@ public class BleCentral {
     public boolean submitSubscription(String remoteAddr, UUID uuidChar) {
     	boolean result = false;
     	
-    	BluetoothGatt gatt = gattS.get(remoteAddr);
-    	BluetoothGattCharacteristic indicifyChar = gatt.getService(UUID.fromString(strSvcUuidBase)).getCharacteristic(uuidChar);
+    	BluetoothGattCharacteristic indicifyChar = null;
+    	BluetoothGatt gatt = null;
+    	
+    	try {
+    		gatt = gattS.get(remoteAddr);
+    		indicifyChar = gatt.getService(UUID.fromString(strSvcUuidBase)).getCharacteristic(uuidChar);
+    	} catch (Exception x) {
+    		Log.v(TAG, "can't subscribe: " + x.getMessage());
+    		return false;
+    	}
    	
     	if (indicifyChar != null) {
         	int cProps = indicifyChar.getProperties();

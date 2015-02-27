@@ -40,6 +40,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
 
 	private static final String TAG = "main";
+	private static final int DEBUGLEVEL = 0;
 
 	BleMessenger bleMessenger;
 	
@@ -70,10 +71,16 @@ public class MainActivity extends Activity {
 	String ourMostRecentFriendsAddress;
 	String statusLogText;
 	
+    private FriendsDbAdapter mDbHelper;
+    private Cursor mFriendsCursor;
+	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
+		
+        mDbHelper = new FriendsDbAdapter(this);
+        mDbHelper.open();
 		
 		statusLogText = "";
 		
@@ -188,6 +195,10 @@ public class MainActivity extends Activity {
 		
 	}
 	
+	private void scaffoldFriends() {
+		
+	}
+	
 	private void SetUpBle() {
 		if (btAdptr != null) {
 			if (btAdptr.isEnabled()) {
@@ -240,8 +251,8 @@ public class MainActivity extends Activity {
 			// this notification is that BleMessenger just found a peer that met the service contract
 			// only central mode gets this
 			if (notification.equalsIgnoreCase("new_contract")) {
-				 ourMostRecentFriendsAddress = peerIndex;
-				 
+				ourMostRecentFriendsAddress = peerIndex;
+				logMessage("a: connected to " + peerIndex);
 				BleMessage idenM = identityMessage();
 				String queuedMsg = "";
 				if (idenM != null) {
@@ -255,6 +266,7 @@ public class MainActivity extends Activity {
 			
 			// only peripheral mode gets this
 			if (notification.equalsIgnoreCase("accepted_connection")) {
+				logMessage("a: connected to " + peerIndex);
 				// since i've just accepted a connection, queue up an identity message 
 				BleMessage idenM = identityMessage();
 				String queuedMsg = "";
@@ -267,6 +279,10 @@ public class MainActivity extends Activity {
 				 runOnUiThread(new Runnable() { public void run() { btnGetId.setEnabled(true); } });
 			}
 			
+			if (notification.contains("msg_sent")) {
+				logMessage("a: " + notification + " sent to " + peerIndex);
+			}
+			
 			
 		}
 		
@@ -276,7 +292,7 @@ public class MainActivity extends Activity {
 		public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, String msgType) {
 
 			//Log.v(TAG, "received msg of type:"+ msgType);
-			logMessage("a: msg type " + msgType + " intended for " + recipientFingerprint.substring(0, 10) + "...");
+			logMessage("a: rcvd " + msgType + " msg for " + recipientFingerprint.substring(0, 10) + "...");
 			
 			// this is an identity message so handle it as such
 			if (msgType.equalsIgnoreCase("identity")) {
@@ -401,7 +417,7 @@ public class MainActivity extends Activity {
 
 		@Override
 		public void headsUp(String msg) {
-			logMessage(msg);
+			logMessage(msg, 1);
 		}
 
 		@Override
@@ -426,6 +442,7 @@ public class MainActivity extends Activity {
 		
 		for (String remoteAddress : bleMessenger.peerMap.keySet()) {
 			// send pending messages to this peer
+			logMessage("a: " + remoteAddress + " needs " + bleMessenger.peerMap.get(remoteAddress).PendingMessageCount() + " msgs");
 			bleMessenger.sendMessagesToPeer(remoteAddress);
 		}
 		
@@ -570,14 +587,23 @@ public class MainActivity extends Activity {
 	}
 	
 	private void logMessage(String msg) {
-
-		statusLogText = "- " + msg + "\n" + statusLogText;
+		logMessage(msg, 0);
+	}
+	
+	
+	private void logMessage(String msg, int level) {
 		
-		runOnUiThread(new Runnable() {
-			  public void run() {
-				  statusText.setText(statusLogText);
-			  }
-		});
+		if (level <= DEBUGLEVEL) {
+
+			statusLogText = "- " + msg + "\n" + statusLogText;
+			
+			runOnUiThread(new Runnable() {
+				  public void run() {
+					  statusText.setText(statusLogText);
+				  }
+			});
+			
+		}
 		
 	}
 		
