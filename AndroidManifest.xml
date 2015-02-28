@@ -29,6 +29,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name="example.handshake.FriendsActivity"
+            android:label="@string/friends_name" >
+        </activity>
+	        
+	    <provider
+	       android:name="Friend"
+	       android:authorities="example.handshake.friend"
+	       android:exported="false" />
+        
     </application>
+    
 
 </manifest>

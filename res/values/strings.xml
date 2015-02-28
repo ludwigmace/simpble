@@ -4,10 +4,16 @@
     <string name="app_name">SimpBleTest</string>
     <string name="be_a_friend">Advt</string>
     <string name="find_a_friend">Scan</string>
-    <string name="xfer_packet">Xfer</string>
+    <string name="msgs_push">Push</string>
+    <string name="msgs_pull">Pull</string>
     <string name="action_settings">Settings</string>
+    <string name="action_friends">List Friends</string>
+    <string name="action_add_message">Add Message</string>
     <string name="status_log">Status History:</string>
     <string name="get_id">id&lt;-</string>
     <string name="send_id">id-&gt;</string>
-    
+	<string name="no_friends">nobody</string>
+	<string name="show_friends">Friends</string>
+	<string name="friends_name">Your Friends</string>
 </resources>
+

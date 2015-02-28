@@ -42,6 +42,13 @@ public class MainActivity extends Activity {
 	private static final String TAG = "main";
 	private static final int DEBUGLEVEL = 0;
 
+    private static final int ACTIVITY_CREATE=0;
+    private static final int ACTIVITY_EDIT=1;
+
+    private static final int INSERT_ID = Menu.FIRST;
+    private static final int DELETE_ID = Menu.FIRST + 1;
+
+	
 	BleMessenger bleMessenger;
 	
 	// maybe for these guys I should leave these inside of the BleMessenger class?
@@ -56,8 +63,8 @@ public class MainActivity extends Activity {
 	TextView statusText;
 	
 	private Button btnAdvertise;
-	private Button btnXfer;
-	private Button btnGetId;
+	private Button btnPush;
+	private Button btnPull;
 	private Button btnSendId;
 	
 	private boolean visible;
@@ -69,16 +76,12 @@ public class MainActivity extends Activity {
 	String ourMostRecentFriendsAddress;
 	String statusLogText;
 	
-    private FriendsDbAdapter mDbHelper;
-    private Cursor mFriendsCursor;
+    private FriendsDb mDbHelper;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
-		
-        mDbHelper = new FriendsDbAdapter(this);
-        mDbHelper.open();
 		
 		statusLogText = "";
 		
@@ -87,16 +90,15 @@ public class MainActivity extends Activity {
 		
 		// get a pointer to our Be A Friend button, and our transfer packet button
 		btnAdvertise = (Button)findViewById(R.id.be_a_friend);
-		btnXfer = (Button)findViewById(R.id.xfer_packet);
-		btnGetId = (Button)findViewById(R.id.get_id);
-		btnSendId = (Button)findViewById(R.id.send_id);
+		
+		btnPush = (Button)findViewById(R.id.pushmsgs);
+		btnPull = (Button)findViewById(R.id.pullmsgs);
 		
 		
 		// disable the Xfer button, because you're not connected and don't have anything set up to transfer
-		btnXfer.setEnabled(false);
+		btnPush.setEnabled(false);
 		// disable Id button, because you're not even connected yet, and thus not ready to identify
-		btnGetId.setEnabled(false);
-		btnSendId.setEnabled(false);
+		btnPull.setEnabled(false);
 		
 		// because this is using BLE, we'll need to get the adapter and manager from the main context and thread 
 		btMgr = (BluetoothManager) this.getSystemService(Context.BLUETOOTH_SERVICE);
@@ -147,43 +149,39 @@ public class MainActivity extends Activity {
 			btnAdvertise.setEnabled(true);			
 		}
 		
-		// this part should be populated by a database or previous application data
-		String testFriendFP = "";
-		String testMessage = "";
 		
 		// nexus 5: BC966C8DB89F0EBB91C82C97E561DF631DB96DC3
 		// gnex: D6DB868F6260FB74ADFE6E340288E77FCA3BA9E5
+		
+		
+		String testFriendFP = "";
+		String testMessage = ""; 
+		
+		mDbHelper = new FriendsDb(this);
+		
 		if (myFingerprint.equalsIgnoreCase("BC966C8DB89F0EBB91C82C97E561DF631DB96DC3")) {
 			testMessage = "i'm a nexus 5 and i love you SO MUCHCHCHCHCH - it's creepy";
 			testFriendFP = "D6DB868F6260FB74ADFE6E340288E77FCA3BA9E5";
 			
-			mDbHelper.createFriend("gnex", testFriendFP);
+			//mDbHelper.createFriend("gnex", testFriendFP);
 			
 		} else if (myFingerprint.equalsIgnoreCase("D6DB868F6260FB74ADFE6E340288E77FCA3BA9E5")) {
 			testMessage = "i'm a GNEX and i'm tolerant of your existence";
 			testFriendFP = "BC966C8DB89F0EBB91C82C97E561DF631DB96DC3";
 			
-			mDbHelper.createFriend("nex5", testFriendFP);
+			//mDbHelper.createFriend("nex5", testFriendFP);
 			
 		} else {
 			Log.v(TAG, "myFingerprint matches nothing!!!!");
 		}
 		
-		mFriendsCursor = mDbHelper.fetchAllFriends();
 		
-		while (mFriendsCursor.moveToNext()) {
-			String friend_name = mFriendsCursor.getString(mFriendsCursor.getColumnIndex("friend_name"));
-			String friend_fp = mFriendsCursor.getString(mFriendsCursor.getColumnIndex("friend_fp"));
-			
-			logMessage("a: friend " + friend_name + " w/ fp " + friend_fp);
-		}
-		
-		mFriendsCursor.close();
-		
+		mDbHelper.close();
 		
 		bleFriends = new HashMap<String, BlePeer>();
 
 		// create the test message, identified as being sent by me
+		/*
 		BleMessage testBleMsg = new BleMessage();
 		testBleMsg.MessageType = "datatext";
 		testBleMsg.RecipientFingerprint = ByteUtilities.hexToBytes(testFriendFP);
@@ -197,7 +195,7 @@ public class MainActivity extends Activity {
 			
 		// let's add this friend
 		bleFriends.put(testFriendFP, testFriend);
-		
+		*/
 		if (myFingerprint != null) {
 			logMessage("a: our fp is:" + myFingerprint.substring(0, 20) + " . . .");
 			Log.v(TAG, "our fp:" + myFingerprint);
@@ -241,13 +239,18 @@ public class MainActivity extends Activity {
 
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
-		// Handle action bar item clicks here. The action bar will
-		// automatically handle clicks on the Home/Up button, so long
-		// as you specify a parent activity in AndroidManifest.xml.
 		int id = item.getItemId();
-		if (id == R.id.action_settings) {
+		if (id == R.id.action_friends) {
+	        Intent i = new Intent(this, FriendsActivity.class);
+	        startActivityForResult(i, ACTIVITY_CREATE);
+		}
+		
+		if (id == R.id.action_add_message) {
 			return true;
 		}
+		
+		
+		
 		return super.onOptionsItemSelected(item);
 	}
 		
@@ -259,6 +262,7 @@ public class MainActivity extends Activity {
 			// this notification is that BleMessenger just found a peer that met the service contract
 			// only central mode gets this
 			if (notification.equalsIgnoreCase("new_contract")) {
+
 				ourMostRecentFriendsAddress = peerIndex;
 				logMessage("a: connected to " + peerIndex);
 				BleMessage idenM = identityMessage();
@@ -266,25 +270,29 @@ public class MainActivity extends Activity {
 				if (idenM != null) {
 					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM);
 					logMessage("a: queued " + queuedMsg + " for " + peerIndex);
+					
+					// we've got at least 1 msg queued up to go out, so enable our push button
+					runOnUiThread(new Runnable() { public void run() { btnPush.setEnabled(true); } });
 				}
-				 
-				 // you don't have the fingerprint yet, you just know that this person meets the contract
-				 runOnUiThread(new Runnable() { public void run() { btnGetId.setEnabled(true); } });
+				
+				// since we're a central we'll have to pull anything from the peripheral, so enable the Pull button
+				runOnUiThread(new Runnable() { public void run() { btnPull.setEnabled(true); } });
 			}
 			
 			// only peripheral mode gets this
 			if (notification.equalsIgnoreCase("accepted_connection")) {
 				logMessage("a: connected to " + peerIndex);
+
 				// since i've just accepted a connection, queue up an identity message 
 				BleMessage idenM = identityMessage();
 				String queuedMsg = "";
 				if (idenM != null) {
 					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM);
 					logMessage("a: queued " + queuedMsg + " for " + peerIndex);
-				} 
-				 
+				}
+				
 				 // you don't have the fingerprint yet, you just know that this person meets the contract
-				 runOnUiThread(new Runnable() { public void run() { btnGetId.setEnabled(true); } });
+				 runOnUiThread(new Runnable() { public void run() { btnPush.setEnabled(true); } });
 			}
 			
 			if (notification.contains("msg_sent")) {
@@ -299,7 +307,6 @@ public class MainActivity extends Activity {
 		@Override
 		public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, String msgType) {
 
-			//Log.v(TAG, "received msg of type:"+ msgType);
 			logMessage("a: rcvd " + msgType + " msg for " + recipientFingerprint.substring(0, 10) + "...");
 			
 			// this is an identity message so handle it as such
@@ -335,25 +342,12 @@ public class MainActivity extends Activity {
 						
 					}
 					
-					 // enable the Xfer button
-					runOnUiThread(new Runnable() { public void run() { btnXfer.setEnabled(true); } });
-					
-					// TODO: queue up any messages for this fingerprint
-					// and then send up queue requests using the address that's been passed in
-					
-
 				} else {
 					logMessage("a: this guy's FP isn't known to me: " + senderFingerprint.substring(0,20));
 										
 					// we don't know the sender and maybe should add them?
 					// parse the public key & friendly name out of the payload, and add this as a new person
 				}
-				
-				// the First message we send them, however, needs to be our own ID message
-				
-				// enable the "send our id" button
-				runOnUiThread(new Runnable() { public void run() { btnSendId.setEnabled(true); }});
-				
 				
 			} else {
 				logMessage("a: received data msg of size:" + String.valueOf(payload.length));
@@ -442,9 +436,43 @@ public class MainActivity extends Activity {
 		
 	};
 	
-	public void handleButtonXfer(View view) {
-		Log.v(TAG, "Xfer Toggle Pressed");
+	public void handleShowFriends(View view) {
+		/*
+        mDbHelper = new FriendsDbAdapter(this);
+        mDbHelper.open();
 
+		mFriendsCursor = mDbHelper.fetchAllFriends();
+		
+		statusLogText = "";
+		
+		if (mFriendsCursor.getCount() > 0) {
+		
+		while (mFriendsCursor.moveToNext()) {
+			String friend_name = mFriendsCursor.getString(mFriendsCursor.getColumnIndex("friend_name"));
+			String friend_fp = mFriendsCursor.getString(mFriendsCursor.getColumnIndex("friend_fp"));
+			
+			logMessage(friend_name + ": " + friend_fp);
+		}
+		} else {
+			logMessage("no friends!");
+		}
+		
+		mFriendsCursor.close();
+		
+        mDbHelper.close();
+		*/
+	}
+		
+	public void handleButtonPull(View view) {
+		Log.v(TAG, "Start Get ID");
+		
+		// should this be available for both central and peripheral, or just central?
+		bleMessenger.getPeripheralIdentifyingInfo(ourMostRecentFriendsAddress);
+		
+	}
+	
+	public void handleButtonPush(View view) {
+		
 		// iterate over our currently connected folks and see if anybody needs a message we have
 		logMessage("a: iterating over " + String.valueOf(bleMessenger.peerMap.keySet().size()) + " connected peers");
 		
@@ -454,31 +482,6 @@ public class MainActivity extends Activity {
 			bleMessenger.sendMessagesToPeer(remoteAddress);
 		}
 		
-	}
-	
-	public void handleButtonGetID(View view) {
-		Log.v(TAG, "Start Get ID");
-		
-		// should this be available for both central and peripheral, or just central?
-		bleMessenger.getPeripheralIdentifyingInfo(ourMostRecentFriendsAddress);
-		
-	}
-	
-	public void handleButtonSendID(View view) {
-		Log.v(TAG, "Start Send ID to: " + ourMostRecentFriendsAddress);		
-		// now send some messages to this peer - we'll already have our Id message queued up
-		
-		// just get one
-		String peerAddress = bleMessenger.peerMap.keySet().iterator().next();
-		BlePeer p = bleMessenger.peerMap.values().iterator().next();
-		
-		// we speak to bleMessenger in terms of addresses that it knows
-		if (p != null) {
-			logMessage("a: send to address:" + peerAddress);
-			bleMessenger.sendMessagesToPeer(peerAddress);
-		} else {
-			logMessage("a: can't get a bleFriend to send to");
-		}
 	}
     
 	

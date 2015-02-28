@@ -3,9 +3,16 @@
     tools:context="com.example.simpblep.MainActivity" >
 
     <item
-        android:id="@+id/action_settings"
+        android:id="@+id/action_friends"
         android:orderInCategory="100"
         android:showAsAction="never"
-        android:title="@string/action_settings"/>
+        android:title="@string/action_friends"/>
+    
+<item
+        android:id="@+id/action_add_message"
+        android:orderInCategory="200"
+        android:showAsAction="never"
+        android:title="@string/action_add_message"/>
+    
 
 </menu>

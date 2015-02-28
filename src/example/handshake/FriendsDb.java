@@ -3,20 +3,25 @@ package example.handshake;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
+import android.database.DatabaseErrorHandler;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteDatabase.CursorFactory;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
 
 // re-using the database stuff from Google's Notes sample application
-public class FriendsDbAdapter {
+public class FriendsDb extends SQLiteOpenHelper {
 
-    public static final String KEY_NAME = "friend_name";
+
+	public static final String KEY_NAME = "friend_name";
     public static final String KEY_FP = "friend_fp";
     public static final String KEY_ROWID = "_id";
 
+    private static String DBNAME = "friends";
+    private static final int DBVERSION = 2;
+ 
     private static final String TAG = "FriendsDbAdapter";
-    private DatabaseHelper mDbHelper;
     private SQLiteDatabase mDb;
 
     /**
@@ -26,62 +31,26 @@ public class FriendsDbAdapter {
         "create table friends (_id integer primary key autoincrement, "
         + "friend_fp text not null, friend_name text not null);";
 
-    private static final String DATABASE_NAME = "data";
     private static final String DATABASE_TABLE = "friends";
-    private static final int DATABASE_VERSION = 2;
 
-    private final Context mCtx;
-
-    private static class DatabaseHelper extends SQLiteOpenHelper {
-
-        DatabaseHelper(Context context) {
-            super(context, DATABASE_NAME, null, DATABASE_VERSION);
-        }
-
-        @Override
-        public void onCreate(SQLiteDatabase db) {
-
-            db.execSQL(DATABASE_CREATE);
-        }
-
-        @Override
-        public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-            Log.w(TAG, "Upgrading database from version " + oldVersion + " to "
-                    + newVersion + ", which will destroy all old data");
-            db.execSQL("DROP TABLE IF EXISTS friends");
-            onCreate(db);
-        }
+	public FriendsDb(Context context) {
+		super(context, DBNAME, null, DBVERSION);
+	    mDb = getWritableDatabase();
+	}
+    
+    
+    @Override
+    public void onCreate(SQLiteDatabase db) {
+        db.execSQL(DATABASE_CREATE);
     }
 
-    /**
-     * Constructor - takes the context to allow the database to be
-     * opened/created
-     * 
-     * @param ctx the Context within which to work
-     */
-    public FriendsDbAdapter(Context ctx) {
-        this.mCtx = ctx;
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        Log.w(TAG, "Upgrading database from version " + oldVersion + " to "
+                + newVersion + ", which will destroy all old data");
+        db.execSQL("DROP TABLE IF EXISTS friends");
+        onCreate(db);
     }
-
-    /**
-     * Open the friends database. If it cannot be opened, try to create a new
-     * instance of the database. If it cannot be created, throw an exception to
-     * signal the failure
-     * 
-     * @return this (self reference, allowing this to be chained in an
-     *         initialization call)
-     * @throws SQLException if the database could be neither opened or created
-     */
-    public FriendsDbAdapter open() throws SQLException {
-        mDbHelper = new DatabaseHelper(mCtx);
-        mDb = mDbHelper.getWritableDatabase();
-        return this;
-    }
-
-    public void close() {
-        mDbHelper.close();
-    }
-
 
     /**
      * Create a new friend using the name and fp provided. If the friend is
