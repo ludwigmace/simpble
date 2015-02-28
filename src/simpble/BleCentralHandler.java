@@ -14,6 +14,6 @@ public interface BleCentralHandler {
 	public void intakeFoundDevices(ArrayList<BluetoothDevice> devices);
 	public void connectedServiceGood(String remoteAddress);
 	public void incomingMissive(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes);
-	public void reportDisconnect();
+	public void reportDisconnect(String remoteAddress);
 	
 }

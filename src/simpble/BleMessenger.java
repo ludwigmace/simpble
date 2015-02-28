@@ -547,6 +547,8 @@ public class BleMessenger {
 	    		// let the calling activity know we've been connected to by a dude
 	    		bleStatusCallback.peerNotification(device, "accepted_connection");
 
+    		} else {
+    			bleStatusCallback.peerNotification(device, "connection_change");
     		}
     		
     	}
@@ -705,9 +707,9 @@ public class BleMessenger {
 		
 		
 		@Override
-		public void reportDisconnect() {
+		public void reportDisconnect(String remoteAddress) {
 			// what to do when disconnected?
-			
+			bleStatusCallback.peerNotification(remoteAddress, "server_disconnected");
 		}
     	
     };

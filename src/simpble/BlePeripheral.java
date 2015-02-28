@@ -220,7 +220,6 @@ public class BlePeripheral {
         	btGattServer.addService(gattServices.get(i));
         }
         
-
         // the AdvertiseData and AdvertiseSettings are both required
         AdvertiseData.Builder dataBuilder = new AdvertiseData.Builder();
         //AdvertisementData.Builder dataBuilder = new AdvertisementData.Builder();
@@ -236,10 +235,7 @@ public class BlePeripheral {
         for (ParcelUuid pu: gattServiceIDs) {
         	dataBuilder.addServiceUuid(pu);
         }
-        
-        // API L
-        //dataBuilder.setServiceUuids(gattServiceIDs);
-        
+                
         // this spells FART, and right now apparently doesn't do anything
         byte[] serviceData = {0x46, 0x41, 0x52, 0x54}; 
         
@@ -249,16 +245,10 @@ public class BlePeripheral {
         // API 5.0
         dataBuilder.addServiceData(serviceDataID, serviceData);
         
-        // API L
-        //dataBuilder.setServiceData(serviceDataID, serviceData);
-        
         // i guess we need all these things for our settings
         settingsBuilder.setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY);
         settingsBuilder.setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH);
-        
-        // API L
-        //settingsBuilder.setType(AdvertiseSettings.ADVERTISE_TYPE_CONNECTABLE);
-        
+                
         // API 5.0 
         settingsBuilder.setConnectable(true);
         

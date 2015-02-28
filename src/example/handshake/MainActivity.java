@@ -295,6 +295,14 @@ public class MainActivity extends Activity {
 				 runOnUiThread(new Runnable() { public void run() { btnPush.setEnabled(true); } });
 			}
 			
+			if (notification.equalsIgnoreCase("connection_change")) {
+				logMessage("a: connection status changed for " + peerIndex);
+			}
+			
+			if (notification.equalsIgnoreCase("server_disconnnected")) {
+				logMessage("a: disconnected from " + peerIndex);
+			}
+			
 			if (notification.contains("msg_sent")) {
 				logMessage("a: " + notification + " sent to " + peerIndex);
 			}

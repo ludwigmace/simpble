@@ -343,7 +343,7 @@ public class BleCentral {
                 // since we're disconnected, remove this guy
                 gattS.remove(gatt.getDevice().getAddress());
                 
-                gattClientHandler.reportDisconnect();
+                gattClientHandler.reportDisconnect(gatt.getDevice().getAddress());
                 Log.i(TAG, "Disconnected from GATT server " + gatt.getDevice().getAddress());
                 
             }
