@@ -29,6 +29,7 @@ import android.util.Log;
 public class BleCentral {
 	
 	private static final String TAG = "BLECC";
+	private static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
 	
 	// we need the system context to perform Gatt operations
 	private Context ctx;
@@ -126,6 +127,10 @@ public class BleCentral {
         bleScanFilter.add(sf.build());
         
     }
+    
+    public void setScanDuration(int duration) {
+    	scanDuration = duration;
+    }
 
     public void initConnect(BluetoothDevice b) {
     	b.connectGatt(ctx, false, mGattCallback);
@@ -161,6 +166,7 @@ public class BleCentral {
     	BluetoothGatt gatt = null;
     	
     	try {
+    		// since you can feasibly access multiple peripherals i keep my gatt server objects in a map, indexed by address
     		gatt = gattS.get(remoteAddr);
     		indicifyChar = gatt.getService(UUID.fromString(strSvcUuidBase)).getCharacteristic(uuidChar);
     	} catch (Exception x) {
@@ -169,16 +175,18 @@ public class BleCentral {
     	}
    	
     	if (indicifyChar != null) {
+
         	int cProps = indicifyChar.getProperties();
-        	
+
+        	// subbing for notify or indicate is the same deal
 	   	     if ((cProps & (BluetoothGattCharacteristic.PROPERTY_NOTIFY | BluetoothGattCharacteristic.PROPERTY_INDICATE)) != 0) {
 		    	 Log.v(TAG, "sub for notifications from " + indicifyChar.getUuid().toString().substring(0,8));
 			
-				// enable notifications for this guy
+				// enable notifications/indications for this guy
 		    	gatt.setCharacteristicNotification(indicifyChar, true);
 				
 				// tell the other guy that we want characteristics enabled
-				BluetoothGattDescriptor descriptor = indicifyChar.getDescriptor(UUID.fromString(SampleGattAttributes.CLIENT_CHARACTERISTIC_CONFIG));
+				BluetoothGattDescriptor descriptor = indicifyChar.getDescriptor(UUID.fromString(CLIENT_CHARACTERISTIC_CONFIG));
 				
 				// if it's a notification value, subscribe by setting the descriptor to ENABLE_NOTIFICATION_VALUE
 				if ((cProps & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0) {
@@ -279,7 +287,7 @@ public class BleCentral {
     	return foundDevices;
     }
     
-    public void scanLeDevice(final boolean enable) {
+    public void scanForPeripherals(final boolean enable) {
     	final long SCAN_PERIOD = scanDuration;
     	
         if (enable) {
@@ -306,7 +314,7 @@ public class BleCentral {
 
         } else {
         	
-        	// the "enable" variable passed wa False, so turn scanning off
+        	// the "enable" variable passed was False, so turn scanning off
             mScanning = false;
             bleScanner.stopScan(scanCallback);
             

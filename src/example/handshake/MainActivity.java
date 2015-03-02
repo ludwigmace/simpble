@@ -65,7 +65,7 @@ public class MainActivity extends Activity {
 	private Button btnAdvertise;
 	private Button btnPush;
 	private Button btnPull;
-	private Button btnSendId;
+	private Button btnStartPair;
 	
 	private boolean visible;
 	
@@ -77,12 +77,14 @@ public class MainActivity extends Activity {
 	String statusLogText;
 	
     private FriendsDb mDbHelper;
+    
+    String currentTask;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
-		
+		currentTask = "";
 		statusLogText = "";
 		
 		// we're not showing ourselves when the program starts
@@ -93,6 +95,7 @@ public class MainActivity extends Activity {
 		
 		btnPush = (Button)findViewById(R.id.pushmsgs);
 		btnPull = (Button)findViewById(R.id.pullmsgs);
+		btnStartPair = (Button)findViewById(R.id.startpair);
 		
 		
 		// disable the Xfer button, because you're not connected and don't have anything set up to transfer
@@ -139,14 +142,11 @@ public class MainActivity extends Activity {
 			bleMessenger = new BleMessenger(btMgr, btAdptr, this, bleMessageStatus);
 		} // if not enabled, the onResume will catch this
 
-		// if our SDK isn't lollipop, then disable our advertising button
-		// for testing i can also tell which is my 5 and which is my Gnex
-		if (Build.VERSION.SDK_INT < 21) {
-			btnAdvertise.setEnabled(false);
-		} else if (!btAdptr.isMultipleAdvertisementSupported()) {
-			btnAdvertise.setEnabled(false);
+		
+		if (bleMessenger.SupportsAdvertising) {
+			btnAdvertise.setEnabled(true);
 		} else {
-			btnAdvertise.setEnabled(true);			
+			btnAdvertise.setEnabled(false);
 		}
 		
 		
@@ -245,6 +245,11 @@ public class MainActivity extends Activity {
 	        startActivityForResult(i, ACTIVITY_CREATE);
 		}
 		
+		if (id == R.id.action_add_friends) {
+	        Intent i = new Intent(this, AddFriendsActivity.class);
+	        startActivityForResult(i, ACTIVITY_CREATE);
+		}		
+		
 		if (id == R.id.action_add_message) {
 			return true;
 		}
@@ -261,7 +266,7 @@ public class MainActivity extends Activity {
 			
 			// this notification is that BleMessenger just found a peer that met the service contract
 			// only central mode gets this
-			if (notification.equalsIgnoreCase("new_contract")) {
+			if (notification.equalsIgnoreCase("new_contract") && currentTask.equalsIgnoreCase("pair")) {
 
 				ourMostRecentFriendsAddress = peerIndex;
 				logMessage("a: connected to " + peerIndex);
@@ -271,16 +276,22 @@ public class MainActivity extends Activity {
 					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM);
 					logMessage("a: queued " + queuedMsg + " for " + peerIndex);
 					
+					// now let the other guy know you're ready to receive data
+					bleMessenger.initRequestForData(ourMostRecentFriendsAddress);
+					
+					// go ahead and send this other person our stuff
+					runOnUiThread(new Runnable() { public void run() { bleMessenger.sendMessagesToPeer(ourMostRecentFriendsAddress);} });
+					
 					// we've got at least 1 msg queued up to go out, so enable our push button
-					runOnUiThread(new Runnable() { public void run() { btnPush.setEnabled(true); } });
+					//runOnUiThread(new Runnable() { public void run() { btnPush.setEnabled(true); } });
 				}
 				
 				// since we're a central we'll have to pull anything from the peripheral, so enable the Pull button
-				runOnUiThread(new Runnable() { public void run() { btnPull.setEnabled(true); } });
+				//runOnUiThread(new Runnable() { public void run() { btnPull.setEnabled(true); } });
 			}
 			
 			// only peripheral mode gets this
-			if (notification.equalsIgnoreCase("accepted_connection")) {
+			if (notification.equalsIgnoreCase("accepted_connection") && currentTask.equalsIgnoreCase("pair")) {
 				logMessage("a: connected to " + peerIndex);
 
 				// since i've just accepted a connection, queue up an identity message 
@@ -291,8 +302,11 @@ public class MainActivity extends Activity {
 					logMessage("a: queued " + queuedMsg + " for " + peerIndex);
 				}
 				
+				// if you're a peripheral,
+				// you can't call bleMessenger.sendMessagesToPeer(peerIndex) until the peer has subscribed
+				
 				 // you don't have the fingerprint yet, you just know that this person meets the contract
-				 runOnUiThread(new Runnable() { public void run() { btnPush.setEnabled(true); } });
+				 //runOnUiThread(new Runnable() { public void run() { btnPush.setEnabled(true); } });
 			}
 			
 			if (notification.equalsIgnoreCase("connection_change")) {
@@ -475,7 +489,7 @@ public class MainActivity extends Activity {
 		Log.v(TAG, "Start Get ID");
 		
 		// should this be available for both central and peripheral, or just central?
-		bleMessenger.getPeripheralIdentifyingInfo(ourMostRecentFriendsAddress);
+		bleMessenger.initRequestForData(ourMostRecentFriendsAddress);
 		
 	}
 	
@@ -509,6 +523,23 @@ public class MainActivity extends Activity {
 			Log.v(TAG, "Go Invisible");
 			bleMessenger.HideYourself();
 		}
+	}
+	
+	public void handleButtonStartPair(View view) {
+		
+		currentTask = "pair";
+		
+		// very few Android devices support advertising, so if you can, start off with advertising 
+		if (bleMessenger.SupportsAdvertising) {
+			bleMessenger.BeFound();
+		} else {
+			// central needs to scan, connect
+			bleMessenger.ScanForPeers(2500); // scan for 2.5 seconds			
+		}
+		
+		
+		// send id
+		
 	}
 	
 	private byte[] benchGenerateMessage(int MessageSize) {
@@ -587,7 +618,7 @@ public class MainActivity extends Activity {
 		logMessage("a: look around");
 
 		// calls back bleMessageStatus when peers are found
-		bleMessenger.ShowFound();
+		bleMessenger.ScanForPeers(10000);
 	}
 		
 	private void showMessage(String msg) {

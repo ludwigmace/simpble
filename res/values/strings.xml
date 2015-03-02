@@ -14,6 +14,9 @@
     <string name="send_id">id-&gt;</string>
 	<string name="no_friends">nobody</string>
 	<string name="show_friends">Friends</string>
+	<string name="msgs_startpair">Pair</string>
 	<string name="friends_name">Your Friends</string>
+	<string name="friends_add">Add A Friend</string>
+	<string name="add_this_friend">Add</string>
 </resources>
 

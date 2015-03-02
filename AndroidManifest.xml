@@ -33,6 +33,11 @@
             android:name="example.handshake.FriendsActivity"
             android:label="@string/friends_name" >
         </activity>
+        
+        <activity
+            android:name="example.handshake.AddFriendsActivity"
+            android:label="@string/friends_add" >
+        </activity>
 	        
 	    <provider
 	       android:name="Friend"

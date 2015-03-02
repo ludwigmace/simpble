@@ -69,7 +69,6 @@ public class BlePeripheral {
 		
 		defaultHandler = myHandler;
 		
-		// API 5.0
 		if (btAdptr.isMultipleAdvertisementSupported()) {
 			Log.v(TAG, "advertisement is SUPPORTED on this chipset!");
 			btLeAdv = btAdptr.getBluetoothLeAdvertiser();
@@ -113,17 +112,16 @@ public class BlePeripheral {
 		if (((bgc.getProperties() & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0)
 				|| ((bgc.getProperties() & BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0)) {
 
-			Log.v(TAG, "characteristic is Notify/Indicate");
+			Log.v(TAG, "characteristic Notify/Indicate");
 
-			// having a list of subscribers might be dumb, because you can only send to one central
 			if (mySubscribers.get(bgc) != null) {
 				Log.v(TAG, "client has subscribed; try to send");
 				
 				BluetoothDevice btClient = mySubscribers.get(bgc);
-				sent = btGattServer.notifyCharacteristicChanged(btClient, bgc, false);
+				sent = btGattServer.notifyCharacteristicChanged(btClient, bgc, ((bgc.getProperties() & BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0));
 				
 				if (sent) {
-					Log.v(TAG, "send SUCCESS");	
+					Log.v(TAG, "send SUCCESS");
 				} else {
 					Log.v(TAG, "send FAILURE");
 				}
@@ -173,13 +171,13 @@ public class BlePeripheral {
         if(btGattServer != null) btGattServer.close();
 	}
 	
-	public void advertiseNow() {
+	public boolean advertiseNow() {
 
 		// if we don't have a handle to the system advertiser, then just stop
         if (btLeAdv == null) {
         	Log.v(TAG, "btLeAdv is null!");
         	isAdvertising = false;
-        	return;
+        	return false;
         }
 		
 		// make our Base UUID the service UUID
@@ -204,7 +202,7 @@ public class BlePeripheral {
 
     	// if we're already advertising, just quit here
         //  TODO: if we get this far and advertising is already started, we may want reset everything!
-        if(isAdvertising) return;
+        if(isAdvertising) return true;
 
         // - calls bluetoothManager.openGattServer(activity, whatever_the_callback_is) as gattServer
         // --- this callback needs to override: onCharacteristicWriteRequest, onCharacteristicReadRequest,
@@ -265,6 +263,8 @@ public class BlePeripheral {
         	Log.v(TAG, "call to btLeAdv.startAdvertising failed");
         	isAdvertising = false;	
         }
+        
+        return true;
     
 	}
 	
@@ -275,6 +275,14 @@ public class BlePeripheral {
 	public UUID addChar(String charType) {
 		UUID lUUID = addChar(charType, defaultHandler);
 		return lUUID;
+	}
+	
+	public boolean IsClientSubscribed(String clientAddress, UUID charToCheck) {
+		//Map<BluetoothGattCharacteristic, BluetoothDevice> mySubscribers
+		
+		
+		
+		return true;
 	}
 	
 	public UUID addChar(String charType, UUID uuid, BlePeripheralHandler charHandler) {

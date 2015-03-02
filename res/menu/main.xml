@@ -8,9 +8,15 @@
         android:showAsAction="never"
         android:title="@string/action_friends"/>
     
-<item
-        android:id="@+id/action_add_message"
+    <item
+        android:id="@+id/action_add_friends"
         android:orderInCategory="200"
+        android:showAsAction="never"
+        android:title="@string/friends_add"/>
+    
+	<item
+        android:id="@+id/action_add_message"
+        android:orderInCategory="300"
         android:showAsAction="never"
         android:title="@string/action_add_message"/>
     

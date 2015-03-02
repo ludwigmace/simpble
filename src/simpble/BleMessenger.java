@@ -58,6 +58,8 @@ public class BleMessenger {
     // our idmessage should stay the same, so save it in a global variable
     // allow to be set from calling functions
 	public BleMessage idMessage;
+	
+	public boolean SupportsAdvertising;
     
     private List<BleCharacteristic> serviceDef;
 	
@@ -77,6 +79,18 @@ public class BleMessenger {
 		btAdptr = bluetoothAdapter;
 		ctx = context;
 		
+
+		/*if (Build.VERSION.SDK_INT < 21) {
+			SupportsAdvertising = false;
+		} else */
+		
+		// check if we support advertising or not
+		if (!btAdptr.isMultipleAdvertisementSupported()) {
+			SupportsAdvertising = false;
+		} else {
+			SupportsAdvertising = true;			
+		}
+		
 		serviceDef = new ArrayList<BleCharacteristic>();
 		
 		// i need a place to put my found peers
@@ -89,7 +103,7 @@ public class BleMessenger {
 		
 		serviceDef.add(new BleCharacteristic("identifier_read", uuidFromBase("100"), BleGattCharacteristics.GATT_READ));		
 		serviceDef.add(new BleCharacteristic("identifier_writes", uuidFromBase("101"), BleGattCharacteristics.GATT_WRITE));
-		serviceDef.add(new BleCharacteristic("data_notify", uuidFromBase("102"), BleGattCharacteristics.GATT_NOTIFY));
+		serviceDef.add(new BleCharacteristic("data_notify", uuidFromBase("102"), BleGattCharacteristics.GATT_INDICATE));
 		serviceDef.add(new BleCharacteristic("flow_control", uuidFromBase("105"), BleGattCharacteristics.GATT_READ));
 		//serviceDef.add(new BleCharacteristic("data_indicate", uuidFromBase("103"), MyAdvertiser.GATT_INDICATE));
 		//serviceDef.add(new BleCharacteristic("data_write", uuidFromBase("104"), MyAdvertiser.GATT_WRITE));
@@ -193,7 +207,7 @@ public class BleMessenger {
 					checkForStaleConnections();
 				}
 				
-			}, timeout); // 10 sec, in ms
+			}, timeout);
 		}
 	}
 	
@@ -269,14 +283,20 @@ public class BleMessenger {
 			try {
 		
 				byte[] nextPacket = p.MessageBytes;
+				boolean flag_sent = false;
 				
 	    		if (nextPacket != null) {
 	    			if (peer.ConnectedAs.equalsIgnoreCase("central")) {
 	    				Thread.sleep(100);
-	    				bleCentral.submitCharacteristicWriteRequest(peerAddress, uuidFromBase("101"), nextPacket);
+	    				flag_sent = bleCentral.submitCharacteristicWriteRequest(peerAddress, uuidFromBase("101"), nextPacket);
 	    			} else {
-	    				blePeripheral.updateCharValue(uuid, nextPacket);
+	    				flag_sent = blePeripheral.updateCharValue(uuid, nextPacket);
 	    			}
+	    		}
+	    		
+	    		// if the particular packet was sent, increment our "sent" counter
+	    		if (flag_sent) {
+	    			sent++;
 	    		}
 	    		
 			}  catch (Exception e) {
@@ -285,8 +305,6 @@ public class BleMessenger {
     		}
 			
 		}
-		
-		sent = i;
 		
 		bleStatusCallback.headsUp("m: " + String.valueOf(sent) + " packets sent");
 		
@@ -300,9 +318,13 @@ public class BleMessenger {
 			// see if we're missing any pending packets
 			bleCentral.submitCharacteristicReadRequest(peerAddress, uuidFromBase("105"));
 		} else {
-			bleStatusCallback.headsUp("m: connected as Perph, assuming send success");
-			bleStatusCallback.peerNotification(peerAddress, "msg_sent_" + String.valueOf(m.GetMessageNumber()));
-			peer.RemoveBleMessage(m.GetMessageNumber());
+			if (sent == bps.size()) {
+				bleStatusCallback.headsUp("m: connected as Perph, assuming send success");
+				bleStatusCallback.peerNotification(peerAddress, "msg_sent_" + String.valueOf(m.GetMessageNumber()));
+				peer.RemoveBleMessage(m.GetMessageNumber());
+			} else {
+				bleStatusCallback.headsUp("m: sent " + String.valueOf(sent) + " packets instead of " + String.valueOf(bps.size()));
+			}
 		}
 		
 		
@@ -316,9 +338,11 @@ public class BleMessenger {
 		return idUUID;
 	}
 	
-	public void ShowFound() {
+	public void ScanForPeers(int duration) {
+		
+		bleCentral.setScanDuration(duration);
 		// call our Central object to scan for devices
-		bleCentral.scanLeDevice(true);
+		bleCentral.scanForPeripherals(true);
 		
 		// centralHandler's intakeFoundDevices method is called after scanning is complete
 		// -- this then calls BleCentral's connectAddress for each found device
@@ -328,6 +352,7 @@ public class BleMessenger {
 		
 	public boolean BeFound() {
 		
+		
 		try {
 			
 			// pull from the service definition
@@ -336,8 +361,7 @@ public class BleMessenger {
 			}
 			
 			// advertising doesn't take much energy, so go ahead and do it
-			blePeripheral.advertiseNow();
-			return true;
+			return blePeripheral.advertiseNow();
 		} catch (Exception e) {
 			return false;
 		}
@@ -717,7 +741,7 @@ public class BleMessenger {
     
     // if you're a central, identify a particular peripheral
     // this function probably won't be called directly
-	public void getPeripheralIdentifyingInfo(String remoteAddress) {
+	public void initRequestForData(String remoteAddress) {
 		
 		BlePeer p = peerMap.get(remoteAddress);
 		
