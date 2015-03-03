@@ -371,6 +371,8 @@ public class MainActivity extends Activity {
 					logMessage("a: this guy's FP isn't known to me: " + senderFingerprint.substring(0,20));
 					
 			        Intent i = new Intent(ctx, AddFriendsActivity.class);
+			        i.putExtra("fp", senderFingerprint);
+			        i.putExtra("puk", payload);
 			        startActivityForResult(i, ACTIVITY_CREATE);
 										
 					// we don't know the sender and maybe should add them?
