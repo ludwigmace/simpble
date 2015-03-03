@@ -78,6 +78,8 @@ public class MainActivity extends Activity {
 	
     private FriendsDb mDbHelper;
     
+    private Context ctx;
+    
     String currentTask;
 	
 	@Override
@@ -86,6 +88,7 @@ public class MainActivity extends Activity {
 		setContentView(R.layout.activity_main);
 		currentTask = "";
 		statusLogText = "";
+		ctx = this;
 		
 		// we're not showing ourselves when the program starts
 		visible = false;
@@ -366,6 +369,9 @@ public class MainActivity extends Activity {
 					
 				} else {
 					logMessage("a: this guy's FP isn't known to me: " + senderFingerprint.substring(0,20));
+					
+			        Intent i = new Intent(ctx, AddFriendsActivity.class);
+			        startActivityForResult(i, ACTIVITY_CREATE);
 										
 					// we don't know the sender and maybe should add them?
 					// parse the public key & friendly name out of the payload, and add this as a new person
