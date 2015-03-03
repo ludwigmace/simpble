@@ -16,10 +16,11 @@ public class FriendsDb extends SQLiteOpenHelper {
 
 	public static final String KEY_NAME = "friend_name";
     public static final String KEY_FP = "friend_fp";
+    public static final String KEY_PUK = "friend_puk";
     public static final String KEY_ROWID = "_id";
 
     private static String DBNAME = "friends";
-    private static final int DBVERSION = 2;
+    private static final int DBVERSION = 1;
  
     private static final String TAG = "FriendsDbAdapter";
     private SQLiteDatabase mDb;
@@ -29,7 +30,7 @@ public class FriendsDb extends SQLiteOpenHelper {
      */
     private static final String DATABASE_CREATE =
         "create table friends (_id integer primary key autoincrement, "
-        + "friend_fp text not null, friend_name text not null);";
+        + "friend_fp text not null, friend_name text not null, friend_puk blob null);";
 
     private static final String DATABASE_TABLE = "friends";
 
@@ -61,12 +62,15 @@ public class FriendsDb extends SQLiteOpenHelper {
      * @param fp the fingerprint of the friend
      * @return rowId or -1 if failed
      */
-    public long createFriend(String name, String fp) {
+    public long createFriend(String name, String fp, byte[] puk) {
         ContentValues initialValues = new ContentValues();
+        
         initialValues.put(KEY_NAME, name);
         initialValues.put(KEY_FP, fp);
-
+        initialValues.put(KEY_PUK, puk);
+        
         return mDb.insert(DATABASE_TABLE, null, initialValues);
+       
     }
 
     /**
@@ -88,7 +92,7 @@ public class FriendsDb extends SQLiteOpenHelper {
     public Cursor fetchAllFriends() {
 
         return mDb.query(DATABASE_TABLE, new String[] {KEY_ROWID, KEY_NAME,
-                KEY_FP}, null, null, null, null, null);
+                KEY_FP, KEY_PUK}, null, null, null, null, null);
     }
 
     /**
@@ -103,7 +107,7 @@ public class FriendsDb extends SQLiteOpenHelper {
         Cursor mCursor =
 
             mDb.query(true, DATABASE_TABLE, new String[] {KEY_ROWID,
-                    KEY_NAME, KEY_FP}, KEY_ROWID + "=" + rowId, null,
+                    KEY_NAME, KEY_FP, KEY_PUK}, KEY_ROWID + "=" + rowId, null,
                     null, null, null, null);
         if (mCursor != null) {
             mCursor.moveToFirst();
@@ -122,10 +126,11 @@ public class FriendsDb extends SQLiteOpenHelper {
      * @param body value to set friend's fp to
      * @return true if the friend was successfully updated, false otherwise
      */
-    public boolean updateFriend(long rowId, String name, String fp) {
+    public boolean updateFriend(long rowId, String name, String fp, byte[] puk) {
         ContentValues args = new ContentValues();
         args.put(KEY_NAME, name);
         args.put(KEY_FP, fp);
+        args.put(KEY_PUK, puk);
 
         return mDb.update(DATABASE_TABLE, args, KEY_ROWID + "=" + rowId, null) > 0;
     }

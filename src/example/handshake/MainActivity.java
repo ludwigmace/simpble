@@ -179,9 +179,26 @@ public class MainActivity extends Activity {
 		}
 		
 		
-		mDbHelper.close();
-		
 		bleFriends = new HashMap<String, BlePeer>();
+		
+		Cursor c = mDbHelper.fetchAllFriends();
+		
+		while (c.moveToNext()) {
+			
+			BlePeer new_peer = new BlePeer("");
+			
+			String peer_name = c.getString(c.getColumnIndex(FriendsDb.KEY_NAME));
+			String peer_fp = c.getString(c.getColumnIndex(FriendsDb.KEY_FP));
+			byte[] peer_puk = c.getBlob(c.getColumnIndex(FriendsDb.KEY_PUK));
+			
+			new_peer.SetFingerprint(peer_fp);
+			new_peer.SetName(peer_name);
+			new_peer.SetPublicKey(peer_puk);
+			
+			bleFriends.put(peer_fp, new_peer);
+		}
+		
+		mDbHelper.close();
 
 		// create the test message, identified as being sent by me
 		/*
