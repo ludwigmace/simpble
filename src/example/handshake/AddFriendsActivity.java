@@ -1,5 +1,7 @@
 package example.handshake;
 
+import java.util.Arrays;
+
 import simpble.ByteUtilities;
 import android.app.Activity;
 import android.app.LoaderManager;
@@ -68,7 +70,9 @@ public class AddFriendsActivity extends Activity  {
 		long new_friend_id = 0;
 		
 		try {
-			byte[] puk = ByteUtilities.hexToBytes(fk);
+			
+			// only read the first 294 bytes - probably not the best idea
+			byte[] puk = Arrays.copyOf(ByteUtilities.hexToBytes(fk), 294);
 		
 			new_friend_id = mDbHelper.createFriend(fn, fp, puk); // need to add argument for adding this friend's PuK
 		} catch (Exception x) {

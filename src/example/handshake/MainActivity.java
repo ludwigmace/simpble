@@ -138,6 +138,8 @@ public class MainActivity extends Activity {
 			e.printStackTrace();
 		}
 		
+		logMessage(ByteUtilities.bytesToHex(rsaKey.PublicKey()));
+		
 		myFingerprint = ByteUtilities.bytesToHex(rsaKey.PuFingerprint());
 		
 		// get our BLE operations going

@@ -19,6 +19,7 @@ import javax.security.auth.x500.X500Principal;
 
 import android.content.Context;
 import android.security.KeyPairGeneratorSpec;
+import android.util.Log;
 
 // taken from: https://android.googlesource.com/platform/development/+/master/samples/Vault/src/com/example/android/vault/SecretKeyWrapper.java
 public class KeyStuff {
@@ -27,6 +28,7 @@ public class KeyStuff {
 	private final KeyPair mPair;
 
     final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+	private static final String TAG = "KeyStuff";
     
     public static String bytesToHex(byte[] bytes) {
         char[] hexChars = new char[bytes.length * 2];
@@ -36,6 +38,30 @@ public class KeyStuff {
             hexChars[j * 2 + 1] = hexArray[v & 0x0F];
         }
         return new String(hexChars);
+    }
+    
+    public static boolean CheckFingerprint(byte[] puk, String fp) {
+    	boolean is_valid = false;
+    	
+    	MessageDigest md = null;
+    	
+        try {
+			md = MessageDigest.getInstance("SHA-1");
+		} catch (NoSuchAlgorithmException e) {
+
+			e.printStackTrace();
+		}
+    	
+        byte[] myF = md.digest(puk);
+        String s_fp = bytesToHex(myF);
+        
+        Log.v(TAG, "calc'd " + s_fp + " but recd " + fp);
+        
+        if (s_fp.contains(fp)) {
+        	is_valid = true;
+        }
+    	
+    	return is_valid;
     }
 	
 	public KeyStuff(Context context, String alias) throws GeneralSecurityException, IOException {
@@ -94,7 +120,7 @@ public class KeyStuff {
     	
     	return myF;
     }
-
+    
     
     // Wrap a SecretKey using the public key assigned to this wrapper.
     public byte[] wrap(SecretKey key) throws GeneralSecurityException {
