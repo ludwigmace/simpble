@@ -66,10 +66,12 @@ public class AddMessageActivity extends Activity  {
 	public void handleButtonQueueMsg(View view) {
 
 		String msg_content = messageContent.getText().toString();
-		String friend_name = friendSpinner.getSelectedItem().toString();
-
 		
-		Log.v(TAG, "try to queue this msg");
+		Cursor cursorFriends = (Cursor) friendSpinner.getSelectedItem();
+
+		String friend_name = cursorFriends.getString(cursorFriends.getColumnIndex("friend_name"));
+		
+		Log.v(TAG, "try to queue msg for " + friend_name);
 		
 		mDbHelper = new FriendsDb(this);
 		

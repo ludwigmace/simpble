@@ -40,7 +40,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
 
 	private static final String TAG = "main";
-	private static final int DEBUGLEVEL = 0;
+	private static final int DEBUGLEVEL = 1;
 
     private static final int ACTIVITY_CREATE=0;
     private static final int ACTIVITY_EDIT=1;
@@ -176,27 +176,37 @@ public class MainActivity extends Activity {
 			new_peer.SetPublicKey(peer_puk);
 			
 			bleFriends.put(peer_fp, new_peer);
+			logMessage("adding peer " + peer_fp);
 		}
 
 		c = mDbHelper.fetchAllMsgs();
 		
 		while (c.moveToNext()) {
-			
+
 			BleMessage m = new BleMessage();
 			
 			String recipient_name = c.getString(c.getColumnIndex(FriendsDb.KEY_M_FNAME));
 			String msg_content = c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT));
 			
+			logMessage("found msg to add for " + recipient_name);
+			
 			// inefficient way to get peer stuff
 			for (BlePeer p: bleFriends.values()) {
+
 				if (p.GetName().equalsIgnoreCase(recipient_name)) {
-					m.RecipientFingerprint = p.GetFingerprintBytes();
-					m.MessageType = "datatext";
-					m.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint);
-					m.setPayload(msg_content.getBytes());
+					logMessage("found friend " + recipient_name + ", queueing msg");
 					
-					p.addBleMessageOut(m);
-					break;
+					try {					
+						m.RecipientFingerprint = p.GetFingerprintBytes();
+						m.MessageType = "datatext";
+						m.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint);
+						m.setPayload(msg_content.getBytes());
+						
+						p.addBleMessageOut(m);
+						break;
+					} catch (Exception x) {
+						logMessage("e: " + x.getMessage());
+					}
 				}
 			}
 			
@@ -275,24 +285,10 @@ public class MainActivity extends Activity {
 			
 			// you don't know who this person is yet
 			if (notification.equalsIgnoreCase("new_contract") && currentTask.equalsIgnoreCase("normal")) {
-				ourMostRecentFriendsAddress = peerIndex;
-				logMessage("a: connected to " + peerIndex);
-				BleMessage idenM = identityMessage();
-				String queuedMsg = "";
+				logMessage("a: peripheral peer meets contract");
 				
-				if (idenM != null) {
-					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM);
-					logMessage("a: queued " + queuedMsg + " for " + peerIndex);
-					
-					// now let the other guy know you're ready to receive data
-					bleMessenger.initRequestForData(ourMostRecentFriendsAddress);
-					
-					// go ahead and send this other person our stuff
-					runOnUiThread(new Runnable() { public void run() { bleMessenger.sendMessagesToPeer(ourMostRecentFriendsAddress);} });
-					
-					// we've got at least 1 msg queued up to go out, so enable our push button
-					//runOnUiThread(new Runnable() { public void run() { btnPush.setEnabled(true); } });
-				}
+				// now let the other guy know you're ready to receive data
+				bleMessenger.initRequestForData(peerIndex);
 			}
 			
 			// this notification is that BleMessenger just found a peer that met the service contract
@@ -321,20 +317,20 @@ public class MainActivity extends Activity {
 				//runOnUiThread(new Runnable() { public void run() { btnPull.setEnabled(true); } });
 			}
 			
-			// only peripheral mode gets this
-			if (notification.equalsIgnoreCase("accepted_connection") && currentTask.equalsIgnoreCase("pair")) {
+			// only peripheral mode gets this; we've accepted a connection and we're either wanting to pair or just data stuff
+			if (notification.equalsIgnoreCase("accepted_connection") && (currentTask.equalsIgnoreCase("pair") || currentTask.equalsIgnoreCase("normal"))) {
 				logMessage("a: connected to " + peerIndex);
 
 				// since i've just accepted a connection, queue up an identity message 
 				BleMessage idenM = identityMessage();
 				String queuedMsg = "";
+				
 				if (idenM != null) {
 					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM);
 					logMessage("a: queued " + queuedMsg + " for " + peerIndex);
 				}
 				
-				// if you're a peripheral,
-				// you can't call bleMessenger.sendMessagesToPeer(peerIndex) until the peer has subscribed
+				// if you're a peripheral, you can't initiate message send until the peer has subscribed
 				
 				 // you don't have the fingerprint yet, you just know that this person meets the contract
 				 //runOnUiThread(new Runnable() { public void run() { btnPush.setEnabled(true); } });
@@ -377,23 +373,30 @@ public class MainActivity extends Activity {
 				
 				// if the sender is in our friends list
 				if (bleFriends.containsKey(senderFingerprint)) {
+
+					logMessage("a: known peer: " + senderFingerprint.substring(0,20));
 					
 					// we know that we have this peer as a friend
 					// so now we can either get the message we have for this friend
 					// and add to the peer in the BleMessenger list
 					
-					// let's keep them separate, and pass it in
+					// if we've got a message, add it in - this only gets the first one
+					// need to change this so we loop over all for this person
 					BleMessage m = bleFriends.get(senderFingerprint).getBleMessageOut();
-					
-					// if we've got a message, add it in
-					logMessage("a: known peer: " + senderFingerprint.substring(0,20));
-					
+										
 					String queuedMsg = "";
 					if (m != null) {
 						queuedMsg = bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(m);
 						logMessage("a: queued " + queuedMsg + " for " + remoteAddress);
+						ourMostRecentFriendsAddress = remoteAddress;
 						
+						runOnUiThread(new Runnable() { public void run() { bleMessenger.sendMessagesToPeer(ourMostRecentFriendsAddress);} });
+
+					} else {
+						logMessage("a: no msg found for " + remoteAddress);
 					}
+					
+					
 					
 				} else {
 					logMessage("a: this guy's FP isn't known to me: " + senderFingerprint.substring(0,20));
@@ -547,6 +550,8 @@ public class MainActivity extends Activity {
 		// now we need to create the payload with our friendly name and public key
 		Log.v(TAG, "Advertising Toggle Pressed");
 		
+		currentTask = "normal";
+		
 		if (!visible) {
 			Log.v(TAG, "Not currently visible, begin stuff");
 
@@ -559,6 +564,8 @@ public class MainActivity extends Activity {
 			Log.v(TAG, "Go Invisible");
 			bleMessenger.HideYourself();
 		}
+		
+		
 	}
 	
 	public void handleButtonStartPair(View view) {
@@ -653,7 +660,7 @@ public class MainActivity extends Activity {
 	public void handleButtonFindAFriend(View view) {
 		logMessage("a: look around");
 
-		currentTask = "pair";
+		currentTask = "normal";
 		
 		// calls back bleMessageStatus when peers are found
 		bleMessenger.ScanForPeers(2500);
