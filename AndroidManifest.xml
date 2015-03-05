@@ -38,6 +38,11 @@
             android:name="example.handshake.AddFriendsActivity"
             android:label="@string/friends_add" >
         </activity>
+        
+        <activity
+            android:name="example.handshake.AddMessageActivity"
+            android:label="@string/message_add" >
+        </activity>
 	        
 	    <provider
 	       android:name="Friend"

@@ -34,7 +34,7 @@ public class FriendsActivity extends Activity implements LoaderManager.LoaderCal
         mAdapter = new SimpleCursorAdapter(getBaseContext(),
                 R.layout.listview_item_layout,
                 null,
-                new String[] { FriendsDb.KEY_ROWID, FriendsDb.KEY_NAME, FriendsDb.KEY_FP},
+                new String[] { FriendsDb.KEY_F_ROWID, FriendsDb.KEY_F_NAME, FriendsDb.KEY_F_FP},
                 new int[] { R.id.rowid, R.id.name, R.id.fp }, 0);
         
         mListView = (ListView) findViewById(R.id.friendslistview);
@@ -53,8 +53,8 @@ public class FriendsActivity extends Activity implements LoaderManager.LoaderCal
 				
 				c.moveToFirst();
 				
-				String peer_fp = c.getString(c.getColumnIndex(FriendsDb.KEY_FP));
-				byte[] peer_puk = c.getBlob(c.getColumnIndex(FriendsDb.KEY_PUK));
+				String peer_fp = c.getString(c.getColumnIndex(FriendsDb.KEY_F_FP));
+				byte[] peer_puk = c.getBlob(c.getColumnIndex(FriendsDb.KEY_F_PUK));
 				
 				boolean keyvalid = KeyStuff.CheckFingerprint(peer_puk, peer_fp);
 				
@@ -81,9 +81,9 @@ public class FriendsActivity extends Activity implements LoaderManager.LoaderCal
     
     // These are the Contacts rows that we will retrieve.
     static final String[] FRIENDS_SUMMARY_PROJECTION = new String[] {
-    	FriendsDb.KEY_ROWID,
-    	FriendsDb.KEY_FP,
-    	FriendsDb.KEY_NAME
+    	FriendsDb.KEY_F_ROWID,
+    	FriendsDb.KEY_F_FP,
+    	FriendsDb.KEY_F_NAME
     };
 
     @Override

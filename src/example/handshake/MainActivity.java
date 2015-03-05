@@ -142,45 +142,23 @@ public class MainActivity extends Activity {
 		
 		myFingerprint = ByteUtilities.bytesToHex(rsaKey.PuFingerprint());
 		
+		btnAdvertise.setEnabled(false);
+		
 		// get our BLE operations going
 		if (btAdptr.isEnabled()) {
 			bleMessenger = new BleMessenger(btMgr, btAdptr, this, bleMessageStatus);
+			
+			if (bleMessenger.SupportsAdvertising) {
+				btnAdvertise.setEnabled(true);
+			} else {
+				btnAdvertise.setEnabled(false);
+			}
+			
 		} // if not enabled, the onResume will catch this
-
-		
-		if (bleMessenger.SupportsAdvertising) {
-			btnAdvertise.setEnabled(true);
-		} else {
-			btnAdvertise.setEnabled(false);
-		}
-		
-		
-		// nexus 5: BC966C8DB89F0EBB91C82C97E561DF631DB96DC3
-		// gnex: D6DB868F6260FB74ADFE6E340288E77FCA3BA9E5
-		
-		
-		String testFriendFP = "";
-		String testMessage = ""; 
 		
 		mDbHelper = new FriendsDb(this);
 		
-		if (myFingerprint.equalsIgnoreCase("BC966C8DB89F0EBB91C82C97E561DF631DB96DC3")) {
-			testMessage = "i'm a nexus 5 and i love you SO MUCHCHCHCHCH - it's creepy";
-			testFriendFP = "D6DB868F6260FB74ADFE6E340288E77FCA3BA9E5";
-			
-			//mDbHelper.createFriend("gnex", testFriendFP);
-			
-		} else if (myFingerprint.equalsIgnoreCase("D6DB868F6260FB74ADFE6E340288E77FCA3BA9E5")) {
-			testMessage = "i'm a GNEX and i'm tolerant of your existence";
-			testFriendFP = "BC966C8DB89F0EBB91C82C97E561DF631DB96DC3";
-			
-			//mDbHelper.createFriend("nex5", testFriendFP);
-			
-		} else {
-			Log.v(TAG, "myFingerprint matches nothing!!!!");
-		}
-		
-		
+		// let's build our friends that we've got stored up in the database
 		bleFriends = new HashMap<String, BlePeer>();
 		
 		Cursor c = mDbHelper.fetchAllFriends();
@@ -189,9 +167,9 @@ public class MainActivity extends Activity {
 			
 			BlePeer new_peer = new BlePeer("");
 			
-			String peer_name = c.getString(c.getColumnIndex(FriendsDb.KEY_NAME));
-			String peer_fp = c.getString(c.getColumnIndex(FriendsDb.KEY_FP));
-			byte[] peer_puk = c.getBlob(c.getColumnIndex(FriendsDb.KEY_PUK));
+			String peer_name = c.getString(c.getColumnIndex(FriendsDb.KEY_F_NAME));
+			String peer_fp = c.getString(c.getColumnIndex(FriendsDb.KEY_F_FP));
+			byte[] peer_puk = c.getBlob(c.getColumnIndex(FriendsDb.KEY_F_PUK));
 			
 			new_peer.SetFingerprint(peer_fp);
 			new_peer.SetName(peer_name);
@@ -199,25 +177,33 @@ public class MainActivity extends Activity {
 			
 			bleFriends.put(peer_fp, new_peer);
 		}
+
+		c = mDbHelper.fetchAllMsgs();
+		
+		while (c.moveToNext()) {
+			
+			BleMessage m = new BleMessage();
+			
+			String recipient_name = c.getString(c.getColumnIndex(FriendsDb.KEY_M_FNAME));
+			String msg_content = c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT));
+			
+			// inefficient way to get peer stuff
+			for (BlePeer p: bleFriends.values()) {
+				if (p.GetName().equalsIgnoreCase(recipient_name)) {
+					m.RecipientFingerprint = p.GetFingerprintBytes();
+					m.MessageType = "datatext";
+					m.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint);
+					m.setPayload(msg_content.getBytes());
+					
+					p.addBleMessageOut(m);
+					break;
+				}
+			}
+			
+		}
 		
 		mDbHelper.close();
 
-		// create the test message, identified as being sent by me
-		/*
-		BleMessage testBleMsg = new BleMessage();
-		testBleMsg.MessageType = "datatext";
-		testBleMsg.RecipientFingerprint = ByteUtilities.hexToBytes(testFriendFP);
-		testBleMsg.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint); 
-		testBleMsg.setPayload(testMessage.getBytes());
-		
-		// don't make a peer here - make something else!
-		BlePeer testFriend = new BlePeer(""); // constructor takes an address; may want to have BleFriends and BlePeers as different classes
-		testFriend.addBleMessageOut(testBleMsg);
-		testFriend.SetFingerprint(testFriendFP);
-			
-		// let's add this friend
-		bleFriends.put(testFriendFP, testFriend);
-		*/
 		if (myFingerprint != null) {
 			logMessage("a: our fp is:" + myFingerprint.substring(0, 20) + " . . .");
 			Log.v(TAG, "our fp:" + myFingerprint);
@@ -273,7 +259,8 @@ public class MainActivity extends Activity {
 		}		
 		
 		if (id == R.id.action_add_message) {
-			return true;
+	        Intent i = new Intent(this, AddMessageActivity.class);
+	        startActivityForResult(i, ACTIVITY_CREATE);
 		}
 		
 		

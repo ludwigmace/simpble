@@ -18,5 +18,7 @@
 	<string name="friends_name">Your Friends</string>
 	<string name="friends_add">Add A Friend</string>
 	<string name="add_this_friend">Add</string>
+	<string name="message_add">Queue Up A Message</string>
+	<string name="queue_msg_btn">Queue Message</string>
 </resources>
 
