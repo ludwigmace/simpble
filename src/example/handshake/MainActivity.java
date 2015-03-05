@@ -273,6 +273,28 @@ public class MainActivity extends Activity {
 		// we just got a notification
 		public void peerNotification(String peerIndex, String notification) {
 			
+			// you don't know who this person is yet
+			if (notification.equalsIgnoreCase("new_contract") && currentTask.equalsIgnoreCase("normal")) {
+				ourMostRecentFriendsAddress = peerIndex;
+				logMessage("a: connected to " + peerIndex);
+				BleMessage idenM = identityMessage();
+				String queuedMsg = "";
+				
+				if (idenM != null) {
+					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM);
+					logMessage("a: queued " + queuedMsg + " for " + peerIndex);
+					
+					// now let the other guy know you're ready to receive data
+					bleMessenger.initRequestForData(ourMostRecentFriendsAddress);
+					
+					// go ahead and send this other person our stuff
+					runOnUiThread(new Runnable() { public void run() { bleMessenger.sendMessagesToPeer(ourMostRecentFriendsAddress);} });
+					
+					// we've got at least 1 msg queued up to go out, so enable our push button
+					//runOnUiThread(new Runnable() { public void run() { btnPush.setEnabled(true); } });
+				}
+			}
+			
 			// this notification is that BleMessenger just found a peer that met the service contract
 			// only central mode gets this
 			if (notification.equalsIgnoreCase("new_contract") && currentTask.equalsIgnoreCase("pair")) {
@@ -631,8 +653,10 @@ public class MainActivity extends Activity {
 	public void handleButtonFindAFriend(View view) {
 		logMessage("a: look around");
 
+		currentTask = "pair";
+		
 		// calls back bleMessageStatus when peers are found
-		bleMessenger.ScanForPeers(10000);
+		bleMessenger.ScanForPeers(2500);
 	}
 		
 	private void showMessage(String msg) {
