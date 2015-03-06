@@ -31,6 +31,7 @@ public class BleMessenger {
 	private static int INACTIVE_TIMEOUT = 600000; // 5 minute timeout
 	
 	private Timer longTimer;
+	private Timer businessTimer;
 	
 	// handles to the device and system's bluetooth management 
 	private BluetoothManager btMgr;
@@ -62,6 +63,8 @@ public class BleMessenger {
 	public boolean SupportsAdvertising;
     
     private List<BleCharacteristic> serviceDef;
+    
+    private boolean areWeSendingMessages;
 	
     /**
      * Instantiates serviceDef arraylist, peerMap, fpNetMap, creates handles for peripheral/central,
@@ -110,46 +113,55 @@ public class BleMessenger {
 
 		bleCentral.setRequiredServiceDef(serviceDef);
 
+		areWeSendingMessages = false;
+		
 		setupStaleChecker(INACTIVE_TIMEOUT);  // setup timeout
+		setupBusinessTimer(1000); // every second make sure that we're all stayin' busy
 		
 	
 		// when we connect, send the id message to the connecting party
+	}
+	
+	public void sendMessagesToPeer(String PeerAddress) {
+		BlePeer p = peerMap.get(PeerAddress);
+		
+		sendMessagesToPeer(p);
 	}
 	
 	/**
 	 * Send all the messages to the passed in Peer
 	 * @param Peer
 	 */
-	public void sendMessagesToPeer(String PeerAddress) {
+	public void sendMessagesToPeer(BlePeer p) {
 		//BlePeer p = GetBlePeerByFingerprint(PeerFingerprint);
-		BlePeer p = peerMap.get(PeerAddress);
 		
 		if (p != null) {
 			if (p.PendingMessageCount() > 0) {
-				bleStatusCallback.headsUp("m: found " + String.valueOf(p.PendingMessageCount()) + " msgs for " + PeerAddress);
+				bleStatusCallback.headsUp("m: found " + String.valueOf(p.PendingMessageCount()) + " msgs for peer " + p.RecipientAddress());
 				
 				// is your peer connected as a peripheral or a central?
 				if (p.ConnectedAs.equalsIgnoreCase("central")) {
 					// if you're a central, send as such
 					bleStatusCallback.headsUp("m: you're a central and can initiate a send, congrats");
-					writeOut(PeerAddress);
+					writeOut(p.RecipientAddress());
 				} else if (p.ConnectedAs.equalsIgnoreCase("peripheral")) {
 					// if you're a peripheral send as such
 					/* you'll need to know which attribute to write on
 					 * if you're hoping to use a notify characteristic, they'll need to be subscribed to it
 					*/
 					// how to tell if this peer is subscribed?
-					bleStatusCallback.headsUp("m: begin peripheral send to " + PeerAddress);
+					bleStatusCallback.headsUp("m: begin peripheral send to " + p.RecipientAddress());
 
-					writeOut(PeerAddress);
+					writeOut(p.RecipientAddress());
 					
 				}
 			} else {
-				bleStatusCallback.headsUp("m: no more messages for peer: " + PeerAddress);
+				bleStatusCallback.headsUp("m: no more messages for peer: " + p.RecipientAddress());
 			}
 		} else {
-			bleStatusCallback.headsUp("m: can't locate a peer w/ fp: " + PeerAddress);
+			bleStatusCallback.headsUp("m: can't locate a peer w/ fp: " + p.RecipientAddress());
 		}
+
 	}
 	
 	public BlePeer GetBlePeerByAddress(String remoteAddress) {
@@ -188,6 +200,51 @@ public class BleMessenger {
 		}
 	}
 
+	private void LoopSendMessages() {
+		setupBusinessTimer(1000);
+
+		// if we're not sending messages, then we need to see if we need to send any
+		if (!areWeSendingMessages) {
+			
+			// loop over all the peers i have that i'm connected to	
+			for (BlePeer p: peerMap.values()) {
+				
+				// get the first message i see
+				BleMessage m = p.getBleMessageOut();
+	
+				// funny, we're not actually sending a particular message per se, even though we asked for a particular message
+				// we're calling a method to send any pending messages for a particular peer
+				// mainly because we don't store the identifier for the peer in a particular BleMessage (although we could?)
+				if (m != null) {
+					areWeSendingMessages = true;
+					sendMessagesToPeer(p);
+				}
+	
+			}
+		}
+	}
+	
+	private synchronized void setupBusinessTimer(long youStillBusy) {
+		if (businessTimer != null) {
+			businessTimer.cancel();
+			businessTimer = null;
+		}
+		
+		if (businessTimer == null) {
+			businessTimer = new Timer();
+			
+			businessTimer.schedule(new TimerTask() {
+				public void run() {
+					businessTimer.cancel();
+					businessTimer = null;
+					
+					// check timing on connections; drop those that are stale
+					LoopSendMessages();
+				}
+				
+			}, youStillBusy);
+		}
+	}
 	
 	private synchronized void setupStaleChecker(long timeout) {
 		if (longTimer != null) {
@@ -305,6 +362,9 @@ public class BleMessenger {
     		}
 			
 		}
+		
+		// well now we've sent some messages
+		areWeSendingMessages = false;
 		
 		bleStatusCallback.headsUp("m: " + String.valueOf(sent) + " packets sent");
 		
@@ -613,7 +673,7 @@ public class BleMessenger {
 			
 			// if somebody's hitting 105 they're gonna wanna know if their msg is sent or not
 			if (remoteCharUUID.toString().equalsIgnoreCase(uuidFromBase("105").toString())) {
-				
+			
 				// get the peer who just asked us if we have any incomplete messages
 				BlePeer p = peerMap.get(remoteAddress);
 				

@@ -82,6 +82,9 @@ public class MainActivity extends Activity {
     
     String currentTask;
 	
+    private boolean messageReceiving = false;
+    private boolean messageSending = false;
+    
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -89,6 +92,10 @@ public class MainActivity extends Activity {
 		currentTask = "";
 		statusLogText = "";
 		ctx = this;
+		
+		// do you want to be able to receive messages?
+		// TODO: have the UI capture this
+		messageReceiving = true;
 		
 		// we're not showing ourselves when the program starts
 		visible = false;
@@ -180,6 +187,11 @@ public class MainActivity extends Activity {
 		}
 
 		c = mDbHelper.fetchAllMsgs();
+		
+		// we want to send some messages
+		if (c.getCount() > 0) {
+			messageSending = true;
+		}
 		
 		while (c.moveToNext()) {
 
@@ -277,7 +289,10 @@ public class MainActivity extends Activity {
 		
 		return super.onOptionsItemSelected(item);
 	}
-		
+	
+	// if i want to be able to receive a message meant for me, then i obviously must volunteer my identifying info
+	// however if i just want to ferry messages or don't care to receive one (maybe i just want to send)
+	// then i don't need to volunteer my info
 	BleStatusCallback bleMessageStatus = new BleStatusCallback() {
 
 		// we just got a notification
@@ -287,8 +302,26 @@ public class MainActivity extends Activity {
 			if (notification.equalsIgnoreCase("new_contract") && currentTask.equalsIgnoreCase("normal")) {
 				logMessage("a: peripheral peer meets contract");
 				
-				// now let the other guy know you're ready to receive data
-				bleMessenger.initRequestForData(peerIndex);
+				ourMostRecentFriendsAddress = peerIndex;
+				
+				// if we're willing to receive messages then we need to transmit our info to the other peer
+				if (messageReceiving) {
+					
+					BleMessage idenM = identityMessage();
+					String queuedMsg = "";
+					
+					if (idenM != null) {
+						queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM);
+						logMessage("a: queued " + queuedMsg + " for " + peerIndex);
+						
+						// go ahead and send this other person our stuff
+						//try1: runOnUiThread(new Runnable() { public void run() { bleMessenger.sendMessagesToPeer(ourMostRecentFriendsAddress);} });
+						
+					}
+				}
+				
+				// subscribe to the peripheral's transport
+				bleMessenger.initRequestForData(ourMostRecentFriendsAddress);
 			}
 			
 			// this notification is that BleMessenger just found a peer that met the service contract
@@ -307,7 +340,7 @@ public class MainActivity extends Activity {
 					bleMessenger.initRequestForData(ourMostRecentFriendsAddress);
 					
 					// go ahead and send this other person our stuff
-					runOnUiThread(new Runnable() { public void run() { bleMessenger.sendMessagesToPeer(ourMostRecentFriendsAddress);} });
+					// try1: runOnUiThread(new Runnable() { public void run() { bleMessenger.sendMessagesToPeer(ourMostRecentFriendsAddress);} });
 					
 					// we've got at least 1 msg queued up to go out, so enable our push button
 					//runOnUiThread(new Runnable() { public void run() { btnPush.setEnabled(true); } });
@@ -318,10 +351,29 @@ public class MainActivity extends Activity {
 			}
 			
 			// only peripheral mode gets this; we've accepted a connection and we're either wanting to pair or just data stuff
-			if (notification.equalsIgnoreCase("accepted_connection") && (currentTask.equalsIgnoreCase("pair") || currentTask.equalsIgnoreCase("normal"))) {
+			if (notification.equalsIgnoreCase("accepted_connection") && currentTask.equalsIgnoreCase("pair")) {
 				logMessage("a: connected to " + peerIndex);
 
-				// since i've just accepted a connection, queue up an identity message 
+				// since i've just accepted a connection, queue up an identity message
+				BleMessage idenM = identityMessage();
+				String queuedMsg = "";
+				
+				if (idenM != null) {
+					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM);
+					logMessage("a: queued " + queuedMsg + " for " + peerIndex);
+				}
+				
+				// if you're a peripheral, you can't initiate message send until the peer has subscribed
+				
+				 // you don't have the fingerprint yet, you just know that this person meets the contract
+				 //runOnUiThread(new Runnable() { public void run() { btnPush.setEnabled(true); } });
+			}
+			
+			// only peripheral mode gets this; we've accepted a connection and we're either wanting to pair or just data stuff
+			if (notification.equalsIgnoreCase("accepted_connection") && currentTask.equalsIgnoreCase("normal")) {
+				logMessage("a: connected to " + peerIndex);
+
+				// since i've just accepted a connection, queue up an identity message
 				BleMessage idenM = identityMessage();
 				String queuedMsg = "";
 				
@@ -390,7 +442,7 @@ public class MainActivity extends Activity {
 						logMessage("a: queued " + queuedMsg + " for " + remoteAddress);
 						ourMostRecentFriendsAddress = remoteAddress;
 						
-						runOnUiThread(new Runnable() { public void run() { bleMessenger.sendMessagesToPeer(ourMostRecentFriendsAddress);} });
+						//try1: runOnUiThread(new Runnable() { public void run() { bleMessenger.sendMessagesToPeer(ourMostRecentFriendsAddress);} });
 
 					} else {
 						logMessage("a: no msg found for " + remoteAddress);
@@ -497,31 +549,18 @@ public class MainActivity extends Activity {
 		
 	};
 	
-	public void handleShowFriends(View view) {
-		/*
-        mDbHelper = new FriendsDbAdapter(this);
-        mDbHelper.open();
+	
+	
+	public void checkMessageStack() {
+		
+		// loop over all the peers i have that i'm connected to
+		for (BlePeer p: bleMessenger.peerMap.values()) {
+			p.getBleMessageOut();
 
-		mFriendsCursor = mDbHelper.fetchAllFriends();
-		
-		statusLogText = "";
-		
-		if (mFriendsCursor.getCount() > 0) {
-		
-		while (mFriendsCursor.moveToNext()) {
-			String friend_name = mFriendsCursor.getString(mFriendsCursor.getColumnIndex("friend_name"));
-			String friend_fp = mFriendsCursor.getString(mFriendsCursor.getColumnIndex("friend_fp"));
-			
-			logMessage(friend_name + ": " + friend_fp);
-		}
-		} else {
-			logMessage("no friends!");
 		}
 		
-		mFriendsCursor.close();
-		
-        mDbHelper.close();
-		*/
+		//bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(m);
+		// runOnUiThread(new Runnable() { public void run() { bleMessenger.sendMessagesToPeer(ourMostRecentFriendsAddress);} });
 	}
 		
 	public void handleButtonPull(View view) {
@@ -540,7 +579,7 @@ public class MainActivity extends Activity {
 		for (String remoteAddress : bleMessenger.peerMap.keySet()) {
 			// send pending messages to this peer
 			logMessage("a: " + remoteAddress + " needs " + bleMessenger.peerMap.get(remoteAddress).PendingMessageCount() + " msgs");
-			bleMessenger.sendMessagesToPeer(remoteAddress);
+			//try1: bleMessenger.sendMessagesToPeer(remoteAddress);
 		}
 		
 	}

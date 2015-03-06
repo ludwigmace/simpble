@@ -128,6 +128,10 @@ public class BlePeer {
 		return peerAddress;
 	}
 	
+	public void SetRecipientAddress(String newAddress) {
+		peerAddress = newAddress;
+	}
+	
 	public byte[] GetPublicKey() {
 		return peerPublicKey;
 	}
