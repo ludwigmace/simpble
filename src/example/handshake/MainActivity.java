@@ -63,7 +63,7 @@ public class MainActivity extends Activity {
 	TextView statusText;
 	
 	private Button btnAdvertise;
-	private Button btnPush;
+	private Button btnToggleBusy;
 	private Button btnPull;
 	private Button btnStartPair;
 	
@@ -103,13 +103,10 @@ public class MainActivity extends Activity {
 		// get a pointer to our Be A Friend button, and our transfer packet button
 		btnAdvertise = (Button)findViewById(R.id.be_a_friend);
 		
-		btnPush = (Button)findViewById(R.id.pushmsgs);
+		btnToggleBusy = (Button)findViewById(R.id.toggle_busy);
 		btnPull = (Button)findViewById(R.id.pullmsgs);
 		btnStartPair = (Button)findViewById(R.id.startpair);
 		
-		
-		// disable the Xfer button, because you're not connected and don't have anything set up to transfer
-		btnPush.setEnabled(false);
 		// disable Id button, because you're not even connected yet, and thus not ready to identify
 		btnPull.setEnabled(false);
 		
@@ -145,7 +142,7 @@ public class MainActivity extends Activity {
 			e.printStackTrace();
 		}
 		
-		logMessage(ByteUtilities.bytesToHex(rsaKey.PublicKey()));
+		//logMessage(ByteUtilities.bytesToHex(rsaKey.PublicKey()));
 		
 		myFingerprint = ByteUtilities.bytesToHex(rsaKey.PuFingerprint());
 		
@@ -183,7 +180,7 @@ public class MainActivity extends Activity {
 			new_peer.SetPublicKey(peer_puk);
 			
 			bleFriends.put(peer_fp, new_peer);
-			logMessage("adding peer " + peer_fp);
+			logMessage("adding peer " + peer_fp.substring(0,8));
 		}
 
 		c = mDbHelper.fetchAllMsgs();
@@ -200,13 +197,13 @@ public class MainActivity extends Activity {
 			String recipient_name = c.getString(c.getColumnIndex(FriendsDb.KEY_M_FNAME));
 			String msg_content = c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT));
 			
-			logMessage("found msg to add for " + recipient_name);
+			//logMessage("found msg to add for " + recipient_name);
 			
 			// inefficient way to get peer stuff
 			for (BlePeer p: bleFriends.values()) {
 
 				if (p.GetName().equalsIgnoreCase(recipient_name)) {
-					logMessage("found friend " + recipient_name + ", queueing msg");
+					String msgHash = "";
 					
 					try {					
 						m.RecipientFingerprint = p.GetFingerprintBytes();
@@ -215,10 +212,21 @@ public class MainActivity extends Activity {
 						m.setPayload(msg_content.getBytes());
 						
 						p.addBleMessageOut(m);
+						
+						try {
+							msgHash = ByteUtilities.bytesToHex(m.MessageHash).substring(0, 8);
+						} catch (Exception e) {
+							msgHash = "err";
+						}
+						
+						logMessage("queued " + msgHash  + " for " + recipient_name);						
+						
 						break;
 					} catch (Exception x) {
 						logMessage("e: " + x.getMessage());
 					}
+					
+
 				}
 			}
 			
@@ -571,15 +579,15 @@ public class MainActivity extends Activity {
 		
 	}
 	
-	public void handleButtonPush(View view) {
+	public void handleButtonToggleBusy(View view) {
 		
-		// iterate over our currently connected folks and see if anybody needs a message we have
-		logMessage("a: iterating over " + String.valueOf(bleMessenger.peerMap.keySet().size()) + " connected peers");
-		
-		for (String remoteAddress : bleMessenger.peerMap.keySet()) {
-			// send pending messages to this peer
-			logMessage("a: " + remoteAddress + " needs " + bleMessenger.peerMap.get(remoteAddress).PendingMessageCount() + " msgs");
-			//try1: bleMessenger.sendMessagesToPeer(remoteAddress);
+		// if we're currently busy, stop being busy
+		if (bleMessenger.BusyStatus()) {
+			bleMessenger.StopBusy();
+			btnToggleBusy.setText("!Busy");
+		} else {
+			bleMessenger.StartBusy();
+			btnToggleBusy.setText("Busy!");
 		}
 		
 	}

@@ -416,7 +416,7 @@ public class BlePeripheral {
         @Override
         public void onDescriptorWriteRequest (BluetoothDevice device, int requestId, BluetoothGattDescriptor descriptor, boolean preparedWrite, boolean responseNeeded, int offset, byte[] value) {
         	Log.d(TAG, "onWriteDescriptorCalled");
-        	// pretty much this is only called when somebody subscribes to indications/notifications
+        	// this is only called when somebody subscribes to indications/notifications
         	
         	String status = "";
         	

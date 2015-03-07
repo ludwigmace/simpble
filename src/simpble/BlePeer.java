@@ -47,6 +47,9 @@ public class BlePeer {
 	// the last update of activity
 	private Date lastActivity;
 	
+	// this needs to be a private collection referenced w/ getters and setters
+	public String subscribedChars;
+	
 	/**
 	 * 
 	 * @param PeerAddress Network address of the peer, or really anything that uniquely identifies this peer for the current connection
@@ -59,6 +62,7 @@ public class BlePeer {
 		
 		ConnectedAs = "";
 		CurrentMessageIndex = 0;
+		subscribedChars ="";
 		
 		// set the last activity date to right now
 		MarkActive();

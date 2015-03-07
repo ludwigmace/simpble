@@ -29,6 +29,9 @@ import android.widget.Toast;
 public class BleMessenger {
 	private static String TAG = "blemessenger";
 	private static int INACTIVE_TIMEOUT = 600000; // 5 minute timeout
+	private static int BUSINESS_TIMEOUT = 5000; // 5 minute timeout
+	
+	private boolean StayingBusy;
 	
 	private Timer longTimer;
 	private Timer businessTimer;
@@ -81,6 +84,7 @@ public class BleMessenger {
 		btMgr = bluetoothManager;
 		btAdptr = bluetoothAdapter;
 		ctx = context;
+		StayingBusy = true;
 		
 
 		/*if (Build.VERSION.SDK_INT < 21) {
@@ -116,13 +120,13 @@ public class BleMessenger {
 		areWeSendingMessages = false;
 		
 		setupStaleChecker(INACTIVE_TIMEOUT);  // setup timeout
-		setupBusinessTimer(1000); // every second make sure that we're all stayin' busy
+		setupBusinessTimer(BUSINESS_TIMEOUT); // every second make sure that we're all stayin' busy
 		
 	
 		// when we connect, send the id message to the connecting party
 	}
 	
-	public void sendMessagesToPeer(String PeerAddress) {
+	private void sendMessagesToPeer(String PeerAddress) {
 		BlePeer p = peerMap.get(PeerAddress);
 		
 		sendMessagesToPeer(p);
@@ -132,34 +136,36 @@ public class BleMessenger {
 	 * Send all the messages to the passed in Peer
 	 * @param Peer
 	 */
-	public void sendMessagesToPeer(BlePeer p) {
-		//BlePeer p = GetBlePeerByFingerprint(PeerFingerprint);
+	private void sendMessagesToPeer(BlePeer p) {
+		// right here i need to catch whether or not my peer has subscribed if i am connected as a peripheral
 		
-		if (p != null) {
-			if (p.PendingMessageCount() > 0) {
-				bleStatusCallback.headsUp("m: found " + String.valueOf(p.PendingMessageCount()) + " msgs for peer " + p.RecipientAddress());
-				
-				// is your peer connected as a peripheral or a central?
-				if (p.ConnectedAs.equalsIgnoreCase("central")) {
-					// if you're a central, send as such
-					bleStatusCallback.headsUp("m: you're a central and can initiate a send, congrats");
-					writeOut(p.RecipientAddress());
-				} else if (p.ConnectedAs.equalsIgnoreCase("peripheral")) {
-					// if you're a peripheral send as such
-					/* you'll need to know which attribute to write on
-					 * if you're hoping to use a notify characteristic, they'll need to be subscribed to it
-					*/
-					// how to tell if this peer is subscribed?
-					bleStatusCallback.headsUp("m: begin peripheral send to " + p.RecipientAddress());
+		// if you're connected to this peer as a peripheral and this peer isn't subscribed to anything, then exit 
+		if (p.ConnectedAs.equalsIgnoreCase("peripheral") && p.subscribedChars.length() < 1) {
+			bleStatusCallback.headsUp("m: connected as perp, nothing is subscribed");
+			return;
+		}
+		
+		if (p.PendingMessageCount() > 0) {
+			bleStatusCallback.headsUp("m: found " + String.valueOf(p.PendingMessageCount()) + " msgs for peer " + p.RecipientAddress());
+			
+			// is your peer connected as a peripheral or a central?
+			if (p.ConnectedAs.equalsIgnoreCase("central")) {
+				// if you're a central, send as such
+				bleStatusCallback.headsUp("m: you're a central and can initiate a send, congrats");
+				writeOut(p.RecipientAddress());
+			} else if (p.ConnectedAs.equalsIgnoreCase("peripheral")) {
+				// if you're a peripheral send as such
+				/* you'll need to know which attribute to write on
+				 * if you're hoping to use a notify characteristic, they'll need to be subscribed to it
+				*/
+				// how to tell if this peer is subscribed?
+				bleStatusCallback.headsUp("m: begin peripheral send to " + p.RecipientAddress());
 
-					writeOut(p.RecipientAddress());
-					
-				}
-			} else {
-				bleStatusCallback.headsUp("m: no more messages for peer: " + p.RecipientAddress());
+				writeOut(p.RecipientAddress());
+				
 			}
 		} else {
-			bleStatusCallback.headsUp("m: can't locate a peer w/ fp: " + p.RecipientAddress());
+			bleStatusCallback.headsUp("m: no more messages for peer: " + p.RecipientAddress());
 		}
 
 	}
@@ -201,7 +207,7 @@ public class BleMessenger {
 	}
 
 	private void LoopSendMessages() {
-		setupBusinessTimer(1000);
+		setupBusinessTimer(BUSINESS_TIMEOUT);
 
 		// if we're not sending messages, then we need to see if we need to send any
 		if (!areWeSendingMessages) {
@@ -230,7 +236,9 @@ public class BleMessenger {
 			businessTimer = null;
 		}
 		
-		if (businessTimer == null) {
+		if (businessTimer == null && StayingBusy) {
+			
+			bleStatusCallback.headsUp("m: business timer reset!");
 			businessTimer = new Timer();
 			
 			businessTimer.schedule(new TimerTask() {
@@ -268,6 +276,19 @@ public class BleMessenger {
 		}
 	}
 	
+	public void StartBusy() {
+		StayingBusy = true;
+		setupBusinessTimer(BUSINESS_TIMEOUT);
+	}
+	
+	public void StopBusy() {
+		StayingBusy = false;
+	}
+	
+	public boolean BusyStatus() {
+		return StayingBusy;
+	}
+	
 	private void checkForStaleConnections() {
 		//bleStatusCallback.headsUp("m: check for stale connection!");
 		// reset our stale-checker
@@ -302,17 +323,26 @@ public class BleMessenger {
 		writeOut(peerAddress, uuid);
 	}
 	
-	
+	//TODO: change writeOut to indicate which particular message you're sending out
 	private void writeOut(String peerAddress, UUID uuid) {
 
+		// if i'm connected to you as a peripheral, and you are not yet subscribed, i should not be sending you
+		// any damn messages
 		
 		// look up the peer by their address (aka index)
 		BlePeer peer = peerMap.get(peerAddress);
 		
 		// given a peer, get the first message in the queue to send out
 		BleMessage m = peer.getBleMessageOut();
+		
+		// 
+		for (int i = 0; i < peer.GetMessagesOut().size(); i++) {
+			BleMessage m1 = peer.GetMessagesOut().get(i);
+			bleStatusCallback.headsUp("m: msg#" + String.valueOf(i) + " " + ByteUtilities.bytesToHex(m1.MessageHash).substring(0,6));
+			
+		}
 	
-		bleStatusCallback.headsUp("m: (writeOut) - pending msgs: " + String.valueOf(peer.PendingMessageCount()));		
+			
 		
 		// if no message found, there's a problem
 		if (m == null) {
@@ -383,6 +413,7 @@ public class BleMessenger {
 				bleStatusCallback.peerNotification(peerAddress, "msg_sent_" + String.valueOf(m.GetMessageNumber()));
 				peer.RemoveBleMessage(m.GetMessageNumber());
 			} else {
+
 				bleStatusCallback.headsUp("m: sent " + String.valueOf(sent) + " packets instead of " + String.valueOf(bps.size()));
 			}
 		}
@@ -477,7 +508,7 @@ public class BleMessenger {
     	
     	// find the message we're building, identified by the first byte (cast to an integer 0-255)
     	// if this message wasn't already created, then the getBleMessageIn method will create it
-    	bleStatusCallback.headsUp("m: msg " + String.valueOf(parentMessage) + ", pckt " + String.valueOf(packetCounter));
+    	bleStatusCallback.headsUp("m: msg<- " + String.valueOf(parentMessage) + ", pckt " + String.valueOf(packetCounter));
     	BleMessage b = p.getBleMessageIn(parentMessage);
     	
     	// your packet payload will be the size of the incoming bytes less our 3 needed for the header (ref'd above)
@@ -653,8 +684,10 @@ public class BleMessenger {
     		bleStatusCallback.headsUp("m: notify request from " + device + "; reset timeout");
     		BlePeer p = peerMap.get(device);
     		p.MarkActive();
+    		p.subscribedChars = uuid.toString() + ";" + p.subscribedChars;
     		
-    		writeOut(device, uuid);
+    		// should i really comment this out?
+    		//writeOut(device, uuid);
 		}
 
 		@Override

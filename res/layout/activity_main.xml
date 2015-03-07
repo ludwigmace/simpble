@@ -53,11 +53,11 @@
 	        android:enabled="true" />
 
 	    <Button
-	        android:id="@+id/pushmsgs"
+	        android:id="@+id/toggle_busy"
 	        android:layout_width="wrap_content"
 	        android:layout_height="wrap_content"
-	        android:text="@string/msgs_push"
-	        android:onClick="handleButtonPush"
+	        android:text="@string/caption_toggle_busy"
+	        android:onClick="handleButtonToggleBusy"
 	        android:enabled="true" />
 	    	    
 	    <Button
