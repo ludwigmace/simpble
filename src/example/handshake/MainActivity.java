@@ -39,7 +39,7 @@ import android.widget.Toast;
 
 public class MainActivity extends Activity {
 
-	private static final String TAG = "main";
+	private static final String TAG = "MAIN";
 	private static final int DEBUGLEVEL = 1;
 
     private static final int ACTIVITY_CREATE=0;
@@ -124,7 +124,9 @@ public class MainActivity extends Activity {
         myIdentifier = Installation.id(this);
         
         // get your name (that name part isn't working on Android 5.0)
-        String userName = getUserName(this.getContentResolver());
+        //String userName = getUserName(this.getContentResolver());
+        String userName = btAdptr.getName();
+        
         EditText yourNameControl = (EditText) findViewById(R.id.your_name);
         yourNameControl.setText(userName);
         
@@ -160,6 +162,19 @@ public class MainActivity extends Activity {
 			
 		} // if not enabled, the onResume will catch this
 		
+		
+		if (myFingerprint != null) {
+			logMessage("a: our fp is:" + myFingerprint.substring(0, 20) + " . . .");
+			Log.v(TAG, "our fp:" + myFingerprint);
+		} else {
+			logMessage("a: global myFingerprint is null");
+		}
+		
+		PopulateFriendsAndMessages();
+		
+	}
+	
+	private void PopulateFriendsAndMessages() {
 		mDbHelper = new FriendsDb(this);
 		
 		// let's build our friends that we've got stored up in the database
@@ -179,6 +194,7 @@ public class MainActivity extends Activity {
 			new_peer.SetName(peer_name);
 			new_peer.SetPublicKey(peer_puk);
 			
+			// for testing, don't add your peer
 			bleFriends.put(peer_fp, new_peer);
 			logMessage("adding peer " + peer_fp.substring(0,8));
 		}
@@ -233,14 +249,6 @@ public class MainActivity extends Activity {
 		}
 		
 		mDbHelper.close();
-
-		if (myFingerprint != null) {
-			logMessage("a: our fp is:" + myFingerprint.substring(0, 20) + " . . .");
-			Log.v(TAG, "our fp:" + myFingerprint);
-		} else {
-			logMessage("a: global myFingerprint is null");
-		}
-		
 	}
 		
 	private void SetUpBle() {
@@ -319,8 +327,8 @@ public class MainActivity extends Activity {
 					String queuedMsg = "";
 					
 					if (idenM != null) {
-						queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM);
-						logMessage("a: queued " + queuedMsg + " for " + peerIndex);
+						queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM).substring(0,8);
+						logMessage("a1: queued " + queuedMsg + " for " + peerIndex);
 						
 						// go ahead and send this other person our stuff
 						//try1: runOnUiThread(new Runnable() { public void run() { bleMessenger.sendMessagesToPeer(ourMostRecentFriendsAddress);} });
@@ -341,8 +349,8 @@ public class MainActivity extends Activity {
 				BleMessage idenM = identityMessage();
 				String queuedMsg = "";
 				if (idenM != null) {
-					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM);
-					logMessage("a: queued " + queuedMsg + " for " + peerIndex);
+					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM).substring(0,8);
+					logMessage("a2: queued " + queuedMsg + " for " + peerIndex);
 					
 					// now let the other guy know you're ready to receive data
 					bleMessenger.initRequestForData(ourMostRecentFriendsAddress);
@@ -367,8 +375,8 @@ public class MainActivity extends Activity {
 				String queuedMsg = "";
 				
 				if (idenM != null) {
-					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM);
-					logMessage("a: queued " + queuedMsg + " for " + peerIndex);
+					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM).substring(0,8);
+					logMessage("a3: queued " + queuedMsg + " for " + peerIndex);
 				}
 				
 				// if you're a peripheral, you can't initiate message send until the peer has subscribed
@@ -386,8 +394,8 @@ public class MainActivity extends Activity {
 				String queuedMsg = "";
 				
 				if (idenM != null) {
-					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM);
-					logMessage("a: queued " + queuedMsg + " for " + peerIndex);
+					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM).substring(0,8);
+					logMessage("a4: queued " + queuedMsg + " for " + peerIndex);
 				}
 				
 				// if you're a peripheral, you can't initiate message send until the peer has subscribed
@@ -440,24 +448,23 @@ public class MainActivity extends Activity {
 					// so now we can either get the message we have for this friend
 					// and add to the peer in the BleMessenger list
 					
-					// if we've got a message, add it in - this only gets the first one
-					// need to change this so we loop over all for this person
-					BleMessage m = bleFriends.get(senderFingerprint).getBleMessageOut();
+					
 										
-					String queuedMsg = "";
-					if (m != null) {
-						queuedMsg = bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(m);
-						logMessage("a: queued " + queuedMsg + " for " + remoteAddress);
-						ourMostRecentFriendsAddress = remoteAddress;
-						
-						//try1: runOnUiThread(new Runnable() { public void run() { bleMessenger.sendMessagesToPeer(ourMostRecentFriendsAddress);} });
+					for (int i = 0; i < bleFriends.get(senderFingerprint).GetMessagesOut().size(); i++) {
+						BleMessage m = bleFriends.get(senderFingerprint).GetMessagesOut().get(i);
 
-					} else {
-						logMessage("a: no msg found for " + remoteAddress);
+						String queuedMsg = "";
+						
+						if (m != null) {
+							queuedMsg = bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(m).substring(0,8);
+							logMessage("a5: queued " + queuedMsg + " for " + remoteAddress);
+							ourMostRecentFriendsAddress = remoteAddress;
+							
+						} else {
+							logMessage("a: no msg found for " + remoteAddress);
+						}						
 					}
-					
-					
-					
+
 				} else {
 					logMessage("a: this guy's FP isn't known to me: " + senderFingerprint.substring(0,20));
 					
@@ -557,19 +564,6 @@ public class MainActivity extends Activity {
 		
 	};
 	
-	
-	
-	public void checkMessageStack() {
-		
-		// loop over all the peers i have that i'm connected to
-		for (BlePeer p: bleMessenger.peerMap.values()) {
-			p.getBleMessageOut();
-
-		}
-		
-		//bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(m);
-		// runOnUiThread(new Runnable() { public void run() { bleMessenger.sendMessagesToPeer(ourMostRecentFriendsAddress);} });
-	}
 		
 	public void handleButtonPull(View view) {
 		Log.v(TAG, "Start Get ID");
@@ -582,13 +576,15 @@ public class MainActivity extends Activity {
 	public void handleButtonToggleBusy(View view) {
 		
 		// if we're currently busy, stop being busy
+		/*
 		if (bleMessenger.BusyStatus()) {
 			bleMessenger.StopBusy();
 			btnToggleBusy.setText("!Busy");
 		} else {
 			bleMessenger.StartBusy();
 			btnToggleBusy.setText("Busy!");
-		}
+		}*/
+		bleMessenger.GooseBusy();
 		
 	}
     

@@ -27,9 +27,9 @@ import android.util.SparseArray;
 import android.widget.Toast;
 
 public class BleMessenger {
-	private static String TAG = "blemessenger";
+	private static String TAG = "BLEM";
 	private static int INACTIVE_TIMEOUT = 600000; // 5 minute timeout
-	private static int BUSINESS_TIMEOUT = 5000; // 5 minute timeout
+	private static int BUSINESS_TIMEOUT = 5000; // 5 second timeout
 	
 	private boolean StayingBusy;
 	
@@ -87,15 +87,21 @@ public class BleMessenger {
 		StayingBusy = true;
 		
 
-		/*if (Build.VERSION.SDK_INT < 21) {
-			SupportsAdvertising = false;
-		} else */
+		blePeripheral = null;
 		
-		// check if we support advertising or not
-		if (!btAdptr.isMultipleAdvertisementSupported()) {
+		if (Build.VERSION.SDK_INT < 21) {
 			SupportsAdvertising = false;
-		} else {
-			SupportsAdvertising = true;			
+		} else {			
+			// check if we support advertising or not
+			if (!btAdptr.isMultipleAdvertisementSupported()) {
+				SupportsAdvertising = false;
+			} else {
+				SupportsAdvertising = true;			
+			}
+		}
+		
+		if (btAdptr.getName().equalsIgnoreCase("Nexus 5")) {
+			SupportsAdvertising = false;
 		}
 		
 		serviceDef = new ArrayList<BleCharacteristic>();
@@ -105,7 +111,10 @@ public class BleMessenger {
 		friendsFpMap = new HashMap<String, BlePeer>();
 		
 		// create your server for listening and your client for looking; Android can be both at the same time
-		blePeripheral = new BlePeripheral(uuidServiceBase, ctx, btAdptr, btMgr, peripheralHandler);
+		
+		if (SupportsAdvertising) {
+			blePeripheral = new BlePeripheral(uuidServiceBase, ctx, btAdptr, btMgr, peripheralHandler);
+		}
 		bleCentral = new BleCentral(btAdptr, ctx, centralHandler, uuidServiceBase, 3000);
 		
 		serviceDef.add(new BleCharacteristic("identifier_read", uuidFromBase("100"), BleGattCharacteristics.GATT_READ));		
@@ -130,6 +139,10 @@ public class BleMessenger {
 		BlePeer p = peerMap.get(PeerAddress);
 		
 		sendMessagesToPeer(p);
+	}
+	
+	public void GooseBusy() {
+		LoopSendMessages();
 	}
 	
 	/**
@@ -207,8 +220,10 @@ public class BleMessenger {
 	}
 
 	private void LoopSendMessages() {
-		setupBusinessTimer(BUSINESS_TIMEOUT);
+		//setupBusinessTimer(BUSINESS_TIMEOUT);
 
+		Log.v(TAG, "LoopSendMessages on thread " + Thread.currentThread().getName());
+		
 		// if we're not sending messages, then we need to see if we need to send any
 		if (!areWeSendingMessages) {
 			
@@ -338,7 +353,14 @@ public class BleMessenger {
 		// 
 		for (int i = 0; i < peer.GetMessagesOut().size(); i++) {
 			BleMessage m1 = peer.GetMessagesOut().get(i);
-			bleStatusCallback.headsUp("m: msg#" + String.valueOf(i) + " " + ByteUtilities.bytesToHex(m1.MessageHash).substring(0,6));
+			String msgHash = "";
+			try {
+				msgHash = ByteUtilities.bytesToHex(m1.MessageHash).substring(0,6);
+			} catch (Exception x) {
+				msgHash = "can't get hash";
+			}
+			
+			bleStatusCallback.headsUp("m: msg#" + String.valueOf(i) + " " + msgHash);
 			
 		}
 	
@@ -781,6 +803,7 @@ public class BleMessenger {
 		@Override
 		public void intakeFoundDevices(ArrayList<BluetoothDevice> devices) {
 			bleStatusCallback.headsUp("m: stopped scanning");
+			Log.v(TAG, "intake devices, thread "+ Thread.currentThread().getName());
 			// loop over all the found devices
 			// add them 
 			for (BluetoothDevice b: devices) {

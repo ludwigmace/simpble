@@ -251,7 +251,7 @@ public class BlePeer {
 		m.SetMessageNumber(messageidx);
 		peerMessagesOut.append(messageidx, m);
 		
-		return ByteUtilities.bytesToHexShort(m.MessageHash);
+		return ByteUtilities.bytesToHex(m.MessageHash);
 			
 	}
 	

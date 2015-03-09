@@ -18,7 +18,7 @@ import com.google.common.primitives.Bytes;
 
 public class BleMessage {
 
-	private static final String TAG = "BLEMSG";
+	private static final String TAG = "BLEG";
 	private static final int MessagePacketSize = 20; 
 	
 	// holds all the packets that make up this message

@@ -28,7 +28,7 @@ import android.util.Log;
 
 public class BleCentral {
 	
-	private static final String TAG = "BLECC";
+	private static final String TAG = "BLEC";
 	private static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
 	
 	// we need the system context to perform Gatt operations
@@ -300,7 +300,7 @@ public class BleCentral {
                     bleScanner.stopScan(scanCallback);
 
         			gattClientHandler.intakeFoundDevices(foundDevices);
-        			Log.v(TAG, "scan stopped, found " + String.valueOf(foundDevices.size()) + " devices");
+        			Log.v(TAG, "stopscan, " + String.valueOf(foundDevices.size()) + " devices, thread "+ Thread.currentThread().getName());
                 }
             }, SCAN_PERIOD);
 

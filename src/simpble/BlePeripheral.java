@@ -29,7 +29,7 @@ import android.util.Log;
 
 public class BlePeripheral {
 	
-    private static final String TAG = "BlePeripheral";
+    private static final String TAG = "BLEP";
     
     // all our BLE android objects
     private BluetoothManager btMgr;
