@@ -186,15 +186,16 @@ public class BlePeer {
 		
 		Log.v(TAG, "find message in peerMessagesOut at index " + String.valueOf(MessageIdentifier));
 		
-		for (int i = 0; i < peerMessagesOut.size(); i++) {
-			BleMessage m = peerMessagesOut.get(i);
+		//for (int i = 0; i < peerMessagesOut.size(); i++) {
+			//BleMessage m = peerMessagesOut.get(i);
+		BleMessage m = peerMessagesOut.get(MessageIdentifier);
 			
 			if (m != null) {
-				Log.v(TAG, "found message at index " + String.valueOf(i) + " with hash " + ByteUtilities.bytesToHex(m.MessageHash));
+				Log.v(TAG, "found message at index " + String.valueOf(MessageIdentifier) + " with hash " + ByteUtilities.bytesToHex(m.MessageHash));
 			} else {
-				Log.v(TAG, "no message found at index " + String.valueOf(i));
+				Log.v(TAG, "no message found at index " + String.valueOf(MessageIdentifier));
 			}
-		}
+		//}
 		
 		return peerMessagesOut.get(MessageIdentifier);
 	}
@@ -204,18 +205,19 @@ public class BlePeer {
 		Log.v(TAG, "peerMessagesOut.size is " + String.valueOf(peerMessagesOut.size()));
 		
 		// get the highest priority (lowest index) message to send out
-		int i = 0;
+		int keyat = 0;
 		
 		// get the min item in this SparseArray
-		for (i = 0; i < peerMessagesOut.size(); i++) {
-			if (peerMessagesOut.get(i) != null) {
+		for (int i = 0; i < peerMessagesOut.size(); i++) {
+			keyat = peerMessagesOut.keyAt(i);
+			if (peerMessagesOut.get(keyat) != null) {
 				break;
 			}
 		}
 		
-		Log.v(TAG, "getBleMessageOut #" + String.valueOf(i));
+		Log.v(TAG, "getBleMessageOut #" + String.valueOf(keyat));
 		
-		return getBleMessageOut(i);
+		return getBleMessageOut(keyat);
 
 	}
 	
