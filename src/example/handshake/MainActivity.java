@@ -445,11 +445,8 @@ public class MainActivity extends Activity {
 					logMessage("a: known peer: " + senderFingerprint.substring(0,20));
 					
 					// we know that we have this peer as a friend
-					// so now we can either get the message we have for this friend
-					// and add to the peer in the BleMessenger list
-					
-					
-										
+
+					// queue up all the messages we've got for this dude
 					for (int i = 0; i < bleFriends.get(senderFingerprint).GetMessagesOut().size(); i++) {
 						BleMessage m = bleFriends.get(senderFingerprint).GetMessagesOut().get(i);
 

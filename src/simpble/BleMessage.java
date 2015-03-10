@@ -432,6 +432,7 @@ public class BleMessage {
 			SenderFingerprint = Arrays.copyOfRange(allBytes, 21, 41); // bytes 21-40
 			MessagePayload = Arrays.copyOfRange(allBytes, 41, allBytes.length+1); //bytes 41 through end
 
+			// msgType can also indicate that we want a multipart message  
 			if (Arrays.equals(msgType, new byte[] {0x01})) {
 				MessageType = "identity";
 			} else {
