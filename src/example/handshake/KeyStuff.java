@@ -3,11 +3,13 @@ package example.handshake;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.GeneralSecurityException;
+import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
@@ -127,11 +129,13 @@ public class KeyStuff {
         mCipher.init(Cipher.WRAP_MODE, mPair.getPublic());
         return mCipher.wrap(key);
     }
+
     
     // Unwrap a SecretKey using the private key assigned to this
     public SecretKey unwrap(byte[] blob) throws GeneralSecurityException {
         mCipher.init(Cipher.UNWRAP_MODE, mPair.getPrivate());
         return (SecretKey) mCipher.unwrap(blob, "AES", Cipher.SECRET_KEY);
     }
+    
 	
 }

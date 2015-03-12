@@ -30,6 +30,20 @@
    </LinearLayout>
    
     <LinearLayout 
+    android:id="@+id/nextrow_security" 
+    android:layout_height="wrap_content" 
+    android:layout_width="fill_parent">
+   	    
+		<CheckBox
+        android:id="@+id/chkEncrypt"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/chk_encrypt" />
+        
+        
+   	    </LinearLayout>
+    
+    <LinearLayout 
     android:id="@+id/nextrow_friendmsg" 
     android:layout_height="wrap_content" 
     android:layout_width="fill_parent">
@@ -64,7 +78,6 @@
 	        android:text="@string/queue_msg_btn"
 	        android:onClick="handleButtonQueueMsg"
 	        android:enabled="true" />   
-
 
    </LinearLayout>
     

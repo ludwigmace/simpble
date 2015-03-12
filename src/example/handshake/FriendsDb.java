@@ -28,6 +28,7 @@ public class FriendsDb extends SQLiteOpenHelper {
 	public static final String KEY_M_FNAME = "friend_name";
     public static final String KEY_M_CONTENT = "msg_content";
     public static final String KEY_M_ROWID = "_id";
+    public static final String KEY_M_HASH = "msghash";
     
     private static final String TAG = "FriendsDbAdapter";
     private SQLiteDatabase mDb;
@@ -46,6 +47,7 @@ public class FriendsDb extends SQLiteOpenHelper {
     	"create table " + MSGS_TABLE + " ("
     	+ KEY_M_ROWID + " integer primary key autoincrement, "
     	+ KEY_M_CONTENT + " text not null, "
+    	+ KEY_M_HASH + " text not null, "
     	+ KEY_M_FNAME + " text not null); ";
 
 
@@ -141,6 +143,20 @@ public class FriendsDb extends SQLiteOpenHelper {
 
             mDb.query(true, FRIENDS_TABLE, new String[] {KEY_F_ROWID,
                     KEY_F_NAME, KEY_F_FP, KEY_F_PUK}, KEY_F_ROWID + "=" + rowId, null,
+                    null, null, null, null);
+        if (mCursor != null) {
+            mCursor.moveToFirst();
+        }
+        return mCursor;
+
+    }
+    
+    public Cursor fetchFriend(String name) throws SQLException {
+
+        Cursor mCursor =
+
+            mDb.query(true, FRIENDS_TABLE, new String[] {KEY_F_ROWID,
+                    KEY_F_NAME, KEY_F_FP, KEY_F_PUK}, KEY_F_NAME + "='" + name + "'", null,
                     null, null, null, null);
         if (mCursor != null) {
             mCursor.moveToFirst();

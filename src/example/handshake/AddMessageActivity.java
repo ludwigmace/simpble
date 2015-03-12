@@ -1,7 +1,21 @@
 
 package example.handshake;
 
+import java.io.ByteArrayOutputStream;
+import java.security.InvalidKeyException;
+import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
+
+import javax.crypto.Cipher;
+import javax.crypto.CipherOutputStream;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
 
 import simpble.ByteUtilities;
 import android.app.Activity;
@@ -15,6 +29,7 @@ import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.SimpleCursorAdapter;
@@ -29,6 +44,7 @@ public class AddMessageActivity extends Activity  {
 	
 	EditText messageContent;
 	Spinner friendSpinner;
+	CheckBox chkEncrypt;
 	
 	SimpleCursorAdapter mAdapter;
 	
@@ -53,6 +69,8 @@ public class AddMessageActivity extends Activity  {
 		mAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 		
 		friendSpinner.setAdapter(mAdapter);
+		
+		chkEncrypt = (CheckBox) findViewById(R.id.chkEncrypt);
                 
     }
     
@@ -65,6 +83,12 @@ public class AddMessageActivity extends Activity  {
 
 	public void handleButtonQueueMsg(View view) {
 
+		boolean encrypt = false;
+		
+		if (chkEncrypt.isChecked()) {
+			encrypt = true;
+		}
+		
 		String msg_content = messageContent.getText().toString();
 		
 		Cursor cursorFriends = (Cursor) friendSpinner.getSelectedItem();
@@ -77,12 +101,8 @@ public class AddMessageActivity extends Activity  {
 		
 		long new_msg_id = 0;
 		
-		try {
-			
-			// only read the first 294 bytes - probably not the best idea
-			//byte[] puk = Arrays.copyOf(ByteUtilities.hexToBytes(fk), 294);
-		
-			new_msg_id = QueueMsg(friend_name, msg_content);
+		try {			
+			new_msg_id = QueueMsg(friend_name, msg_content, encrypt);
 		} catch (Exception x) {
 			Log.v(TAG, "can't add msg " + x.getMessage());
 			Toast.makeText(this, x.getMessage(), Toast.LENGTH_SHORT).show();
@@ -96,13 +116,71 @@ public class AddMessageActivity extends Activity  {
 		
 	}
     
-	private long QueueMsg(String friend_name, String msg_content) {
+	private long QueueMsg(String friend_name, String msg_content, boolean encrypt) {
 		long new_msg_id = 0;
+
+		if (encrypt) {
+
+			// we need to pull the public key for the friend
+			Cursor c = mDbHelper.fetchFriend(friend_name);
+			c.moveToFirst();
+			byte[] friendPuk = c.getBlob(c.getColumnIndex(FriendsDb.KEY_F_PUK));
+			
+			// generate a symmetric key
+			SecretKey key = null;
+			try {
+				key = KeyGenerator.getInstance("AES").generateKey();
+			} catch (Exception e) {
+				Log.v(TAG, "couldn't generate AES key");
+			}
+			
+			// encrypt our payload bytes
+			try {
+				Cipher encryptCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+				encryptCipher.init(Cipher.ENCRYPT_MODE, key);
+				
+				ByteArrayOutputStream outS = new ByteArrayOutputStream();
+				CipherOutputStream cipherOutS = new CipherOutputStream(outS, encryptCipher);
+				
+				cipherOutS.write(msg_content.getBytes());
+				cipherOutS.flush();
+				cipherOutS.close();
+				
+				msg_content = ByteUtilities.bytesToHex(outS.toByteArray());
+				
+			
+			} catch (Exception x) {
+				Log.v(TAG, "couldn't encrypt final payload");
+			}
+						
+			byte[] aesKeyEncrypted = null; 
+			
+			if (key != null) {
+				try {
+					aesKeyEncrypted = encryptedSymmetricKey(friendPuk, key);
+				} catch (Exception e) {
+					Log.v(TAG, "couldn't encrypt aes key");	
+				}
+			}
+			
+
+		// encrypt the message with the symmetric key
+		// get the fingerprint of this message and build the key msg
+		}
 		
 		new_msg_id = mDbHelper.queueMsg(friend_name, msg_content); // need to add argument for adding this friend's PuK
 		
-		
 		return new_msg_id;
+	}
+	
+	private byte[] encryptedSymmetricKey(byte[] friendPuk, SecretKey symmkey) throws InvalidKeySpecException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException {
+    	PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(friendPuk));
+    	Cipher mCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        mCipher.init(Cipher.WRAP_MODE, publicKey);
+        
+        byte[] encryptedSK = mCipher.wrap(symmkey);
+        
+        return encryptedSK;
 	}
 
 }

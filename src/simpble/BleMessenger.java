@@ -568,7 +568,7 @@ public class BleMessenger {
 	    				bleStatusCallback.headsUp("m: hash good");
 	    			} else {
 	    				bleStatusCallback.headsUp("m: hash bad: " + b.GetCalcHash());
-	    				bleStatusCallback.headsUp("m: shouldbe: " + ByteUtilities.bytesToHexShort(b.MessageHash));
+	    				bleStatusCallback.headsUp("m: shouldbe: " + ByteUtilities.bytesToHex(b.MessageHash).substring(0,8));
 	    			}
 	    			
 	    			// we don't want to overwrite the friend we put in earlier, but if it's not

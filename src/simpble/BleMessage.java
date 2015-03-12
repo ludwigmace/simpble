@@ -165,7 +165,7 @@ public class BleMessage {
 	}
 
 	public String GetPayload() {
-		return ByteUtilities.bytesToHexShort(MessagePayload);
+		return ByteUtilities.bytesToHex(MessagePayload).substring(0,8);
 	}
 
 	/**
@@ -193,7 +193,7 @@ public class BleMessage {
 		//return ByteUtilities.bytesToHexShort(calcDigest);
         
         // return the source for our hash so we can see if it's what we need
-        return ByteUtilities.bytesToHexShort(calcDigest);
+        return ByteUtilities.bytesToHex(calcDigest).substring(0,8);
 	}
 	
 
@@ -228,6 +228,13 @@ public class BleMessage {
         
 	}
 	
+	/**
+	 * Sets the MessagePayload class variable to the bytes you pass in.  Constructs a SHA1 hash based on
+	 * (MessageType, RecipientFingerprint, SenderFingerprint, MessagePayload), strips off the last 5 bytes,
+	 * and stores this value in the class variable MessagePayload.
+	 * 
+	 * @param Payload
+	 */
 	public void setPayload(byte[] Payload) {
 		MessagePayload = Payload;
 		

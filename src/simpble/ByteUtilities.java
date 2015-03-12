@@ -15,13 +15,6 @@ public class ByteUtilities {
         return new String(hexChars);
     }
     
-    public static String bytesToHexShort(byte[] bytes) {
-    	String hexOut = bytesToHex(bytes);
-    	
-    	hexOut = hexOut.substring(0, 10) + " . . . " + hexOut.substring(hexOut.length() - 10, hexOut.length()); 
-    	
-    	return hexOut;
-    }
     
     public static byte[] hexToBytes(String hex) {
     	byte[] bytes = new byte[hex.length() / 2];
