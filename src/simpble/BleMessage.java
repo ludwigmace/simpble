@@ -42,7 +42,9 @@ public class BleMessage {
 	private int messageNumber;
 
 	// Identity or something else
-	public String MessageType;
+	//public String MessageType;
+	
+	public byte MessageType;
 	
 	// sha1 of public key for recipient
 	public byte[] RecipientFingerprint;
@@ -57,6 +59,7 @@ public class BleMessage {
 	public byte[] MessagePayload;
 	
 	public boolean ReceiptAcknowledged;
+	
 
 	// initializes our list of BlePackets, current counter, and sent status
 	public BleMessage() {
@@ -73,6 +76,7 @@ public class BleMessage {
 		// now that we know which message sequence this is for the receiving peer, we can build the packets
 		constructPackets();
 	}
+
 	
 	// get the message sequence number
 	public int GetMessageNumber() {
@@ -179,15 +183,8 @@ public class BleMessage {
 			e.printStackTrace();
 		}
         
-        byte[] MsgType;
         
-		if (MessageType == "identity") {
-			MsgType = new byte[]{(byte)(0x01)};
-		} else {
-			MsgType = new byte[]{(byte)(0x02)};
-		}
-        
-        byte[] MessageBytes = Bytes.concat(MsgType, RecipientFingerprint, SenderFingerprint, MessagePayload);
+        byte[] MessageBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
         
         // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
         // (i want my digest to be the packet size less the 5 bytes needed for header info)
@@ -212,15 +209,8 @@ public class BleMessage {
 			e.printStackTrace();
 		}
         
-        byte[] MsgType;
         
-		if (MessageType == "identity") {
-			MsgType = new byte[]{(byte)(0x01)};
-		} else {
-			MsgType = new byte[]{(byte)(0x02)};
-		}
-        
-        byte[] MessageBytes = Bytes.concat(MsgType, RecipientFingerprint, SenderFingerprint, MessagePayload);
+        byte[] MessageBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
         
         // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
         // (i want my digest to be the packet size less the 5 bytes needed for header info)
@@ -241,15 +231,7 @@ public class BleMessage {
 	public void setPayload(byte[] Payload) {
 		MessagePayload = Payload;
 		
-		byte[] MsgType;
-		
-		if (MessageType == "identity") {
-			MsgType = new byte[]{(byte)(0x01)};
-		} else {
-			MsgType = new byte[]{(byte)(0x02)};
-		}
-		
-		byte[] MessageBytes = Bytes.concat(MsgType, RecipientFingerprint, SenderFingerprint, MessagePayload);
+		byte[] MessageBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
 		
 	    // get a digest for the message, to define it
         MessageDigest md = null;
@@ -286,18 +268,9 @@ public class BleMessage {
 		// next 20 bytes are sender fingerprint
 		// final arbitrary bytes are the payload
 		
-		//byte[] newMsg = Bytes.concat(new byte[]{(byte)(0x01)}, new byte[20], rsaKey.PuFingerprint());
-		
-		byte[] MsgType;
-		
-		if (MessageType == "identity") {
-			MsgType = new byte[]{(byte)(0x01)};
-		} else {
-			MsgType = new byte[]{(byte)(0x02)};
-		}
 		
 		// Message Type, RFP, SFP, and payload
-		byte[] MessageBytes = Bytes.concat(MsgType, RecipientFingerprint, SenderFingerprint, MessagePayload);
+		byte[] MessageBytes = Bytes.concat(new byte[] {MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
 		
 		// clear the list of packets; we're building a new message using packets!
         messagePackets.clear();
@@ -309,9 +282,7 @@ public class BleMessage {
         
         // first byte is counter; 0 provides meta info about msg
         // right now it's just how many packets to expect
-        
- 
-        
+                
         Log.v(TAG, "first payload is of size: " + String.valueOf(MessageHash.length));
         
         // first byte is which message this is for the receiver to understand
@@ -427,17 +398,10 @@ public class BleMessage {
 		// we need this to be 41+ bytes
 		if (allBytes.length > 41) {
 		
-			byte[] msgType = Arrays.copyOfRange(allBytes, 0, 1); // byte 0
+			MessageType = Arrays.copyOfRange(allBytes, 0, 1)[0]; // byte 0
 			RecipientFingerprint = Arrays.copyOfRange(allBytes, 1, 21); // bytes 1-20
 			SenderFingerprint = Arrays.copyOfRange(allBytes, 21, 41); // bytes 21-40
 			MessagePayload = Arrays.copyOfRange(allBytes, 41, allBytes.length+1); //bytes 41 through end
-
-			// msgType can also indicate that we want a multipart message  
-			if (Arrays.equals(msgType, new byte[] {0x01})) {
-				MessageType = "identity";
-			} else {
-				MessageType = "direct";
-			}
 		
 		}
 		

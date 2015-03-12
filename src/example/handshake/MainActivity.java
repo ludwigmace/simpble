@@ -223,7 +223,7 @@ public class MainActivity extends Activity {
 					
 					try {					
 						m.RecipientFingerprint = p.GetFingerprintBytes();
-						m.MessageType = "datatext";
+						m.MessageType = (byte)(2 & 0xFF);  //msg type for identity is 1, raw data is 2
 						m.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint);
 						m.setPayload(msg_content.getBytes());
 						
@@ -330,9 +330,6 @@ public class MainActivity extends Activity {
 						queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM).substring(0,8);
 						logMessage("a1: queued " + queuedMsg + " for " + peerIndex);
 						
-						// go ahead and send this other person our stuff
-						//try1: runOnUiThread(new Runnable() { public void run() { bleMessenger.sendMessagesToPeer(ourMostRecentFriendsAddress);} });
-						
 					}
 				}
 				
@@ -422,12 +419,14 @@ public class MainActivity extends Activity {
 		// this is when all the packets have come in, and a message is received in its entirety (hopefully)
 		// the secret sauce
 		@Override
-		public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, String msgType) {
+		public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, int msgType) {
 
+			
+			
 			logMessage("a: rcvd " + msgType + " msg for " + recipientFingerprint.substring(0, 10) + "...");
 			
 			// this is an identity message so handle it as such
-			if (msgType.equalsIgnoreCase("identity")) {
+			if (msgType == 1) {
 				Log.v(TAG, "received identity msg");
 								
 				if (recipientFingerprint.length() == 0) {
@@ -750,7 +749,7 @@ public class MainActivity extends Activity {
 	// creates a message formatted for identity exchange
 	private BleMessage identityMessage() {
 		BleMessage m = new BleMessage();
-		m.MessageType = "identity";
+		m.MessageType = (byte)1 & 0xFF;
 		m.SenderFingerprint = rsaKey.PuFingerprint();
 		m.RecipientFingerprint = new byte[20];
 		
