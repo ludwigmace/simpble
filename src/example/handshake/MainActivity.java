@@ -233,29 +233,73 @@ public class MainActivity extends Activity {
 			// inefficient way to get peer stuff
 			for (BlePeer p: bleFriends.values()) {
 
+				// if the peer in our friends list equals the name we've pulled out of the database for this message
 				if (p.GetName().equalsIgnoreCase(recipient_name)) {
 					String msgHash = "";
 					
 					try {					
+						// get the fingerprint from the Friend object
 						m.RecipientFingerprint = p.GetFingerprintBytes();
+						
+						// just call this msg raw data - should we?
 						m.MessageType = (byte)(2 & 0xFF);  //msg type for identity is 1, raw data is 2
+						
+						// get the sending fingerprint from our global variable
+						// TODO: this won't work if the original sender is different
 						m.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint);
 						
+						// in case we need to encrypt this message
 						byte[] msgbytes = null;
-						
+						byte[] aesKeyEncrypted = null;
+
+						// if our message is meant to be encrypted, do that first
 						if (msg_type.equalsIgnoreCase("encrypted")) {
 							
-							byte[] friendPuk = p.GetPublicKey();
-							
+							// generate a brand new symmetric key
 							SecretKey key = genAesKey();
 							
-							msgbytes = encryptMsg(friendPuk, key, msg_content);
+							// get our friend's public key from the friend's object
+							byte[] friendPuk = p.GetPublicKey();
+							
+							// encrypt the body of this message with our symmetric key
+							msgbytes = encryptMsg(key, msg_content);
+							
+							// encrypt our encryption key using our recipient's public key 							
+							if (key != null) {
+								try {
+									aesKeyEncrypted = encryptedSymmetricKey(friendPuk, key);
+								} catch (Exception e) {
+									Log.v(TAG, "couldn't encrypt aes key");	
+								}
+							}
 							
 						} else {
 							msgbytes = msg_content.getBytes();
 						}
 						
 						m.setPayload(msgbytes);
+						
+						
+						if (msg_type.equalsIgnoreCase("encrypted")) {
+							
+							BleMessage m_key = new BleMessage();
+							
+							// get the fingerprint from the Friend object
+							m_key.RecipientFingerprint = p.GetFingerprintBytes();
+							
+							// gotta give it a pre-determined messagetype to know this is an encryption key
+							m_key.MessageType = (byte)(10 & 0xFF);
+							
+							// get the sending fingerprint from the main message
+							m_key.SenderFingerprint = m.SenderFingerprint;
+							
+							// the payload needs to include the encrypted key, and the orig msg's fingerprint
+							// if the hash is a certain size, then we can assume the rest of the message is the
+							// encrypted portion of the aes key
+							byte[] aes_payload = Bytes.concat(m.MessageHash, aesKeyEncrypted);
+							m_key.setPayload(aesKeyEncrypted);
+						
+						}
 						
 						
 						
@@ -790,7 +834,7 @@ public class MainActivity extends Activity {
 		return m;
 	}
 
-	private byte[] encryptMsg(byte[] destPuK, SecretKey key, String msg_content) {
+	private byte[] encryptMsg(SecretKey key, String msg_content) {
 			
 		byte[] encrypted = null;
 		
@@ -811,16 +855,6 @@ public class MainActivity extends Activity {
 		
 		} catch (Exception x) {
 			Log.v(TAG, "couldn't encrypt final payload");
-		}
-					
-		byte[] aesKeyEncrypted = null; 
-		
-		if (key != null) {
-			try {
-				aesKeyEncrypted = encryptedSymmetricKey(destPuK, key);
-			} catch (Exception e) {
-				Log.v(TAG, "couldn't encrypt aes key");	
-			}
 		}
 					
 		return encrypted;
