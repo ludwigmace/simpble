@@ -241,9 +241,6 @@ public class MainActivity extends Activity {
 						// get the fingerprint from the Friend object
 						m.RecipientFingerprint = p.GetFingerprintBytes();
 						
-						// just call this msg raw data - should we?
-						m.MessageType = (byte)(2 & 0xFF);  //msg type for identity is 1, raw data is 2
-						
 						// get the sending fingerprint from our global variable
 						// TODO: this won't work if the original sender is different
 						m.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint);
@@ -282,13 +279,17 @@ public class MainActivity extends Activity {
 						
 						if (msg_type.equalsIgnoreCase("encrypted")) {
 							
+							// just call this msg raw data - should we?
+							m.MessageType = (byte)(20 & 0xFF);  //msg type for identity is 1, raw data is 2
+							
+							
 							BleMessage m_key = new BleMessage();
 							
 							// get the fingerprint from the Friend object
 							m_key.RecipientFingerprint = p.GetFingerprintBytes();
 							
 							// gotta give it a pre-determined messagetype to know this is an encryption key
-							m_key.MessageType = (byte)(10 & 0xFF);
+							m_key.MessageType = (byte)(21 & 0xFF);
 							
 							// get the sending fingerprint from the main message
 							m_key.SenderFingerprint = m.SenderFingerprint;
@@ -298,10 +299,13 @@ public class MainActivity extends Activity {
 							// encrypted portion of the aes key
 							byte[] aes_payload = Bytes.concat(m.MessageHash, aesKeyEncrypted);
 							m_key.setPayload(aesKeyEncrypted);
+							
+							p.addBleMessageOut(m_key);
 						
+						} else {
+							m.MessageType = (byte)(2 & 0xFF);  // raw data is 2
+							
 						}
-						
-						
 						
 						p.addBleMessageOut(m);
 						

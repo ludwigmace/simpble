@@ -21,14 +21,13 @@ public class FriendsDb extends SQLiteOpenHelper {
     public static final String KEY_F_ROWID = "_id";
 
     private static String DBNAME = "friends";
-    private static final int DBVERSION = 2;
+    private static final int DBVERSION = 4;
  
 
     private static final String MSGS_TABLE = "msgs";
 	public static final String KEY_M_FNAME = "friend_name";
     public static final String KEY_M_CONTENT = "msg_content";
     public static final String KEY_M_ROWID = "_id";
-    public static final String KEY_M_HASH = "msghash";
     public static final String KEY_M_MSGTYPE = "msgtype";
     
     private static final String TAG = "FriendsDbAdapter";
@@ -48,7 +47,6 @@ public class FriendsDb extends SQLiteOpenHelper {
     	"create table " + MSGS_TABLE + " ("
     	+ KEY_M_ROWID + " integer primary key autoincrement, "
     	+ KEY_M_CONTENT + " text not null, "
-    	+ KEY_M_HASH + " text not null, "
     	+ KEY_M_MSGTYPE + " text not null, "
     	+ KEY_M_FNAME + " text not null); ";
 
