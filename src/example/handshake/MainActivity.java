@@ -21,6 +21,7 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 
 import simpble.BleMessage;
 import simpble.BleMessenger;
@@ -99,6 +100,8 @@ public class MainActivity extends Activity {
     private boolean messageReceiving = false;
     private boolean messageSending = false;
     
+    private Map<String, String> hashToKey;
+    
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -106,6 +109,10 @@ public class MainActivity extends Activity {
 		currentTask = "";
 		statusLogText = "";
 		ctx = this;
+		
+		if (hashToKey == null) {
+			hashToKey = new HashMap<String, String>();
+		}
 		
 		// do you want to be able to receive messages?
 		// TODO: have the UI capture this
@@ -567,11 +574,33 @@ public class MainActivity extends Activity {
 				logMessage("a: received encrypted msg of size:" + String.valueOf(payload.length));
 				Log.v(TAG, "received encrypted msg, payload size:"+ String.valueOf(payload.length));
 				
+				// we need to build a BleMessage from all this stuff, and then calc its hash?
+				// or is its hash already calc'd?
+				byte[] incomingMessageHash = null;
+				
+				// get the key
+				SecretKey aesKey = getKeyForMessageHash(incomingMessageHash);
+				
+				// if we have a key for this thing already, then let's go for it
+				if (aesKey != null) {
+					// we can decrypt
+				} else {
+					// we need to store this shit somewhere so when the key comes in, we can decrypt
+				}
+				
 				
 				
 			} else if (msgType == 21) {
 				
-				processIncomingKeyMsg(payload);
+				byte[] incomingMessageHash = processIncomingKeyMsg(payload);
+				
+				// get the key
+				SecretKey aesKey = getKeyForMessageHash(incomingMessageHash);
+				
+				// if we have a key for this thing already, then let's go for it
+				if (aesKey != null) {
+					
+				}
 				
 				logMessage("a: received encrypted key of size:" + String.valueOf(payload.length));
 				Log.v(TAG, "received encrypted key, payload size:"+ String.valueOf(payload.length));
@@ -651,7 +680,22 @@ public class MainActivity extends Activity {
 		
 	};
 	
-	public void processIncomingKeyMsg(byte[] keyPayload) {
+	public SecretKey getKeyForMessageHash(byte[] incomingHash) {
+		
+		String aesKey = hashToKey.get(ByteUtilities.bytesToHex(incomingHash));
+		
+		SecretKey key = null;
+		
+		if (aesKey != null) {
+			byte[] byteKey = ByteUtilities.hexToBytes(aesKey);
+			key = new SecretKeySpec(byteKey, 0, byteKey.length, "AES");
+		}
+		
+		return key;
+				
+	}
+	
+	public byte[] processIncomingKeyMsg(byte[] keyPayload) {
 		
 		//keyPayload = Bytes.concat(m.MessageHash, aesKeyEncrypted);
 		// first 15 bytes are the hash that corresponds to the encrypted msg this key is for
@@ -674,7 +718,12 @@ public class MainActivity extends Activity {
 			logMessage("can't unwrap the damn key");
 		}
 		
+		// map our messages hashes to our encryption keys
+		hashToKey.put(ByteUtilities.bytesToHex(hash), ByteUtilities.bytesToHex(symmetric_key.getEncoded()));
+		
 		Log.v(TAG, "unwrapped key is: " + ByteUtilities.bytesToHex(symmetric_key.getEncoded()).substring(0,8));
+		
+		return hash;
 		
 		
 	}
