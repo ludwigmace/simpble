@@ -265,6 +265,8 @@ public class MainActivity extends Activity {
 							if (key != null) {
 								try {
 									aesKeyEncrypted = encryptedSymmetricKey(friendPuk, key);
+									Log.v(TAG, "generated symmetric key is: " + ByteUtilities.bytesToHex(key.getEncoded()));
+									Log.v(TAG, "encrypted key bytes: " + ByteUtilities.bytesToHex(aesKeyEncrypted));
 								} catch (Exception e) {
 									Log.v(TAG, "couldn't encrypt aes key");	
 								}
@@ -274,14 +276,11 @@ public class MainActivity extends Activity {
 							msgbytes = msg_content.getBytes();
 						}
 						
-						m.setPayload(msgbytes);
-						
-						
 						if (msg_type.equalsIgnoreCase("encrypted")) {
 							
-							// just call this msg raw data - should we?
-							m.MessageType = (byte)(20 & 0xFF);  //msg type for identity is 1, raw data is 2
 							
+							m.MessageType = (byte)(20 & 0xFF);  // just throwing out 20 as indicating an encrypted msg
+							m.setPayload(msgbytes);
 							
 							BleMessage m_key = new BleMessage();
 							
@@ -297,13 +296,15 @@ public class MainActivity extends Activity {
 							// the payload needs to include the encrypted key, and the orig msg's fingerprint
 							// if the hash is a certain size, then we can assume the rest of the message is the
 							// encrypted portion of the aes key
+							logMessage("symmetric key " + ByteUtilities.bytesToHex(aesKeyEncrypted).substring(0,8));
 							byte[] aes_payload = Bytes.concat(m.MessageHash, aesKeyEncrypted);
-							m_key.setPayload(aesKeyEncrypted);
+							m_key.setPayload(aes_payload);
 							
 							p.addBleMessageOut(m_key);
 						
 						} else {
 							m.MessageType = (byte)(2 & 0xFF);  // raw data is 2
+							m.setPayload(msgbytes);
 							
 						}
 						
@@ -501,8 +502,6 @@ public class MainActivity extends Activity {
 		@Override
 		public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, int msgType) {
 
-			
-			
 			logMessage("a: rcvd " + msgType + " msg for " + recipientFingerprint.substring(0, 10) + "...");
 			
 			// this is an identity message so handle it as such
@@ -553,8 +552,8 @@ public class MainActivity extends Activity {
 					// parse the public key & friendly name out of the payload, and add this as a new person
 				}
 				
-			} else {
-				logMessage("a: received data msg of size:" + String.valueOf(payload.length));
+			} else if (msgType == 2) {
+				logMessage("a: received raw msg of size:" + String.valueOf(payload.length));
 				
 				if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
 					logMessage("a: message is for us (as follows, next line):");
@@ -564,6 +563,18 @@ public class MainActivity extends Activity {
 				}
 				
 				Log.v(TAG, "received data msg, payload size:"+ String.valueOf(payload.length));
+			} else if (msgType == 20) {
+				logMessage("a: received encrypted msg of size:" + String.valueOf(payload.length));
+				Log.v(TAG, "received encrypted msg, payload size:"+ String.valueOf(payload.length));
+				
+				
+				
+			} else if (msgType == 21) {
+				
+				processIncomingKeyMsg(payload);
+				
+				logMessage("a: received encrypted key of size:" + String.valueOf(payload.length));
+				Log.v(TAG, "received encrypted key, payload size:"+ String.valueOf(payload.length));
 			}
 			
 		}
@@ -639,6 +650,34 @@ public class MainActivity extends Activity {
 		
 		
 	};
+	
+	public void processIncomingKeyMsg(byte[] keyPayload) {
+		
+		//keyPayload = Bytes.concat(m.MessageHash, aesKeyEncrypted);
+		// first 15 bytes are the hash that corresponds to the encrypted msg this key is for
+		// aesKey
+		
+		// read in the hash of the originating message
+		byte[] hash = Arrays.copyOfRange(keyPayload, 0, 15);
+		byte[] encrypted_key = Arrays.copyOfRange(keyPayload, 15, 256+15);
+		
+		Log.v(TAG, "encrypted_key length is: " + String.valueOf(encrypted_key.length));
+		Log.v(TAG, "encrypted_key bytes are: " + ByteUtilities.bytesToHex(encrypted_key));
+		
+		// let's decrypt the key so we can unlock the other message
+		SecretKey symmetric_key = null;
+		
+		try {
+			symmetric_key = rsaKey.unwrap(encrypted_key);
+		} catch (GeneralSecurityException e) {
+			Log.v(TAG, e.getMessage());
+			logMessage("can't unwrap the damn key");
+		}
+		
+		Log.v(TAG, "unwrapped key is: " + ByteUtilities.bytesToHex(symmetric_key.getEncoded()).substring(0,8));
+		
+		
+	}
 	
 		
 	public void handleButtonPull(View view) {
@@ -886,5 +925,6 @@ public class MainActivity extends Activity {
         
         return encryptedSK;
 	}
+
 	
 }

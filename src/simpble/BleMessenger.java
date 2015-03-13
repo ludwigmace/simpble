@@ -100,9 +100,9 @@ public class BleMessenger {
 			}
 		}
 		
-		if (btAdptr.getName().equalsIgnoreCase("Nexus 5")) {
-			SupportsAdvertising = false;
-		}
+		//if (btAdptr.getName().equalsIgnoreCase("Nexus 5")) {
+		//			SupportsAdvertising = false;
+		//}
 		
 		serviceDef = new ArrayList<BleCharacteristic>();
 		
@@ -532,7 +532,7 @@ public class BleMessenger {
     	
     	// find the message we're building, identified by the first byte (cast to an integer 0-255)
     	// if this message wasn't already created, then the getBleMessageIn method will create it
-    	bleStatusCallback.headsUp("m: msg<- " + String.valueOf(parentMessage) + ", pckt " + String.valueOf(packetCounter));
+    	//bleStatusCallback.headsUp("m: msg<- " + String.valueOf(parentMessage) + ", pckt " + String.valueOf(packetCounter));
     	BleMessage b = p.getBleMessageIn(parentMessage);
     	
     	// your packet payload will be the size of the incoming bytes less our 3 needed for the header (ref'd above)
