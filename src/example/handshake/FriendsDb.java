@@ -29,6 +29,7 @@ public class FriendsDb extends SQLiteOpenHelper {
     public static final String KEY_M_CONTENT = "msg_content";
     public static final String KEY_M_ROWID = "_id";
     public static final String KEY_M_HASH = "msghash";
+    public static final String KEY_M_MSGTYPE = "msgtype";
     
     private static final String TAG = "FriendsDbAdapter";
     private SQLiteDatabase mDb;
@@ -48,6 +49,7 @@ public class FriendsDb extends SQLiteOpenHelper {
     	+ KEY_M_ROWID + " integer primary key autoincrement, "
     	+ KEY_M_CONTENT + " text not null, "
     	+ KEY_M_HASH + " text not null, "
+    	+ KEY_M_MSGTYPE + " text not null, "
     	+ KEY_M_FNAME + " text not null); ";
 
 
@@ -92,11 +94,12 @@ public class FriendsDb extends SQLiteOpenHelper {
        
     }
     
-    public long queueMsg(String friend_name, String message_content) {
+    public long queueMsg(String friend_name, String message_content, String message_type) {
         ContentValues initialValues = new ContentValues();
         
         initialValues.put(KEY_M_FNAME, friend_name);
         initialValues.put(KEY_M_CONTENT, message_content);
+        initialValues.put(KEY_M_MSGTYPE, message_type);
         
         return mDb.insert(MSGS_TABLE, null, initialValues);
        
@@ -104,8 +107,8 @@ public class FriendsDb extends SQLiteOpenHelper {
     
     public Cursor fetchAllMsgs() {
 
-        return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME,
-                KEY_M_CONTENT}, null, null, null, null, null);
+        return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE},
+        		null, null, null, null, null);
     }
 
     /**

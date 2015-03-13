@@ -1,12 +1,26 @@
 package example.handshake;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.GeneralSecurityException;
+import java.security.InvalidKeyException;
+import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+
+import javax.crypto.Cipher;
+import javax.crypto.CipherOutputStream;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
 
 import simpble.BleMessage;
 import simpble.BleMessenger;
@@ -212,6 +226,7 @@ public class MainActivity extends Activity {
 			
 			String recipient_name = c.getString(c.getColumnIndex(FriendsDb.KEY_M_FNAME));
 			String msg_content = c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT));
+			String msg_type =  c.getString(c.getColumnIndex(FriendsDb.KEY_M_MSGTYPE));
 			
 			//logMessage("found msg to add for " + recipient_name);
 			
@@ -225,7 +240,24 @@ public class MainActivity extends Activity {
 						m.RecipientFingerprint = p.GetFingerprintBytes();
 						m.MessageType = (byte)(2 & 0xFF);  //msg type for identity is 1, raw data is 2
 						m.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint);
-						m.setPayload(msg_content.getBytes());
+						
+						byte[] msgbytes = null;
+						
+						if (msg_type.equalsIgnoreCase("encrypted")) {
+							
+							byte[] friendPuk = p.GetPublicKey();
+							
+							SecretKey key = genAesKey();
+							
+							msgbytes = encryptMsg(friendPuk, key, msg_content);
+							
+						} else {
+							msgbytes = msg_content.getBytes();
+						}
+						
+						m.setPayload(msgbytes);
+						
+						
 						
 						p.addBleMessageOut(m);
 						
@@ -756,6 +788,65 @@ public class MainActivity extends Activity {
 		m.setPayload(rsaKey.PublicKey());
 		
 		return m;
+	}
+
+	private byte[] encryptMsg(byte[] destPuK, SecretKey key, String msg_content) {
+			
+		byte[] encrypted = null;
+		
+		// encrypt our payload bytes
+		try {
+			Cipher encryptCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+			encryptCipher.init(Cipher.ENCRYPT_MODE, key);
+			
+			ByteArrayOutputStream outS = new ByteArrayOutputStream();
+			CipherOutputStream cipherOutS = new CipherOutputStream(outS, encryptCipher);
+			
+			cipherOutS.write(msg_content.getBytes());
+			cipherOutS.flush();
+			cipherOutS.close();
+			
+			encrypted = outS.toByteArray();
+		
+		
+		} catch (Exception x) {
+			Log.v(TAG, "couldn't encrypt final payload");
+		}
+					
+		byte[] aesKeyEncrypted = null; 
+		
+		if (key != null) {
+			try {
+				aesKeyEncrypted = encryptedSymmetricKey(destPuK, key);
+			} catch (Exception e) {
+				Log.v(TAG, "couldn't encrypt aes key");	
+			}
+		}
+					
+		return encrypted;
+	}
+
+	private SecretKey genAesKey() {
+	
+		// generate a symmetric key
+		SecretKey key = null;
+		try {
+			key = KeyGenerator.getInstance("AES").generateKey();
+		} catch (Exception e) {
+			Log.v(TAG, "couldn't generate AES key");
+		}
+		return key;
+		
+	}
+	
+	private byte[] encryptedSymmetricKey(byte[] friendPuk, SecretKey symmkey) throws InvalidKeySpecException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException {
+    	PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(friendPuk));
+    	Cipher mCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        mCipher.init(Cipher.WRAP_MODE, publicKey);
+        
+        byte[] encryptedSK = mCipher.wrap(symmkey);
+        
+        return encryptedSK;
 	}
 	
 }
