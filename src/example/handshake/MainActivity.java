@@ -230,6 +230,8 @@ public class MainActivity extends Activity {
 		// we want to send some messages
 		if (c.getCount() > 0) {
 			messageSending = true;
+		} else {
+			logMessage("no messages to send");
 		}
 		
 		while (c.moveToNext()) {
@@ -240,7 +242,7 @@ public class MainActivity extends Activity {
 			String msg_content = c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT));
 			String msg_type =  c.getString(c.getColumnIndex(FriendsDb.KEY_M_MSGTYPE));
 			
-			//logMessage("found msg to add for " + recipient_name);
+			logMessage("found msg to add for " + recipient_name);
 			
 			// inefficient way to get peer stuff
 			for (BlePeer p: bleFriends.values()) {
@@ -249,7 +251,7 @@ public class MainActivity extends Activity {
 				if (p.GetName().equalsIgnoreCase(recipient_name)) {
 					String msgHash = "";
 					
-					try {					
+					//try {					
 						// get the fingerprint from the Friend object
 						m.RecipientFingerprint = p.GetFingerprintBytes();
 						
@@ -269,27 +271,40 @@ public class MainActivity extends Activity {
 							
 							String encryption_key = "thisismydamnpassphrasepleaseacceptthisasthegodshonestthruthofmine!";
 							
-							AESCrypt aes = new AESCrypt(encryption_key.getBytes());
+							AESCrypt aes = null;
 							
-							
-							
-							Log.v("DOIT", "encryption key raw: " + ByteUtilities.bytesToHex(encryption_key.getBytes()));
-							// encrypt the body of this message with our symmetric key
-							//msgbytes = encryptMsg(key, msg_content);
-							Log.v("DOIT", "encrypting bytes: " + ByteUtilities.bytesToHex(msg_content.getBytes()));
-							msgbytes = aes.encrypt(msg_content.getBytes());
-							
-							
-							Log.v("DOIT", "encrypted bytes: " + ByteUtilities.bytesToHex(msgbytes));
-							
-							Log.v("DOIT", "test decrypt bytes: " + ByteUtilities.bytesToHex(aes.decrypt(msgbytes)));
-							
-							// encrypt our encryption key using our recipient's public key 							
 							try {
-								aesKeyEncrypted = encryptedSymmetricKey(friendPuk, encryption_key);
-								Log.v(TAG, "encrypted key bytes: " + ByteUtilities.bytesToHex(aesKeyEncrypted));
+								aes = new AESCrypt(encryption_key.getBytes());
 							} catch (Exception e) {
-								Log.v(TAG, "couldn't encrypt aes key");	
+								Log.v(TAG, "can't instantia AESCrypt");
+							}
+							
+							if (aes != null) {
+							
+								Log.v("DOIT", "encryption key raw: " + ByteUtilities.bytesToHex(encryption_key.getBytes()));
+								Log.v("DOIT", "encrypting bytes: " + ByteUtilities.bytesToHex(msg_content.getBytes()));
+								
+								try {
+									msgbytes = aes.encrypt(msg_content.getBytes());
+								} catch (Exception x) {
+									Log.v(TAG, "encrypt error: " + x.getMessage());
+								}
+								
+								if (msgbytes != null) {
+									Log.v("DOIT", "encrypted bytes: " + ByteUtilities.bytesToHex(msgbytes));
+									//Log.v("DOIT", "test decrypt bytes: " + ByteUtilities.bytesToHex(aes.decrypt(msgbytes)));
+									
+									// encrypt our encryption key using our recipient's public key 							
+									try {
+										aesKeyEncrypted = encryptedSymmetricKey(friendPuk, encryption_key);
+										Log.v(TAG, "encrypted key bytes: " + ByteUtilities.bytesToHex(aesKeyEncrypted));
+									} catch (Exception e) {
+										Log.v(TAG, "couldn't encrypt aes key");	
+									}
+								} else {
+									logMessage("couldnt encrypt message");
+									break;
+								}
 							}
 							
 						} else {
@@ -339,9 +354,9 @@ public class MainActivity extends Activity {
 						logMessage("queued " + msgHash  + " for " + recipient_name);						
 						
 						break;
-					} catch (Exception x) {
-						logMessage("e: " + x.getMessage());
-					}
+					//} catch (Exception x) {
+//						logMessage("e: " + x.getMessage());
+					//}
 					
 
 				}
