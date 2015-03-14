@@ -264,24 +264,32 @@ public class MainActivity extends Activity {
 						// if our message is meant to be encrypted, do that first
 						if (msg_type.equalsIgnoreCase("encrypted")) {
 							
-							// generate a brand new symmetric key
-							SecretKey key = genAesKey();
-							
 							// get our friend's public key from the friend's object
 							byte[] friendPuk = p.GetPublicKey();
 							
+							String encryption_key = "thisismydamnpassphrasepleaseacceptthisasthegodshonestthruthofmine!";
+							
+							AESCrypt aes = new AESCrypt(encryption_key.getBytes());
+							
+							
+							
+							Log.v("DOIT", "encryption key raw: " + ByteUtilities.bytesToHex(encryption_key.getBytes()));
 							// encrypt the body of this message with our symmetric key
-							msgbytes = encryptMsg(key, msg_content);
+							//msgbytes = encryptMsg(key, msg_content);
+							Log.v("DOIT", "encrypting bytes: " + ByteUtilities.bytesToHex(msg_content.getBytes()));
+							msgbytes = aes.encrypt(msg_content.getBytes());
+							
+							
+							Log.v("DOIT", "encrypted bytes: " + ByteUtilities.bytesToHex(msgbytes));
+							
+							Log.v("DOIT", "test decrypt bytes: " + ByteUtilities.bytesToHex(aes.decrypt(msgbytes)));
 							
 							// encrypt our encryption key using our recipient's public key 							
-							if (key != null) {
-								try {
-									aesKeyEncrypted = encryptedSymmetricKey(friendPuk, key);
-									Log.v(TAG, "generated symmetric key is: " + ByteUtilities.bytesToHex(key.getEncoded()));
-									Log.v(TAG, "encrypted key bytes: " + ByteUtilities.bytesToHex(aesKeyEncrypted));
-								} catch (Exception e) {
-									Log.v(TAG, "couldn't encrypt aes key");	
-								}
+							try {
+								aesKeyEncrypted = encryptedSymmetricKey(friendPuk, encryption_key);
+								Log.v(TAG, "encrypted key bytes: " + ByteUtilities.bytesToHex(aesKeyEncrypted));
+							} catch (Exception e) {
+								Log.v(TAG, "couldn't encrypt aes key");	
 							}
 							
 						} else {
@@ -592,25 +600,34 @@ public class MainActivity extends Activity {
 				logMessage("a: received encrypted msg of size:" + String.valueOf(payload.length));
 				Log.v(TAG, "received encrypted msg, payload size:"+ String.valueOf(payload.length));
 				
+				// payload might be padded with zeroes, strip out trailing null bytes
+				payload = ByteUtilities.trimmedBytes(payload);
+				
 				// load this payload into our hash to payload lookup
 				hashToPayload.put(ByteUtilities.bytesToHex(messageHash), payload);
 				
-				// look for an existing key
-				Log.v(TAG, "key for " + ByteUtilities.bytesToHex(messageHash).substring(0,8));
-				SecretKey aesKey = getKeyForMessageHash(messageHash);
+
 				
-				// if we have a key for this thing already, decrypt and display messages
-				byte[] decryptedPayload = null;
+				Log.v("DOIT", "encrypted payload: " + ByteUtilities.bytesToHex(payload));
 				
-				if (aesKey != null) {
-					logMessage("a: found key for this message");
-					Log.v(TAG, "found key for this message");
-					
+				byte[] aesKeyBytes = hashToKey.get(ByteUtilities.bytesToHex(messageHash));
+				
+				if (aesKeyBytes != null) {
+				
+					// if we have a key for this thing already, decrypt and display messages
+					byte[] decryptedPayload = null;
+				
+					AESCrypt aes = null;
 					try {
-						decryptedPayload = decryptMsg(aesKey, payload);
-					} catch (Exception x) {
-						logMessage("a: unable to decrypt");
-						Log.v(TAG, "unable to decrypt!");
+						aes = new AESCrypt(aesKeyBytes);
+					} catch (Exception e) {
+						Log.v(TAG, "couldn't create AESCrypt class with String(aesKeyBytes):" + e.getMessage());
+					}
+				
+					try {
+						decryptedPayload = aes.decrypt(payload);
+					} catch (Exception e) {
+						Log.v(TAG, "couldn't decrypt payload:" + e.getMessage());
 					}
 					
 					if (decryptedPayload != null) {
@@ -762,7 +779,7 @@ public class MainActivity extends Activity {
 		// map our messages hashes to our encryption keys
 		hashToKey.put(ByteUtilities.bytesToHex(hash), symmetric_key.getEncoded());
 		
-		Log.v(TAG, "unwrapped key is: " + ByteUtilities.bytesToHex(symmetric_key.getEncoded()).substring(0,8));
+		Log.v("DOIT", "key is: " + ByteUtilities.bytesToHex(symmetric_key.getEncoded()));
 		
 		return hash;
 		
@@ -967,79 +984,6 @@ public class MainActivity extends Activity {
 		return m;
 	}
 
-	private byte[] encryptMsg(SecretKey key, String msg_content) {
-			
-		byte[] encrypted = null;
-		
-		Log.v(TAG, "encrypt w/ key: " + ByteUtilities.bytesToHex(key.getEncoded()));
-		
-		// encrypt our payload bytes
-		try {
-			Cipher encryptCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-			encryptCipher.init(Cipher.ENCRYPT_MODE, key);
-			
-			ByteArrayOutputStream outS = new ByteArrayOutputStream();
-			CipherOutputStream cipherOutS = new CipherOutputStream(outS, encryptCipher);
-			
-			cipherOutS.write(msg_content.getBytes());
-			cipherOutS.flush();
-			cipherOutS.close();
-			
-			encrypted = outS.toByteArray();
-		
-		
-		} catch (Exception x) {
-			Log.v(TAG, "couldn't encrypt final payload");
-		}
-					
-		Log.v(TAG, "encrypted val: " + ByteUtilities.bytesToHex(encrypted));
-		return encrypted;
-	}
-
-	public byte[] decryptMsg(SecretKey key, byte[] EncryptedPayload) {
-		
-		byte[] decrypted = null;
-		
-		Log.v(TAG, "decrypt this: " + ByteUtilities.bytesToHex(EncryptedPayload));
-		Log.v(TAG, "... using key: " + ByteUtilities.bytesToHex(key.getEncoded()));
-		
-		Cipher decryptCipher = null;
-				
-		try {
-			decryptCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-		} catch (NoSuchAlgorithmException e) {
-			Log.v(TAG, "cipher! " + e.getMessage());
-		} catch (NoSuchPaddingException e) {
-			Log.v(TAG, "cipher! " + e.getMessage());
-		}
-		
-		if (decryptCipher != null) {
-			
-			try {
-				decryptCipher.init(Cipher.DECRYPT_MODE, key);
-			} catch (InvalidKeyException e) {
-				Log.v(TAG, "cipher! " + e.getMessage());
-			}
-			
-			try {
-				ByteArrayOutputStream outS = new ByteArrayOutputStream();
-				CipherOutputStream cipherOutS = new CipherOutputStream(outS, decryptCipher);
-				
-				cipherOutS.write(EncryptedPayload);
-				cipherOutS.flush();
-				cipherOutS.close();
-				
-				decrypted = outS.toByteArray();
-			} catch (Exception x) {
-				Log.v(TAG, "outstream! " + x.getMessage());
-			}
-		
-		} else {
-			logMessage("unable to init decryptCipher");
-		}
-					
-		return decrypted;
-	}
 	
 	private SecretKey genAesKey() {
 	
@@ -1054,10 +998,12 @@ public class MainActivity extends Activity {
 		
 	}
 	
-	private byte[] encryptedSymmetricKey(byte[] friendPuk, SecretKey symmkey) throws InvalidKeySpecException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException {
+	private byte[] encryptedSymmetricKey(byte[] friendPuk, String secretKeyText) throws Exception {
     	PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(friendPuk));
     	Cipher mCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
         mCipher.init(Cipher.WRAP_MODE, publicKey);
+        
+        SecretKey symmkey = new SecretKeySpec(secretKeyText.getBytes("UTF-8"), "AES");
         
         byte[] encryptedSK = mCipher.wrap(symmkey);
         
