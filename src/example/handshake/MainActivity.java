@@ -100,7 +100,8 @@ public class MainActivity extends Activity {
     private boolean messageReceiving = false;
     private boolean messageSending = false;
     
-    private Map<String, String> hashToKey;
+    private Map<String, byte[]> hashToKey;
+    private Map<String, byte[]> hashToPayload;
     
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -111,7 +112,11 @@ public class MainActivity extends Activity {
 		ctx = this;
 		
 		if (hashToKey == null) {
-			hashToKey = new HashMap<String, String>();
+			hashToKey = new HashMap<String,byte[]>();
+		}
+
+		if (hashToPayload == null) {
+			hashToPayload = new HashMap<String, byte[]>();
 		}
 		
 		// do you want to be able to receive messages?
@@ -507,12 +512,25 @@ public class MainActivity extends Activity {
 		// this is when all the packets have come in, and a message is received in its entirety (hopefully)
 		// the secret sauce
 		@Override
-		public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, int msgType) {
+		public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, byte msgType, byte[] messageHash) {
 
+			/*
+			BleMessage incomingMsg = new BleMessage();
+			
+			incomingMsg.MessagePayload = payload;
+			incomingMsg.MessageType = msgType;
+			incomingMsg.RecipientFingerprint = ByteUtilities.hexToBytes(recipientFingerprint);
+			incomingMsg.SenderFingerprint = ByteUtilities.hexToBytes(senderFingerprint);
+			
+			// i'm doing something wrong, cause this doesn't work!
+			incomingMsg.rebuildHash();
+			*/
 			logMessage("a: rcvd " + msgType + " msg for " + recipientFingerprint.substring(0, 10) + "...");
 			
+			int mt = msgType & 0xFF;
+			
 			// this is an identity message so handle it as such
-			if (msgType == 1) {
+			if (mt == 1) {
 				Log.v(TAG, "received identity msg");
 								
 				if (recipientFingerprint.length() == 0) {
@@ -559,7 +577,7 @@ public class MainActivity extends Activity {
 					// parse the public key & friendly name out of the payload, and add this as a new person
 				}
 				
-			} else if (msgType == 2) {
+			} else if (mt == 2) {
 				logMessage("a: received raw msg of size:" + String.valueOf(payload.length));
 				
 				if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
@@ -570,40 +588,61 @@ public class MainActivity extends Activity {
 				}
 				
 				Log.v(TAG, "received data msg, payload size:"+ String.valueOf(payload.length));
-			} else if (msgType == 20) {
+			} else if (mt == 20) {
 				logMessage("a: received encrypted msg of size:" + String.valueOf(payload.length));
 				Log.v(TAG, "received encrypted msg, payload size:"+ String.valueOf(payload.length));
 				
-				// we need to build a BleMessage from all this stuff, and then calc its hash?
-				// or is its hash already calc'd?
-				byte[] incomingMessageHash = null;
+				// load this payload into our hash to payload lookup
+				hashToPayload.put(ByteUtilities.bytesToHex(messageHash), payload);
 				
-				// get the key
-				SecretKey aesKey = getKeyForMessageHash(incomingMessageHash);
+				// look for an existing key
+				Log.v(TAG, "key for " + ByteUtilities.bytesToHex(messageHash).substring(0,8));
+				SecretKey aesKey = getKeyForMessageHash(messageHash);
 				
-				// if we have a key for this thing already, then let's go for it
+				// if we have a key for this thing already, decrypt and display messages
+				byte[] decryptedPayload = null;
+				
 				if (aesKey != null) {
-					// we can decrypt
+					logMessage("a: found key for this message");
+					Log.v(TAG, "found key for this message");
+					
+					try {
+						decryptedPayload = decryptMsg(aesKey, payload);
+					} catch (Exception x) {
+						logMessage("a: unable to decrypt");
+						Log.v(TAG, "unable to decrypt!");
+					}
+					
+					if (decryptedPayload != null) {
+						String msgtext = new String(decryptedPayload);
+						logMessage("decrypted: " + msgtext);
+					} else {
+						logMessage("empty decrypted payload!");
+					}
+					
+					
 				} else {
-					// we need to store this shit somewhere so when the key comes in, we can decrypt
+					logMessage("a: no key for this message!");
+					Log.v(TAG, "no key for this message!");
 				}
 				
-				
-				
-			} else if (msgType == 21) {
+			} else if (mt == 21) {
+				logMessage("a: received encrypted key of size:" + String.valueOf(payload.length));
+				Log.v(TAG, "received encrypted key, payload size:"+ String.valueOf(payload.length));
 				
 				byte[] incomingMessageHash = processIncomingKeyMsg(payload);
 				
-				// get the key
-				SecretKey aesKey = getKeyForMessageHash(incomingMessageHash);
+				Log.v(TAG, "added key for incoming msg hash " + ByteUtilities.bytesToHex(incomingMessageHash));
+
+				byte[] encryptedPayload = hashToPayload.get(ByteUtilities.bytesToHex(incomingMessageHash));
 				
-				// if we have a key for this thing already, then let's go for it
-				if (aesKey != null) {
-					
+				if (encryptedPayload != null ) {
+					logMessage("a: found encrypted payload for the key we just got");
+				} else {
+					logMessage("a: NO encrypted payload found for this new key");
 				}
 				
-				logMessage("a: received encrypted key of size:" + String.valueOf(payload.length));
-				Log.v(TAG, "received encrypted key, payload size:"+ String.valueOf(payload.length));
+				
 			}
 			
 		}
@@ -681,14 +720,16 @@ public class MainActivity extends Activity {
 	};
 	
 	public SecretKey getKeyForMessageHash(byte[] incomingHash) {
-		
-		String aesKey = hashToKey.get(ByteUtilities.bytesToHex(incomingHash));
+				
+		byte[] aesKey = hashToKey.get(ByteUtilities.bytesToHex(incomingHash));
 		
 		SecretKey key = null;
 		
 		if (aesKey != null) {
-			byte[] byteKey = ByteUtilities.hexToBytes(aesKey);
-			key = new SecretKeySpec(byteKey, 0, byteKey.length, "AES");
+			Log.v(TAG, "found key for " + ByteUtilities.bytesToHex(incomingHash).substring(0,8));
+			key = new SecretKeySpec(aesKey, 0, aesKey.length, "AES");
+		} else {
+			Log.v(TAG, "NO key found for " + ByteUtilities.bytesToHex(incomingHash).substring(0,8));
 		}
 		
 		return key;
@@ -719,7 +760,7 @@ public class MainActivity extends Activity {
 		}
 		
 		// map our messages hashes to our encryption keys
-		hashToKey.put(ByteUtilities.bytesToHex(hash), ByteUtilities.bytesToHex(symmetric_key.getEncoded()));
+		hashToKey.put(ByteUtilities.bytesToHex(hash), symmetric_key.getEncoded());
 		
 		Log.v(TAG, "unwrapped key is: " + ByteUtilities.bytesToHex(symmetric_key.getEncoded()).substring(0,8));
 		
@@ -930,6 +971,8 @@ public class MainActivity extends Activity {
 			
 		byte[] encrypted = null;
 		
+		Log.v(TAG, "encrypt w/ key: " + ByteUtilities.bytesToHex(key.getEncoded()));
+		
 		// encrypt our payload bytes
 		try {
 			Cipher encryptCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
@@ -949,9 +992,55 @@ public class MainActivity extends Activity {
 			Log.v(TAG, "couldn't encrypt final payload");
 		}
 					
+		Log.v(TAG, "encrypted val: " + ByteUtilities.bytesToHex(encrypted));
 		return encrypted;
 	}
 
+	public byte[] decryptMsg(SecretKey key, byte[] EncryptedPayload) {
+		
+		byte[] decrypted = null;
+		
+		Log.v(TAG, "decrypt this: " + ByteUtilities.bytesToHex(EncryptedPayload));
+		Log.v(TAG, "... using key: " + ByteUtilities.bytesToHex(key.getEncoded()));
+		
+		Cipher decryptCipher = null;
+				
+		try {
+			decryptCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+		} catch (NoSuchAlgorithmException e) {
+			Log.v(TAG, "cipher! " + e.getMessage());
+		} catch (NoSuchPaddingException e) {
+			Log.v(TAG, "cipher! " + e.getMessage());
+		}
+		
+		if (decryptCipher != null) {
+			
+			try {
+				decryptCipher.init(Cipher.DECRYPT_MODE, key);
+			} catch (InvalidKeyException e) {
+				Log.v(TAG, "cipher! " + e.getMessage());
+			}
+			
+			try {
+				ByteArrayOutputStream outS = new ByteArrayOutputStream();
+				CipherOutputStream cipherOutS = new CipherOutputStream(outS, decryptCipher);
+				
+				cipherOutS.write(EncryptedPayload);
+				cipherOutS.flush();
+				cipherOutS.close();
+				
+				decrypted = outS.toByteArray();
+			} catch (Exception x) {
+				Log.v(TAG, "outstream! " + x.getMessage());
+			}
+		
+		} else {
+			logMessage("unable to init decryptCipher");
+		}
+					
+		return decrypted;
+	}
+	
 	private SecretKey genAesKey() {
 	
 		// generate a symmetric key

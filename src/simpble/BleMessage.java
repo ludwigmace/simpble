@@ -227,6 +227,32 @@ public class BleMessage {
         }
         
 	}
+
+	/**
+	 * Build or Rebuild the stored message hash
+	 * SHA-1 of (new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload) 
+	 */
+	public void rebuildHash() {
+		
+		byte[] MessageBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
+		
+	    // get a digest for the message, to define it
+        MessageDigest md = null;
+        
+        try {
+			md = MessageDigest.getInstance("SHA-1");
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		}
+        
+        // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
+        // (i want my digest to be the packet size less the 5 bytes needed for header info)
+        byte[] myDigest = Arrays.copyOfRange(md.digest(MessageBytes), 0, MessagePacketSize - 5);
+        
+        // set our global variable for the hash to this digest
+        MessageHash = myDigest;	
+	}
+	
 	
 	/**
 	 * Sets the MessagePayload class variable to the bytes you pass in.  Constructs a SHA1 hash based on

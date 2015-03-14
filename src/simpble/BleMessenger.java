@@ -565,7 +565,7 @@ public class BleMessenger {
 	    			bleStatusCallback.headsUp("m: sender has fp, handling msg");
 	    			
 	    			if (b.checkHash()) {
-	    				bleStatusCallback.headsUp("m: hash good");
+	    				bleStatusCallback.headsUp("m: hash good: " + ByteUtilities.bytesToHex(b.MessageHash).substring(0,8));
 	    			} else {
 	    				bleStatusCallback.headsUp("m: hash bad: " + b.GetCalcHash());
 	    				bleStatusCallback.headsUp("m: shouldbe: " + ByteUtilities.bytesToHex(b.MessageHash).substring(0,8));
@@ -577,7 +577,7 @@ public class BleMessenger {
 	    				friendsFpMap.put(ByteUtilities.bytesToHex(b.SenderFingerprint), p);
 	    			}
 	    			
-	    			bleStatusCallback.handleReceivedMessage(remoteAddress, ByteUtilities.bytesToHex(b.RecipientFingerprint), ByteUtilities.bytesToHex(b.SenderFingerprint), b.MessagePayload, b.MessageType);
+	    			bleStatusCallback.handleReceivedMessage(remoteAddress, ByteUtilities.bytesToHex(b.RecipientFingerprint), ByteUtilities.bytesToHex(b.SenderFingerprint), b.MessagePayload, b.MessageType, b.MessageHash);
 	    			
 	    		} else {
 	    			bleStatusCallback.headsUp("m: msg error: SenderFingerprint.length=0");	
