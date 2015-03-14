@@ -233,12 +233,11 @@ public class BleMessenger {
 				// get the first message i see
 				BleMessage m = p.getBleMessageOut();
 				
-				Log.v("DOIT", "pulled msg #" + String.valueOf(m.GetMessageNumber()) + ", " + ByteUtilities.bytesToHex(m.MessageHash).substring(0,8));
-	
 				// funny, we're not actually sending a particular message per se, even though we asked for a particular message
 				// we're calling a method to send any pending messages for a particular peer
 				// mainly because we don't store the identifier for the peer in a particular BleMessage (although we could?)
 				if (m != null) {
+					Log.v("DOIT", "pulled msg #" + String.valueOf(m.GetMessageNumber()) + ", " + ByteUtilities.bytesToHex(m.MessageHash).substring(0,8));
 					areWeSendingMessages = true;
 					sendMessagesToPeer(p);
 				}
