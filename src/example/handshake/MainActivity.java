@@ -28,7 +28,8 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
-import secretshare.SecretShare.ShareInfo;
+import secretshare.ShamirCombiner;
+import secretshare.ShamirSplitter;
 import simpble.BleMessage;
 import simpble.BleMessenger;
 import simpble.BlePeer;
@@ -120,8 +121,12 @@ public class MainActivity extends Activity {
         // get a pointer to the status text
         statusText = (TextView) findViewById(R.id.status_log);
         
-        // split something
-        //MainSplit.Workin();
+        
+        ShamirSplitter shamirSplitter = new ShamirSplitter();
+        shamirSplitter.Workin();
+        
+        ShamirCombiner shamirCombiner = new ShamirCombiner();
+        shamirCombiner.Workin();
         
         // combine something
         //MainCombine.Workin();
