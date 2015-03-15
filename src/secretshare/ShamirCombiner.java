@@ -31,6 +31,8 @@ public final class ShamirCombiner {
 	static PrintStream ps;
 	static SparseArray<String> shareHolders;
 	
+	static List<ShareInfo> shares;
+	
 	static int paramK = 3;
 
     public static void Workin() {
@@ -38,6 +40,8 @@ public final class ShamirCombiner {
     	ps = new PrintStream(os);
     	
     	shareHolders = new SparseArray<String>();
+    	
+    	shares = new ArrayList<ShareInfo>();
     	
     	/* 
     	 * 1 - 7352982178009263086080134442619255798685951
@@ -83,7 +87,7 @@ public final class ShamirCombiner {
         // required arguments:
         private Integer k           = null;
 
-        private final List<SecretShare.ShareInfo> shares = new ArrayList<SecretShare.ShareInfo>();
+        private final List<ShareInfo> shares = new ArrayList<ShareInfo>();
 
         private BigInteger modulus = SecretShare.getPrimeUsedFor384bitSecretPayload();
 
@@ -108,7 +112,7 @@ public final class ShamirCombiner {
         		int sharenum = shareHolders.keyAt(i);
         		String shareval = shareHolders.get(sharenum);
         		
-        		SecretShare.ShareInfo share = ret.parseEqualShare(sharenum, shareval);
+        		ShareInfo share = ret.parseEqualShare(sharenum, shareval);
         		
         		ret.addIfNotDuplicate(share);
         	}
@@ -124,7 +128,7 @@ public final class ShamirCombiner {
         private void addIfNotDuplicate(ShareInfo add)
         {
             boolean shouldadd = true;
-            for (ShareInfo share : this.shares)
+            for (ShareInfo share : shares)
             {
                 if (share.getX() == add.getX())
                 {
@@ -177,7 +181,7 @@ public final class ShamirCombiner {
 
         private PublicInfo constructPublicInfoFromFields(String where)
         {
-            return new SecretShare.PublicInfo(this.n, this.k, this.modulus, "MainCombine:" + where);
+            return new PublicInfo(this.n, this.k, this.modulus, "MainCombine:" + where);
         }
 
         //  Share (x:2) = bigintcs:005468-69732d-4e02c5-7b11d2-9d4426-e26c88-8a6f94-9809A9
@@ -213,7 +217,7 @@ public final class ShamirCombiner {
             ret.combineInput = this;
 
             // it is a "copy" since it should be equal to this.publicInfo
-            SecretShare.PublicInfo copyPublicInfo = constructPublicInfoFromFields("output");
+            PublicInfo copyPublicInfo = constructPublicInfoFromFields("output");
 
             SecretShare secretShare = new SecretShare(copyPublicInfo);
 

@@ -376,22 +376,21 @@ public class SecretShare
      * @param random to use for random number generation
      * @return split secret output instance
      */
-    public SplitSecretOutput split(final BigInteger secret,
-                                   final Random random)
+    public SplitSecretOutput split(final BigInteger secret, final Random random)
     {
         if (secret == null)
         {
             throw new SecretShareException("Secret cannot be null");
         }
+        
         if (secret.signum() <= 0)
         {
             throw new SecretShareException("Secret cannot be negative");
         }
+        
         if (publicInfo.getPrimeModulus() != null)
         {
-            checkThatModulusIsAppropriate(publicInfo.getPrimeModulus(),
-                                          secret);
-
+            checkThatModulusIsAppropriate(publicInfo.getPrimeModulus(), secret);
         }
 
         BigInteger[] coeffs = new BigInteger[publicInfo.getK()];
@@ -404,8 +403,7 @@ public class SecretShare
 
         final PolyEquationImpl equation = new PolyEquationImpl(coeffs);
 
-        SplitSecretOutput ret = new SplitSecretOutput(this.publicInfo,
-                                                      equation);
+        SplitSecretOutput ret = new SplitSecretOutput(this.publicInfo, equation);
 
         for (int x = 1, n = publicInfo.getNforSplit() + 1; x < n; x++)
         {
@@ -645,252 +643,6 @@ public class SecretShare
     }
 
 
-    // ==================================================
-    // public
-    // ==================================================
-
-    /**
-     * Holds all the "publicly available" information about a secret share.
-     * Holds both "required" and "optional" information.
-     *
-     */
-    public static class PublicInfo
-    {
-        // the required public info: "K" and the modulus
-        private final int k;                         // determines the order of the polynomial
-        private final BigInteger primeModulus;       // can be null
-
-        // required for split: "N" - how many shares were generated?
-        // optional for combine (can be null)
-        private final Integer n;
-
-        // just descriptive info:
-        private final String description;            // any string, including null
-        private final String uuid;                   // a "Random" UUID string
-        private final String date;                   // yyyy-MM-dd HH:mm:ss string
-
-        public PublicInfo(final Integer inN,
-                          final int inK,
-                          final BigInteger inPrimeModulus,
-                          final String inDescription)
-        {
-            super();
-            this.n = inN;
-            this.k = inK;
-            this.primeModulus = inPrimeModulus;
-            this.description = inDescription;
-
-            UUID uuidobj = UUID.randomUUID();
-            uuid =  uuidobj.toString();
-
-            date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-
-            if (n != null)
-            {
-                if (k > n)
-                {
-                    throw new SecretShareException("k cannot be bigger than n [k=" + k +
-                                                   " n=" + n + "]");
-                }
-            }
-        }
-
-        @Override
-        public String toString()
-        {
-            return "PublicInfo[k=" + k + ", n=" + n + "\n" +
-                "modulus=" + primeModulus + "\n" +
-                "description=" + description + "\n" +
-                "date=" + date + "\n" +
-                "uuid=" + uuid +
-                "]";
-        }
-        public String debugDump()
-        {
-            return toString();
-        }
-        public final int getNforSplit()
-        {
-            if (n == null)
-            {
-                throw new SecretShareException("n was not set, can not perform split");
-            }
-            else
-            {
-                return n;
-            }
-        }
-        public final int getN()
-        {
-            if (n == null)
-            {
-                return -1;
-            }
-            else
-            {
-                return n;
-            }
-        }
-        public final int getK()
-        {
-            return k;
-        }
-        public final BigInteger getPrimeModulus()
-        {
-            return primeModulus;
-        }
-        public final String getDescription()
-        {
-            return description;
-        }
-        public final String getUuid()
-        {
-            return uuid;
-        }
-        public final String getDate()
-        {
-            return date;
-        }
-    }
-
-    /**
-     * Holds all the info needed to be a "piece" of the secret.
-     * aka a "Share" of the secret.
-     *
-     * @author tiemens
-     *
-     */
-    public static class ShareInfo
-    {
-        // Identity fields:
-        private final int x;              // this is aka "the index", the x in "f(x)"
-        private final BigInteger share;   // our piece of the secret
-
-        // technically"extra" - at least one ShareInfo must have a PublicInfo,
-        //                      but it is not required that every ShareInfo has a PublicInfo
-        // But for simplicity, it is a required field:
-        private final PublicInfo publicInfo;
-
-        public ShareInfo(final int inX,
-                         final BigInteger inShare,
-                         final PublicInfo inPublicInfo)
-        {
-            if (inShare == null)
-            {
-                throw new SecretShareException("share cannot be null");
-            }
-            if (inPublicInfo == null)
-            {
-                throw new SecretShareException("publicinfo cannot be null");
-            }
-
-            x = inX;
-            share = inShare;
-            publicInfo = inPublicInfo;
-        }
-        public String debugDump()
-        {
-            return "ShareInfo[x=" + x + "\n" +
-                    "share=" + share + "\n" +
-                    "shareBigIntCs=" + BigIntStringChecksum.create(share).toString() + "\n" +
-                    " public=" + publicInfo.debugDump() +
-                    "]";
-        }
-        public final int getIndex()
-        {
-            return x;
-        }
-        public final int getX()
-        {
-            return x;
-        }
-        public final BigInteger getXasBigInteger()
-        {
-            return BigInteger.valueOf(x);
-        }
-        public final BigInteger getShare()
-        {
-            return share;
-        }
-        public final PublicInfo getPublicInfo()
-        {
-            return publicInfo;
-        }
-        @Override
-        public int hashCode()
-        {
-            // Yes, this is a terrible implementation.   But it is correct.
-            return x;
-        }
-        @Override
-        public boolean equals(Object obj)
-        {
-            if (obj instanceof ShareInfo)
-            {
-                return equalsType((ShareInfo) obj);
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-        public boolean equalsType(ShareInfo other)
-        {
-            // NOTE: equality of a ShareInfo is based on:
-            //  1.  x
-            //  2.  f(x)
-            //  3.  k
-            return ((this.x == other.x)  &&
-                    (this.share.equals(other.share)) &&
-                    (this.publicInfo.k == other.publicInfo.k)
-                   );
-        }
-    }
-
-    /**
-     * When the secret is split, this is the information that is returned.
-     * Note: This object is NOT the "public" information, since the polynomial
-     *         used in splitting the secret is in this object.
-     *       The "public" information is the '.getShareInfos()' method.
-     */
-    public static class SplitSecretOutput
-    {
-        private final PublicInfo publicInfo;
-        private final List<ShareInfo> sharesInfo = new ArrayList<ShareInfo>();
-        private final PolyEquationImpl polynomial;
-
-        public SplitSecretOutput(final PublicInfo inPublicInfo,
-                                 final PolyEquationImpl inPolynomial)
-        {
-            publicInfo = inPublicInfo;
-            polynomial = inPolynomial;
-        }
-        public String debugDump()
-        {
-            String ret = "Public=" + publicInfo.debugDump() + "\n";
-
-            ret += "EQ: " + polynomial.debugDump() + "\n";
-
-            for (ShareInfo share : sharesInfo)
-            {
-                ret += "SHARE: " + share.debugDump() + "\n";
-            }
-            return ret;
-        }
-        public final List<ShareInfo> getShareInfos()
-        {
-            return Collections.unmodifiableList(sharesInfo);
-        }
-        public final PublicInfo getPublicInfo()
-        {
-            return publicInfo;
-        }
-        public void debugPrintEquationCoefficients(PrintStream out) {
-            polynomial.debugPrintEquationCoefficients(out);
-        }
-    }
-
     public ParanoidOutput combineParanoid(List<ShareInfo> shares)
     {
         return combineParanoid(shares, null);
@@ -927,7 +679,7 @@ public class SecretShare
 
 
         int count = -1;
-        for (List<SecretShare.ShareInfo> usetheseshares : combo)
+        for (List<ShareInfo> usetheseshares : combo)
         {
             count++;
             if (maximumCombinationsToTest != null)
@@ -980,70 +732,6 @@ public class SecretShare
         public final BigInteger getSecret()
         {
             return secret;
-        }
-    }
-
-
-    /**
-     * Holds the output of the combineParanoid() operation.
-     * "Paranoid" is the term used when:
-     *    "given more shares than needed, check (all) combinations of shares,
-     *     make sure that _each_ combination of shares returns the same secret"
-     *
-     */
-    public static class ParanoidOutput
-    {
-        private Integer maximumCombinationsAllowedToTest; // null means "all"
-        private BigInteger totalNumberOfCombinations;
-        private final List<String> combinations = new ArrayList<String>();
-        private BigInteger agreedAnswerEveryTime;
-
-        public String getParanoidCompleteOutput()
-        {
-            String ret = getParanoidHeaderOutput();
-            ret += getParanoidCombinationOutput();
-            return ret;
-        }
-
-        public String getParanoidHeaderOutput()
-        {
-            String ret = "SecretShare.paranoid(max=" +
-                        ((maximumCombinationsAllowedToTest != null) ? maximumCombinationsAllowedToTest : "all") +
-                        " combo.total=" +
-                        totalNumberOfCombinations +
-                        ")";
-            ret += "\n";
-            return ret;
-        }
-
-        public String getParanoidCombinationOutput()
-        {
-            String ret = "";
-            for (String s : combinations)
-            {
-                ret += s;
-                ret += "\n";
-            }
-
-            return ret;
-        }
-
-        public void recordCombination(BigInteger currentCombinationNumber,
-                                      String indexesAsString,
-                                      String dumpshares)
-        {
-            String s = "Combination: " +
-                        currentCombinationNumber +
-                        " of " +
-                        totalNumberOfCombinations +
-                        indexesAsString +
-                        dumpshares;
-            combinations.add(s);
-        }
-
-        public BigInteger getAgreedAnswer()
-        {
-            return agreedAnswerEveryTime;
         }
     }
 

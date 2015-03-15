@@ -223,12 +223,11 @@ public final class ShamirSplitter
             SplitOutput ret = new SplitOutput(this);
             ret.setPrintAllSharesAtOnce(printAllSharesAtOnce);
 
-            SecretShare.PublicInfo publicInfo = 
-            		new SecretShare.PublicInfo(this.n, this.k, this.modulus, this.description);
+            PublicInfo publicInfo = new PublicInfo(this.n, this.k, this.modulus, this.description);
 
             SecretShare secretShare = new SecretShare(publicInfo);
 
-            SecretShare.SplitSecretOutput generate = secretShare.split(this.secret, this.random);
+            SplitSecretOutput generate = secretShare.split(this.secret, this.random);
 
             ret.splitSecretOutput = generate;
 
@@ -240,9 +239,7 @@ public final class ShamirSplitter
                     parg = null;
                 }
 
-                ret.paranoidOutput =
-                        secretShare.combineParanoid(generate.getShareInfos(),
-                                                    parg);
+                ret.paranoidOutput = secretShare.combineParanoid(generate.getShareInfos(), parg);
             }
             else
             {
@@ -310,9 +307,9 @@ public final class ShamirSplitter
 
         private void printSharesOnePerPage(PrintStream out)
         {
-            final List<SecretShare.ShareInfo> shares = splitSecretOutput.getShareInfos();
+            final List<ShareInfo> shares = splitSecretOutput.getShareInfos();
             boolean first = true;
-            for (SecretShare.ShareInfo share : shares)
+            for (ShareInfo share : shares)
             {
                 if (! first)
                 {
@@ -336,7 +333,7 @@ public final class ShamirSplitter
 
         private void printHeaderInfo(PrintStream out)
         {
-            final SecretShare.PublicInfo publicInfo = splitSecretOutput.getPublicInfo();
+            final PublicInfo publicInfo = splitSecretOutput.getPublicInfo();
 
             field(out, "Secret Share version ", "");
             field(out, "Date", publicInfo.getDate());
@@ -351,13 +348,13 @@ public final class ShamirSplitter
 
         private void printSharesAllAtOnce(PrintStream out)
         {
-            List<SecretShare.ShareInfo> shares = splitSecretOutput.getShareInfos();
+            List<ShareInfo> shares = splitSecretOutput.getShareInfos();
             out.println("");
-            for (SecretShare.ShareInfo share : shares)
+            for (ShareInfo share : shares)
             {
                 printShare(out, share, false);
             }
-            for (SecretShare.ShareInfo share : shares)
+            for (ShareInfo share : shares)
             {
                 printShare(out, share, true);
             }
