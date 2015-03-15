@@ -3,6 +3,8 @@ package example.handshake;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.math.BigInteger;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
@@ -10,8 +12,11 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -23,6 +28,7 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+import math.SecretShare.ShareInfo;
 import simpble.BleMessage;
 import simpble.BleMessenger;
 import simpble.BlePeer;
@@ -111,6 +117,11 @@ public class MainActivity extends Activity {
 		statusLogText = "";
 		ctx = this;
 		
+        // get a pointer to the status text
+        statusText = (TextView) findViewById(R.id.status_log);
+        
+        MainSplit.Workin();
+        
 		if (hashToKey == null) {
 			hashToKey = new HashMap<String,byte[]>();
 		}
@@ -156,8 +167,6 @@ public class MainActivity extends Activity {
         EditText yourNameControl = (EditText) findViewById(R.id.your_name);
         yourNameControl.setText(userName);
         
-        // get a pointer to the status text
-        statusText = (TextView) findViewById(R.id.status_log);
         
         // init the rsaKey object
         rsaKey = null;
@@ -1025,5 +1034,5 @@ public class MainActivity extends Activity {
         return encryptedSK;
 	}
 
-	
+    
 }

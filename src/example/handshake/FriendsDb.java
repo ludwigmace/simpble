@@ -30,6 +30,12 @@ public class FriendsDb extends SQLiteOpenHelper {
     public static final String KEY_M_ROWID = "_id";
     public static final String KEY_M_MSGTYPE = "msgtype";
     
+    private static final String PARENT_MSGS_TABLE = "msgs";
+ 	public static final String KEY_PM_FNAME = "friend_name";
+    public static final String KEY_PM_CONTENT = "msg_content";
+    public static final String KEY_PM_ROWID = "_id";
+    public static final String KEY_PM_MSGTYPE = "msgtype";
+    
     private static final String TAG = "FriendsDbAdapter";
     private SQLiteDatabase mDb;
 
@@ -50,6 +56,13 @@ public class FriendsDb extends SQLiteOpenHelper {
     	+ KEY_M_MSGTYPE + " text not null, "
     	+ KEY_M_FNAME + " text not null); ";
 
+    private static final String PARENT_MSGS_CREATE =
+        	"create table " + PARENT_MSGS_TABLE + " ("
+        	+ KEY_PM_ROWID + " integer primary key autoincrement, "
+        	+ KEY_PM_CONTENT + " text not null, "
+        	+ KEY_PM_MSGTYPE + " text not null, "
+        	+ KEY_PM_FNAME + " text not null); ";
+    
 
 	public FriendsDb(Context context) {
 		super(context, DBNAME, null, DBVERSION);
