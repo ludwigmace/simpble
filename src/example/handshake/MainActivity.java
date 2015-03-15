@@ -120,7 +120,9 @@ public class MainActivity extends Activity {
         // get a pointer to the status text
         statusText = (TextView) findViewById(R.id.status_log);
         
-        MainSplit.Workin();
+        //MainSplit.Workin();
+        MainCombine.Workin();
+        
         
 		if (hashToKey == null) {
 			hashToKey = new HashMap<String,byte[]>();
