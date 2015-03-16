@@ -22,5 +22,26 @@
 	<string name="queue_msg_btn">Queue Message</string>
 	<string name="caption_toggle_busy">Busy!</string>
 	<string name="chk_encrypt">Encrypt</string>
+	<string name="shares_msg">Create Threshold Msg</string>
+	<string name="prompt_shares_total">TOTAL</string>
+	<string name="prompt_shares_min">MINL</string>
+	<string name="action_add_deaddrops">Add Dead Drop Msg</string>
+	
+	<string-array name="shares_total">
+	    <item>2</item>
+	    <item>3</item>
+	    <item>4</item>
+	    <item>5</item>
+	    <item>6</item>
+	</string-array>
+	
+	<string-array name="shares_min">
+	    <item>2</item>
+	    <item>3</item>
+	    <item>4</item>
+	    <item>5</item>
+	    <item>6</item>
+	</string-array>
+	
 </resources>
 

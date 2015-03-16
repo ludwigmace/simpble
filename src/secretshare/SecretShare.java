@@ -378,18 +378,15 @@ public class SecretShare
      */
     public SplitSecretOutput split(final BigInteger secret, final Random random)
     {
-        if (secret == null)
-        {
+        if (secret == null) {
             throw new SecretShareException("Secret cannot be null");
         }
         
-        if (secret.signum() <= 0)
-        {
+        if (secret.signum() <= 0) {
             throw new SecretShareException("Secret cannot be negative");
         }
         
-        if (publicInfo.getPrimeModulus() != null)
-        {
+        if (publicInfo.getPrimeModulus() != null) {
             checkThatModulusIsAppropriate(publicInfo.getPrimeModulus(), secret);
         }
 
@@ -405,14 +402,14 @@ public class SecretShare
 
         SplitSecretOutput ret = new SplitSecretOutput(this.publicInfo, equation);
 
-        for (int x = 1, n = publicInfo.getNforSplit() + 1; x < n; x++)
-        {
+        for (int x = 1, n = publicInfo.getNforSplit() + 1; x < n; x++) {
             final BigInteger fofx = equation.calculateFofX(BigInteger.valueOf(x));
             BigInteger data = fofx;
-            if (publicInfo.primeModulus != null)
-            {
+            
+            if (publicInfo.primeModulus != null) {
                 data = data.mod(publicInfo.primeModulus);
             }
+            
             final ShareInfo share = new ShareInfo(x, data, this.publicInfo);
             ret.sharesInfo.add(share);
         }

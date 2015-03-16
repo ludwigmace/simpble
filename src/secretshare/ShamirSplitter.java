@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Random;
 
 import android.util.Log;
+import android.util.SparseArray;
 
 /**
  * Main command line for the "split" (aka "create") of a secret.
@@ -41,36 +42,34 @@ public final class ShamirSplitter
 {
 
 	private static final String TAG = "shamir";
-	static int paramK = 3;
-	static int paramN = 6;
-	static String paramS = "The Cat In The Hat";
+	static int paramK;
+	static int paramN;
+	static String paramS;
 
 	static ByteArrayOutputStream os;
 	static PrintStream ps;
 	
-    public static void Workin() {
-
-    	String results = "";
+    public static SparseArray<String> Workin(int k, int n, String s) {
     	
-    	os = new ByteArrayOutputStream();
-    	ps = new PrintStream(os);
+    	paramK = k;
+    	paramN = n;
+    	paramS = s;
     	
     	SplitInput input = SplitInput.buildSplitInput();
-        SplitOutput output = input.output();
+    	SplitOutput output = input.output();
         
-        output.print(ps);
+    	SparseArray<String> sharesOut  = new SparseArray<String>();
+    	
+        for (ShareInfo i: output.getShares()) {
+        	int x = i.getIndex();
+        	BigInteger bi = i.getShare();
+        	
+        	sharesOut.put(x, bi.toString());
+        }
         
-        try {
-			results = os.toString("UTF8");
-		} catch (UnsupportedEncodingException e) {
-			results = "error";
-		}
-        
-        Log.v(TAG, results);
+        return sharesOut;
 
     }
-
-    // -k, -n, -sS, -prime384
 
     public static BigInteger parseBigInteger(String argname, String[] args, int index) {
         checkIndex(argname, args, index);
@@ -145,7 +144,8 @@ public final class ShamirSplitter
 
         // optional:  if null, then do not use modulus
         // default to 384-bit
-        private BigInteger modulus = SecretShare.getPrimeUsedFor384bitSecretPayload();
+        //private BigInteger modulus = SecretShare.getPrimeUsedFor384bitSecretPayload();
+        private BigInteger modulus = null;
 
         // optional:
         //    paranoid: null = do nothing, paranoid < 0 = do all, otherwise paranoid = # of tests
@@ -174,10 +174,10 @@ public final class ShamirSplitter
             ret.n = paramN;
             ret.secretArgument = paramS;
             ret.secret = BigIntUtilities.Human.createBigInteger(paramS);
-            ret.modulus = SecretShare.getPrimeUsedFor384bitSecretPayload();
+            ret.modulus = SecretShare.getPrimeUsedFor4096bigSecretPayload();
+            
 
-            if (ret.modulus != null)
-            {
+            if (ret.modulus != null) {
                 if (! SecretShare.isTheModulusAppropriateForSecret(ret.modulus, ret.secret))
                 {
                     final String originalString;
@@ -220,8 +220,9 @@ public final class ShamirSplitter
         // ==================================================
         public SplitOutput output()
         {
-            SplitOutput ret = new SplitOutput(this);
-            ret.setPrintAllSharesAtOnce(printAllSharesAtOnce);
+            SplitOutput splitOutput = new SplitOutput(this);
+            
+            splitOutput.setPrintAllSharesAtOnce(printAllSharesAtOnce);
 
             PublicInfo publicInfo = new PublicInfo(this.n, this.k, this.modulus, this.description);
 
@@ -229,24 +230,9 @@ public final class ShamirSplitter
 
             SplitSecretOutput generate = secretShare.split(this.secret, this.random);
 
-            ret.splitSecretOutput = generate;
+            splitOutput.splitSecretOutput = generate;
 
-            if (paranoid != null)
-            {
-                Integer parg = paranoid;
-                if (parg < 0)
-                {
-                    parg = null;
-                }
-
-                ret.paranoidOutput = secretShare.combineParanoid(generate.getShareInfos(), parg);
-            }
-            else
-            {
-                ret.paranoidOutput = null;
-            }
-
-            return ret;
+            return splitOutput;
         }
 
 
@@ -346,6 +332,10 @@ public final class ShamirSplitter
             markedValue(out, "modulus", publicInfo.getPrimeModulus(), true);
         }
 
+        public List<ShareInfo> getShares() {
+        	 return splitSecretOutput.getShareInfos();
+        }
+        
         private void printSharesAllAtOnce(PrintStream out)
         {
             List<ShareInfo> shares = splitSecretOutput.getShareInfos();

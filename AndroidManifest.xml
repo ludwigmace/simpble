@@ -43,6 +43,11 @@
             android:name="example.handshake.AddMessageActivity"
             android:label="@string/message_add" >
         </activity>
+        
+        <activity
+            android:name="example.handshake.AddShamirActivity"
+            android:label="@string/shares_msg" >
+        </activity>
 	        
 	    <provider
 	       android:name="Friend"

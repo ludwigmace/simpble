@@ -123,10 +123,15 @@ public class MainActivity extends Activity {
         
         
         ShamirSplitter shamirSplitter = new ShamirSplitter();
-        shamirSplitter.Workin();
         
-        ShamirCombiner shamirCombiner = new ShamirCombiner();
-        shamirCombiner.Workin();
+        SparseArray<String> shares = shamirSplitter.Workin(3, 6, "The Cat In The Hat");
+        
+        for (int i=0; i < shares.size(); i++) {
+        	Log.v(TAG, shares.keyAt(i) + " " + shares.get(shares.keyAt(i))); 
+        }
+        
+        //ShamirCombiner shamirCombiner = new ShamirCombiner();
+        //shamirCombiner.Workin();
         
         // combine something
         //MainCombine.Workin();
@@ -435,7 +440,12 @@ public class MainActivity extends Activity {
 	        Intent i = new Intent(this, AddMessageActivity.class);
 	        startActivityForResult(i, ACTIVITY_CREATE);
 		}
-		
+
+		if (id == R.id.action_add_deaddrops) {
+	        Intent i = new Intent(this, AddShamirActivity.class);
+	        startActivityForResult(i, ACTIVITY_CREATE);
+		}
+
 		
 		
 		return super.onOptionsItemSelected(item);

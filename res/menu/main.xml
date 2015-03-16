@@ -19,6 +19,12 @@
         android:orderInCategory="300"
         android:showAsAction="never"
         android:title="@string/action_add_message"/>
+	
+	<item
+        android:id="@+id/action_add_deaddrops"
+        android:orderInCategory="300"
+        android:showAsAction="never"
+        android:title="@string/action_add_deaddrops"/>
     
 
 </menu>

@@ -1,0 +1,108 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingLeft="@dimen/activity_horizontal_margin"
+    android:paddingRight="@dimen/activity_horizontal_margin"
+    android:paddingTop="@dimen/activity_vertical_margin"
+    android:paddingBottom="@dimen/activity_vertical_margin"
+    android:orientation="vertical"
+    tools:context=".AddShamirActivity">
+
+    <LinearLayout 
+	    android:id="@+id/toprow_msgprefs" 
+	    android:layout_height="wrap_content" 
+	    android:layout_width="fill_parent">
+   
+		<TextView
+	        android:id="@+id/section_caption"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:text="Public Id:"
+	        android:textAppearance="?android:attr/textAppearanceSmall" />
+        
+   	    <EditText
+	        android:id="@+id/public_id"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:ems="10"
+	        />
+
+   </LinearLayout>
+   
+    <LinearLayout 
+	    android:id="@+id/toprow_msgoptions" 
+	    android:layout_height="wrap_content" 
+	    android:layout_width="fill_parent">
+   	    
+		<TextView
+	        android:id="@+id/maxshare_caption"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:text="#Max:"
+	        android:textAppearance="?android:attr/textAppearanceSmall" />
+		
+        <Spinner
+            android:id="@+id/num_total_shares"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:entries="@array/shares_total"
+            android:prompt="@string/prompt_shares_total" />
+
+		<TextView
+	        android:id="@+id/minshare_caption"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:text="#Min:"
+	        android:textAppearance="?android:attr/textAppearanceSmall" />
+        
+        <Spinner
+            android:id="@+id/num_min_shares"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:entries="@array/shares_min"
+            android:prompt="@string/prompt_shares_min" />
+        
+	
+	</LinearLayout>
+    
+    
+    <LinearLayout 
+    android:id="@+id/nextrow_friendmsg" 
+    android:layout_height="wrap_content" 
+    android:layout_width="fill_parent">
+   
+		<TextView
+	        android:id="@+id/friend_fp_caption"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:text="Enter your Message:"
+	        android:textAppearance="?android:attr/textAppearanceSmall" />
+        
+   	    <EditText
+	        android:id="@+id/message_content"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:ems="10"
+	        android:maxLines="20"
+	        android:inputType="textMultiLine"
+	        />
+
+   </LinearLayout>
+
+    <LinearLayout
+    android:id="@+id/nextrow_finish" 
+    android:layout_height="wrap_content" 
+    android:layout_width="fill_parent">
+   	    
+	    <Button
+	        android:id="@+id/queue_this_msg"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:text="@string/queue_msg_btn"
+	        android:onClick="handleButtonQueueMsg"
+	        android:enabled="true" />   
+
+   </LinearLayout>
+    
+</LinearLayout>
