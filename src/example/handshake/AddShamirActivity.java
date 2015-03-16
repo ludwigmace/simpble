@@ -101,8 +101,7 @@ public class AddShamirActivity extends Activity  {
 			String msgPayload = String.valueOf(minShares) + String.valueOf(shareNum) + digestAsText + shareText;
 			
 			try {			
-				//new_msg_id = QueueMsg(friend_name, msg_content, encrypt);
-				new_msg_id = mDbHelper.queueMsg("", "", msgtype);
+				new_msg_id = mDbHelper.queueMsg("", msgPayload, msgtype);
 			} catch (Exception x) {
 				Log.v(TAG, "can't add share " + x.getMessage());
 			}
