@@ -21,7 +21,7 @@ public class FriendsDb extends SQLiteOpenHelper {
     public static final String KEY_F_ROWID = "_id";
 
     private static String DBNAME = "friends";
-    private static final int DBVERSION = 4;
+    private static final int DBVERSION = 6;
  
 
     private static final String MSGS_TABLE = "msgs";
@@ -29,12 +29,7 @@ public class FriendsDb extends SQLiteOpenHelper {
     public static final String KEY_M_CONTENT = "msg_content";
     public static final String KEY_M_ROWID = "_id";
     public static final String KEY_M_MSGTYPE = "msgtype";
-    
-    private static final String PARENT_MSGS_TABLE = "msgs";
- 	public static final String KEY_PM_FNAME = "friend_name";
-    public static final String KEY_PM_CONTENT = "msg_content";
-    public static final String KEY_PM_ROWID = "_id";
-    public static final String KEY_PM_MSGTYPE = "msgtype";
+    public static final String KEY_M_RECIP = "recipient";
     
     private static final String TAG = "FriendsDbAdapter";
     private SQLiteDatabase mDb;
@@ -54,14 +49,8 @@ public class FriendsDb extends SQLiteOpenHelper {
     	+ KEY_M_ROWID + " integer primary key autoincrement, "
     	+ KEY_M_CONTENT + " text not null, "
     	+ KEY_M_MSGTYPE + " text not null, "
-    	+ KEY_M_FNAME + " text not null); ";
-
-    private static final String PARENT_MSGS_CREATE =
-        	"create table " + PARENT_MSGS_TABLE + " ("
-        	+ KEY_PM_ROWID + " integer primary key autoincrement, "
-        	+ KEY_PM_CONTENT + " text not null, "
-        	+ KEY_PM_MSGTYPE + " text not null, "
-        	+ KEY_PM_FNAME + " text not null); ";
+    	+ KEY_M_RECIP + " text null, "
+    	+ KEY_M_FNAME + " text null); ";
     
 
 	public FriendsDb(Context context) {
@@ -196,6 +185,13 @@ public class FriendsDb extends SQLiteOpenHelper {
         args.put(KEY_F_PUK, puk);
 
         return mDb.update(FRIENDS_TABLE, args, KEY_F_ROWID + "=" + rowId, null) > 0;
+    }
+    
+    public boolean updateMsgSent(long msgId, String fp) {
+        ContentValues args = new ContentValues();
+        args.put(KEY_M_RECIP, fp);
+
+        return mDb.update(MSGS_TABLE, args, KEY_F_ROWID + "=" + msgId, null) > 0;
     }
 	
 }

@@ -85,9 +85,7 @@ public class MainActivity extends Activity {
 	TextView statusText;
 	
 	private Button btnAdvertise;
-	private Button btnToggleBusy;
 	private Button btnPull;
-	private Button btnStartPair;
 	
 	private boolean visible;
 	
@@ -110,6 +108,8 @@ public class MainActivity extends Activity {
     private Map<String, byte[]> hashToKey;
     private Map<String, byte[]> hashToPayload;
     
+    private Map<String, String> addressesToFriends;
+    
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -121,22 +121,6 @@ public class MainActivity extends Activity {
         // get a pointer to the status text
         statusText = (TextView) findViewById(R.id.status_log);
         
-        
-        ShamirSplitter shamirSplitter = new ShamirSplitter();
-        
-        SparseArray<String> shares = shamirSplitter.Workin(3, 6, "The Cat In The Hat");
-        
-        for (int i=0; i < shares.size(); i++) {
-        	Log.v(TAG, shares.keyAt(i) + " " + shares.get(shares.keyAt(i))); 
-        }
-        
-        //ShamirCombiner shamirCombiner = new ShamirCombiner();
-        //shamirCombiner.Workin();
-        
-        // combine something
-        //MainCombine.Workin();
-        
-        
 		if (hashToKey == null) {
 			hashToKey = new HashMap<String,byte[]>();
 		}
@@ -144,6 +128,8 @@ public class MainActivity extends Activity {
 		if (hashToPayload == null) {
 			hashToPayload = new HashMap<String, byte[]>();
 		}
+		
+		addressesToFriends = new HashMap<String, String>();
 		
 		// do you want to be able to receive messages?
 		// TODO: have the UI capture this
@@ -155,9 +141,7 @@ public class MainActivity extends Activity {
 		// get a pointer to our Be A Friend button, and our transfer packet button
 		btnAdvertise = (Button)findViewById(R.id.be_a_friend);
 		
-		btnToggleBusy = (Button)findViewById(R.id.toggle_busy);
 		btnPull = (Button)findViewById(R.id.pullmsgs);
-		btnStartPair = (Button)findViewById(R.id.startpair);
 		
 		// disable Id button, because you're not even connected yet, and thus not ready to identify
 		btnPull.setEnabled(false);
@@ -222,6 +206,23 @@ public class MainActivity extends Activity {
 		
 		PopulateFriendsAndMessages();
 		
+	}
+	
+	/**
+	 * Update the messages table with the fingerprint of the person to whom you sent this msg
+	 * 
+	 * @param msgid index in the messages table for the msg you wanna update
+	 * @param peerIndex remote address for this peer
+	 */
+	public void MarkMsgSent(int msgid, String peerIndex) {
+		mDbHelper = new FriendsDb(this);
+		String fp = addressesToFriends.get(peerIndex);
+		
+		mDbHelper.updateMsgSent(msgid, fp);
+		
+		Log.v(TAG, "call updateMsgSent(" + String.valueOf(msgid) + ", " + fp + ")");
+		
+		mDbHelper.close();
 	}
 	
 	private void PopulateFriendsAndMessages() {
@@ -555,7 +556,26 @@ public class MainActivity extends Activity {
 			}
 			
 			if (notification.contains("msg_sent")) {
-				logMessage("a: " + notification + " sent to " + peerIndex);
+				
+				int msg_id = -1;
+				String msgid_as_string = "";
+				// here's me not being thread safe
+				try {
+					//String msgid_as_string = notification.substring(9, notification.length() - 9);
+					msgid_as_string = notification.substring(9, notification.length());
+					msg_id = Integer.valueOf(msgid_as_string);
+				} catch (Exception e) {
+					logMessage("!" + notification);
+				}
+				
+				final int msgid = msg_id;
+				final String peer = peerIndex;
+				
+				logMessage(String.valueOf(msg_id) + " sent to " + peerIndex);
+				
+				runOnUiThread(new Runnable() { public void run() { MarkMsgSent(msgid, peer); } });
+				
+				
 			}
 			
 			
@@ -566,19 +586,9 @@ public class MainActivity extends Activity {
 		@Override
 		public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, byte msgType, byte[] messageHash) {
 
-			/*
-			BleMessage incomingMsg = new BleMessage();
-			
-			incomingMsg.MessagePayload = payload;
-			incomingMsg.MessageType = msgType;
-			incomingMsg.RecipientFingerprint = ByteUtilities.hexToBytes(recipientFingerprint);
-			incomingMsg.SenderFingerprint = ByteUtilities.hexToBytes(senderFingerprint);
-			
-			// i'm doing something wrong, cause this doesn't work!
-			incomingMsg.rebuildHash();
-			*/
 			logMessage("a: rcvd " + msgType + " msg for " + recipientFingerprint.substring(0, 10) + "...");
 			
+			// get the message type in integer form; should be between 0 and 255 so &0xFF should work
 			int mt = msgType & 0xFF;
 			
 			// this is an identity message so handle it as such
@@ -596,6 +606,10 @@ public class MainActivity extends Activity {
 				
 				// if the sender is in our friends list
 				if (bleFriends.containsKey(senderFingerprint)) {
+					
+					// we need to be able to look this person up by incoming address
+					// TODO: remove this association upon disconnect
+					addressesToFriends.put(remoteAddress, senderFingerprint);
 
 					logMessage("a: known peer: " + senderFingerprint.substring(0,20));
 					
