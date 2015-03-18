@@ -90,9 +90,13 @@ public class AddShamirActivity extends Activity  {
         
         mDbHelper = new FriendsDb(this);
 		
+        
+        // TODO: this could easily be an array of agreed upon names, one used for each share to be sent
+        String msgGroupFriendName = msgId;
+        
 		long new_msg_id = 0;
 		
-		String msgtype = "drop";
+		String msgtype = "topic";
 		int i = 0;
 		for (i = 0; i < shareList.size(); i++) {
 			int shareNum = shareList.keyAt(i);
@@ -101,7 +105,7 @@ public class AddShamirActivity extends Activity  {
 			String msgPayload = String.valueOf(minShares) + String.valueOf(shareNum) + digestAsText + shareText;
 			
 			try {			
-				new_msg_id = mDbHelper.queueMsg("", msgPayload, msgtype);
+				new_msg_id = mDbHelper.queueMsg(msgGroupFriendName, msgPayload, msgtype);
 			} catch (Exception x) {
 				Log.v(TAG, "can't add share " + x.getMessage());
 			}
@@ -110,6 +114,8 @@ public class AddShamirActivity extends Activity  {
 		Toast.makeText(this, "Added " + String.valueOf(i) + " shares as msgs.", Toast.LENGTH_SHORT).show();
 		
 		mDbHelper.close();
+		
+		this.finish();
 		
 	}
 

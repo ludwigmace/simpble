@@ -101,7 +101,6 @@ public class AddMessageActivity extends Activity  {
 		long new_msg_id = 0;
 		
 		try {			
-			//new_msg_id = QueueMsg(friend_name, msg_content, encrypt);
 			new_msg_id = mDbHelper.queueMsg(friend_name, msg_content, msgtype);
 		} catch (Exception x) {
 			Log.v(TAG, "can't add msg " + x.getMessage());

@@ -105,10 +105,19 @@ public class FriendsDb extends SQLiteOpenHelper {
        
     }
     
-    public Cursor fetchAllMsgs() {
+    public Cursor fetchMsgs() {
+    	return fetchMsgs("");
+    }
+    
+    public Cursor fetchMsgs(String msgtype) {
 
-        return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE},
-        		null, null, null, null, null);
+    	if (msgtype.length() == 0) {
+    		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE},
+    				null, null, null, null, null);
+    	} else {
+    		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE},
+    				KEY_M_MSGTYPE + " = ?", new String[] {msgtype}, null, null, null);
+    	}
     }
 
     /**
