@@ -125,6 +125,8 @@ public class MainActivity extends Activity {
 		statusLogText = "";
 		ctx = this;
 		
+		mDbHelper = new FriendsDb(this);
+		
 		topicMessages = new SparseArray<BleMessage>();
 		
 		// initialize an anonymous fingerprint of 20 bytes of zeroes!
@@ -230,7 +232,7 @@ public class MainActivity extends Activity {
 	 * @param peerIndex remote address for this peer
 	 */
 	public void MarkMsgSent(String messageSignature, String peerIndex) {
-		mDbHelper = new FriendsDb(this);
+		
 		String fp = addressesToFriends.get(peerIndex);
 		
 		// update as sent using the messageSignature to identify
@@ -243,11 +245,9 @@ public class MainActivity extends Activity {
 			logMessage("failure");
 		}
 		
-		mDbHelper.close();
 	}
 	
 	private void PopulateFriendsAndMessages() {
-		mDbHelper = new FriendsDb(this);
 		
 		// let's build our friends that we've got stored up in the database
 		bleFriends = new HashMap<String, BlePeer>();
@@ -298,7 +298,7 @@ public class MainActivity extends Activity {
 			
 			// if this is a drop (topic) message, the recipient shouldn't be in our friends list
 			// throw all our muleMessages into the SparseArray muleMessages 
-			if (msg_type.equalsIgnoreCase("drop") && sendToAnybody) {
+			if (msg_type.equalsIgnoreCase("topic") && sendToAnybody) {
 				m.RecipientFingerprint = recipient_name.getBytes();
 				m.SenderFingerprint = anonFP;
 				m.MessageType = (byte)(90 & 0xFF); // just throwing out 90 as indicating a secret share
@@ -437,7 +437,6 @@ public class MainActivity extends Activity {
 			
 		}
 		
-		mDbHelper.close();
 	}
 		
 	private void SetUpBle() {
@@ -523,7 +522,6 @@ public class MainActivity extends Activity {
 					if (idenM != null) {
 						queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM).substring(0,8);
 						logMessage("a1: queued " + queuedMsg + " for " + peerIndex);
-						
 					}
 				}
 				
@@ -546,15 +544,8 @@ public class MainActivity extends Activity {
 					// now let the other guy know you're ready to receive data
 					bleMessenger.initRequestForData(ourMostRecentFriendsAddress);
 					
-					// go ahead and send this other person our stuff
-					// try1: runOnUiThread(new Runnable() { public void run() { bleMessenger.sendMessagesToPeer(ourMostRecentFriendsAddress);} });
-					
-					// we've got at least 1 msg queued up to go out, so enable our push button
-					//runOnUiThread(new Runnable() { public void run() { btnPush.setEnabled(true); } });
 				}
 				
-				// since we're a central we'll have to pull anything from the peripheral, so enable the Pull button
-				//runOnUiThread(new Runnable() { public void run() { btnPull.setEnabled(true); } });
 			}
 			
 			// only peripheral mode gets this; we've accepted a connection and we're either wanting to pair or just data stuff
@@ -572,8 +563,6 @@ public class MainActivity extends Activity {
 				
 				// if you're a peripheral, you can't initiate message send until the peer has subscribed
 				
-				 // you don't have the fingerprint yet, you just know that this person meets the contract
-				 //runOnUiThread(new Runnable() { public void run() { btnPush.setEnabled(true); } });
 			}
 			
 			// only peripheral mode gets this; we've accepted a connection and we're either wanting to pair or just data stuff
@@ -590,9 +579,7 @@ public class MainActivity extends Activity {
 				}
 				
 				// if you're a peripheral, you can't initiate message send until the peer has subscribed
-				
-				 // you don't have the fingerprint yet, you just know that this person meets the contract
-				 //runOnUiThread(new Runnable() { public void run() { btnPush.setEnabled(true); } });
+				// you don't have the fingerprint yet, you just know that this person meets the contract
 			}
 			
 			if (notification.equalsIgnoreCase("connection_change")) {
@@ -635,7 +622,7 @@ public class MainActivity extends Activity {
 		}
 		
 		// this is when all the packets have come in, and a message is received in its entirety (hopefully)
-		// the secret sauce
+		// TODO: too much happens in this callback; need to move things out of here!
 		@Override
 		public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, byte msgType, byte[] messageHash) {
 
@@ -661,16 +648,34 @@ public class MainActivity extends Activity {
 				// check muleMessages
 				if (sendToAnybody) {
 					// well this is certainly indiscriminate, but will get only 1
-					BleMessage mIndiscriminate = topicMessages.get(0);
+					BleMessage mTopic = topicMessages.get(0);
+
+					if (mTopic != null) { 
 					
-					// need to check against what we've already sent for this "secret name" so that
-					// we don't send another share
-					
-					String queuedMsg = "";
-					if (mIndiscriminate != null) {
-						queuedMsg = bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(mIndiscriminate).substring(0,8);
-						logMessage("a5: queued " + queuedMsg + " for " + remoteAddress);
-						ourMostRecentFriendsAddress = remoteAddress;
+						String topic_name = new String(mTopic.RecipientFingerprint);
+						
+						// need to check against what we've already sent for this "topic name" so that
+						// we don't send another share
+						ArrayList<String> avoidSending = mDbHelper.recipientsForTopic(topic_name);
+						
+						boolean OkToSend = false;
+	
+						if (!avoidSending.contains(addressesToFriends.get(remoteAddress))) {
+							logMessage("ok to send topic");
+							OkToSend = true;
+						} else {
+							logMessage("already got a share, not ok to send topic!");
+						}
+						
+						String queuedMsg = "";
+						
+						if (OkToSend) {
+							queuedMsg = bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(mTopic).substring(0,8);
+							logMessage("a5: queued " + queuedMsg + " for " + remoteAddress);
+							ourMostRecentFriendsAddress = remoteAddress;
+						}
+					} else {
+						logMessage("no topic messages to check");
 					}
 				}
 				

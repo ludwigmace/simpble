@@ -1,5 +1,7 @@
 package example.handshake;
 
+import java.util.ArrayList;
+
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
@@ -205,6 +207,23 @@ public class FriendsDb extends SQLiteOpenHelper {
         args.put(KEY_M_RECIP, fp);
 
         return mDb.update(MSGS_TABLE, args, KEY_M_MSGID + " = ?", new String[] {signature}) > 0;
+    }
+    
+    public ArrayList<String> recipientsForTopic(String topic_name) {
+    	
+    	ArrayList<String> recipients = new ArrayList<String>();
+        Cursor mCursor =
+        	mDb.query(true, MSGS_TABLE, new String[] {KEY_M_RECIP}, KEY_M_FNAME + "='" + topic_name + "'", null, null, null, null, null);
+        
+            if (mCursor != null) {
+                mCursor.moveToFirst();
+            }
+            
+            while (mCursor.moveToNext()) {
+            	recipients.add(mCursor.getString(0));
+            }
+            
+            return recipients;
     }
 	
 }
