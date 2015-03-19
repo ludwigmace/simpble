@@ -1,5 +1,7 @@
 package simpble;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
 public class ByteUtilities {
@@ -37,6 +39,33 @@ public class ByteUtilities {
     	return Arrays.copyOf(bytes, i+1);
     	
     	
+    }
+    
+    public static byte[] digestAsBytes(byte[] Payload) {
+    	
+        // get a digest for the message, to define it
+        MessageDigest md = null;
+        
+        try {
+			md = MessageDigest.getInstance("SHA-1");
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		}
+        
+        byte[] digestAsBytes = md.digest(Payload);
+        
+        return digestAsBytes;
+    	
+    }
+    
+    public static String digestAsHex(byte[] digestAsBytes) {
+    	return bytesToHex(digestAsBytes(digestAsBytes));
+    }
+
+    public static String digestAsHex(String digestAsString) {
+    	byte[] digestAsBytes = digestAsString.getBytes();
+    	
+    	return bytesToHex(digestAsBytes(digestAsBytes));
     }
 	
 }

@@ -225,16 +225,23 @@ public class MainActivity extends Activity {
 	/**
 	 * Update the messages table with the fingerprint of the person to whom you sent this msg
 	 * 
-	 * @param msgid index in the messages table for the msg you wanna update
+	 * @param msg_content Content of the message
+	 * @param msgtype Type of message, as a string
 	 * @param peerIndex remote address for this peer
 	 */
-	public void MarkMsgSent(int msgid, String peerIndex) {
+	public void MarkMsgSent(String messageSignature, String peerIndex) {
 		mDbHelper = new FriendsDb(this);
 		String fp = addressesToFriends.get(peerIndex);
 		
-		mDbHelper.updateMsgSent(msgid, fp);
+		// update as sent using the messageSignature to identify
+		logMessage("call updateMsgSent(" + messageSignature + ", " + fp + ")");
+		boolean updated = mDbHelper.updateMsgSent(messageSignature, fp);
 		
-		Log.v(TAG, "call updateMsgSent(" + String.valueOf(msgid) + ", " + fp + ")");
+		if (updated) {
+			logMessage("success");
+		} else {
+			logMessage("failure");
+		}
 		
 		mDbHelper.close();
 	}
@@ -280,11 +287,16 @@ public class MainActivity extends Activity {
 			
 			String recipient_name = c.getString(c.getColumnIndex(FriendsDb.KEY_M_FNAME));
 			String msg_content = c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT));
-			String msg_type =  c.getString(c.getColumnIndex(FriendsDb.KEY_M_MSGTYPE));
+			String msg_type = c.getString(c.getColumnIndex(FriendsDb.KEY_M_MSGTYPE));
+			String msg_signature = c.getString(c.getColumnIndex(FriendsDb.KEY_M_MSGID));
+			
+			if (msg_signature == null) {
+				msg_signature = "";
+			}
 			
 			logMessage("found msg to add for " + recipient_name);
 			
-			// if this is a drop message, the recipient shouldn't be in our friends list
+			// if this is a drop (topic) message, the recipient shouldn't be in our friends list
 			// throw all our muleMessages into the SparseArray muleMessages 
 			if (msg_type.equalsIgnoreCase("drop") && sendToAnybody) {
 				m.RecipientFingerprint = recipient_name.getBytes();
@@ -292,6 +304,8 @@ public class MainActivity extends Activity {
 				m.MessageType = (byte)(90 & 0xFF); // just throwing out 90 as indicating a secret share
 				// TODO: for the above, have these all be constants and use msg_type (that'll be a constant too)
 				m.setPayload(msg_content.getBytes());
+				
+				m.SetSignature(msg_signature);
 				
 				topicMessages.put(topicMessages.size(), m);
 			// if it's not a drop message, loop over all our friends to see if anything is headed their way!
@@ -312,6 +326,8 @@ public class MainActivity extends Activity {
 							// get the sending fingerprint from our global variable
 							// TODO: this won't work if the original sender is different
 							m.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint);
+							
+							m.SetSignature(msg_signature);
 							
 							// in case we need to encrypt this message
 							byte[] msgbytes = null;
@@ -593,19 +609,24 @@ public class MainActivity extends Activity {
 				String msgid_as_string = "";
 				// here's me not being thread safe
 				try {
-					//String msgid_as_string = notification.substring(9, notification.length() - 9);
 					msgid_as_string = notification.substring(9, notification.length());
 					msg_id = Integer.valueOf(msgid_as_string);
 				} catch (Exception e) {
 					logMessage("!" + notification);
 				}
+
+				BleMessage sentMsg = bleMessenger.peerMap.get(peerIndex).getBleMessageOut(msg_id);
 				
-				final int msgid = msg_id;
-				final String peer = peerIndex;
+				final String peerSentTo = peerIndex;
+				String sig = "no_signature";
 				
-				logMessage(String.valueOf(msg_id) + " sent to " + peerIndex);
+				if (sentMsg.GetSignature() != null) {
+					sig = sentMsg.GetSignature();
+				}
 				
-				runOnUiThread(new Runnable() { public void run() { MarkMsgSent(msgid, peer); } });
+				final String msgSignature = sig; 
+				
+				runOnUiThread(new Runnable() { public void run() { MarkMsgSent(msgSignature, peerSentTo); } });
 				
 				
 			}

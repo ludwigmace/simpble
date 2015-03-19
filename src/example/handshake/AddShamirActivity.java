@@ -73,23 +73,9 @@ public class AddShamirActivity extends Activity  {
         SparseArray<String> shareList = splitMsg.Workin(minShares, totalShares, msgContent);
         
         // get a digest for the message, to define it
-        MessageDigest md = null;
-        
-        try {
-			md = MessageDigest.getInstance("SHA-1");
-		} catch (NoSuchAlgorithmException e) {
-
-			e.printStackTrace();
-		}
-        
-        // build a digest of the original payload
-        byte[] plainTextAsBytes = null;
-        plainTextAsBytes = msgContent.getBytes();
-        byte[] digestAsBytes = md.digest(plainTextAsBytes);
-        String digestAsText = ByteUtilities.bytesToHex(digestAsBytes);
+        String digestAsText = ByteUtilities.digestAsHex(msgContent.getBytes());
         
         mDbHelper = new FriendsDb(this);
-		
         
         // TODO: this could easily be an array of agreed upon names, one used for each share to be sent
         String msgGroupFriendName = msgId;
@@ -103,9 +89,10 @@ public class AddShamirActivity extends Activity  {
 			String shareText = shareList.get(shareNum);
 			
 			String msgPayload = String.valueOf(minShares) + String.valueOf(shareNum) + digestAsText + shareText;
+			String msgSignature = ByteUtilities.digestAsHex(msgPayload + msgtype + msgGroupFriendName);
 			
 			try {			
-				new_msg_id = mDbHelper.queueMsg(msgGroupFriendName, msgPayload, msgtype);
+				new_msg_id = mDbHelper.queueMsg(msgGroupFriendName, msgPayload, msgtype, msgSignature);
 			} catch (Exception x) {
 				Log.v(TAG, "can't add share " + x.getMessage());
 			}

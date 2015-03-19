@@ -58,6 +58,8 @@ public class BleMessage {
 	// body of message in bytes
 	public byte[] MessagePayload;
 	
+	private String messageSignature;
+	
 	public boolean ReceiptAcknowledged;
 	
 
@@ -164,6 +166,27 @@ public class BleMessage {
 		}
 	}
 
+	/**
+	 * A message signature uniquely identifies a line-item message in the database
+	 * 
+	 * @return A most-likely unique signature for this message that can be reconstructed
+	 */
+	public String GetSignature() {
+		return messageSignature;
+	}
+	
+	/**
+	 * A message signature uniquely identifies a line-item message in the database
+	 * 
+	 * @param Pass in a signature
+	 * @return returns the signature that you probably just passed in
+	 */
+	public String SetSignature(String signature) {
+		messageSignature = signature;
+		
+		return messageSignature;
+	}
+	
 	public String GetPayload() {
 		return ByteUtilities.bytesToHex(MessagePayload).substring(0,8);
 	}

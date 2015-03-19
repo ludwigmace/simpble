@@ -21,7 +21,7 @@ public class FriendsDb extends SQLiteOpenHelper {
     public static final String KEY_F_ROWID = "_id";
 
     private static String DBNAME = "friends";
-    private static final int DBVERSION = 6;
+    private static final int DBVERSION = 7;
  
 
     private static final String MSGS_TABLE = "msgs";
@@ -30,6 +30,7 @@ public class FriendsDb extends SQLiteOpenHelper {
     public static final String KEY_M_ROWID = "_id";
     public static final String KEY_M_MSGTYPE = "msgtype";
     public static final String KEY_M_RECIP = "recipient";
+    public static final String KEY_M_MSGID = "msgid";
     
     private static final String TAG = "FriendsDbAdapter";
     private SQLiteDatabase mDb;
@@ -50,6 +51,7 @@ public class FriendsDb extends SQLiteOpenHelper {
     	+ KEY_M_CONTENT + " text not null, "
     	+ KEY_M_MSGTYPE + " text not null, "
     	+ KEY_M_RECIP + " text null, "
+    	+ KEY_M_MSGID + " text null, "
     	+ KEY_M_FNAME + " text null); ";
     
 
@@ -94,30 +96,31 @@ public class FriendsDb extends SQLiteOpenHelper {
        
     }
     
-    public long queueMsg(String friend_name, String message_content, String message_type) {
+    public long queueMsg(String friend_name, String message_content, String message_type, String msg_id) {
         ContentValues initialValues = new ContentValues();
         
         initialValues.put(KEY_M_FNAME, friend_name);
         initialValues.put(KEY_M_CONTENT, message_content);
         initialValues.put(KEY_M_MSGTYPE, message_type);
+        initialValues.put(KEY_M_MSGID, msg_id);
         
         return mDb.insert(MSGS_TABLE, null, initialValues);
        
     }
     
-    public Cursor fetchMsgs() {
-    	return fetchMsgs("");
+    public Cursor fetchMsgByType(String msgtype) {
+		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE, KEY_M_MSGID},
+				KEY_M_MSGTYPE + " = ?", new String[] {msgtype}, null, null, null);
     }
     
-    public Cursor fetchMsgs(String msgtype) {
-
-    	if (msgtype.length() == 0) {
-    		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE},
-    				null, null, null, null, null);
-    	} else {
-    		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE},
-    				KEY_M_MSGTYPE + " = ?", new String[] {msgtype}, null, null, null);
-    	}
+    public Cursor fetchMsgById(String msgid) {
+		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE, KEY_M_MSGID},
+				KEY_M_MSGID + " = ?", new String[] {msgid}, null, null, null);
+    }
+    
+    public Cursor fetchMsgs() {
+		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE, KEY_M_MSGID},
+				null, null, null, null, null);
     }
 
     /**
@@ -196,11 +199,12 @@ public class FriendsDb extends SQLiteOpenHelper {
         return mDb.update(FRIENDS_TABLE, args, KEY_F_ROWID + "=" + rowId, null) > 0;
     }
     
-    public boolean updateMsgSent(long msgId, String fp) {
+    // the message id from the database OBVIOUSLY doesn't match the message id for a message session
+    public boolean updateMsgSent(String signature, String fp) {
         ContentValues args = new ContentValues();
         args.put(KEY_M_RECIP, fp);
 
-        return mDb.update(MSGS_TABLE, args, KEY_F_ROWID + "=" + msgId, null) > 0;
+        return mDb.update(MSGS_TABLE, args, KEY_M_MSGID + " = ?", new String[] {signature}) > 0;
     }
 	
 }

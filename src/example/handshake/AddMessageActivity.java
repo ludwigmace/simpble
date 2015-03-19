@@ -99,9 +99,10 @@ public class AddMessageActivity extends Activity  {
 		mDbHelper = new FriendsDb(this);
 		
 		long new_msg_id = 0;
+		String msgSignature = ByteUtilities.digestAsHex(msg_content + msgtype + friend_name);
 		
 		try {			
-			new_msg_id = mDbHelper.queueMsg(friend_name, msg_content, msgtype);
+			new_msg_id = mDbHelper.queueMsg(friend_name, msg_content, msgtype, msgSignature);
 		} catch (Exception x) {
 			Log.v(TAG, "can't add msg " + x.getMessage());
 			Toast.makeText(this, x.getMessage(), Toast.LENGTH_SHORT).show();
