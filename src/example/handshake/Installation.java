@@ -14,18 +14,23 @@ public class Installation {
     private static String sID = null;
     private static final String INSTALLATION = "INSTALLATION";
 
-    public synchronized static String id(Context context) {
-        if (sID == null) {  
+    public synchronized static String id(Context context, boolean resetInstall) {
+        if (sID == null) {
             File installation = new File(context.getFilesDir(), INSTALLATION);
             try {
-                if (!installation.exists())
+                if (!installation.exists() || resetInstall) {
                     writeInstallationFile(installation);
+                }
                 sID = readInstallationFile(installation);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         }
         return sID;
+    }
+    
+    public synchronized static String id(Context context) {
+    	return id(context, false);
     }
 
     private static String readInstallationFile(File installation) throws IOException {

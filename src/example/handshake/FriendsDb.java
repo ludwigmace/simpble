@@ -2,6 +2,7 @@ package example.handshake;
 
 import java.util.ArrayList;
 
+import simpble.ByteUtilities;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
@@ -25,14 +26,14 @@ public class FriendsDb extends SQLiteOpenHelper {
     private static String DBNAME = "friends";
     private static final int DBVERSION = 7;
  
-
     private static final String MSGS_TABLE = "msgs";
-	public static final String KEY_M_FNAME = "friend_name";
-    public static final String KEY_M_CONTENT = "msg_content";
+    
     public static final String KEY_M_ROWID = "_id";
-    public static final String KEY_M_MSGTYPE = "msgtype";
+	public static final String KEY_M_FNAME = "addressee";
+    public static final String KEY_M_CONTENT = "content";
+    public static final String KEY_M_MSGTYPE = "type";
     public static final String KEY_M_RECIP = "recipient";
-    public static final String KEY_M_MSGID = "msgid";
+    public static final String KEY_M_MSGID = "signature";
     
     private static final String TAG = "FriendsDbAdapter";
     private SQLiteDatabase mDb;
@@ -109,6 +110,11 @@ public class FriendsDb extends SQLiteOpenHelper {
         return mDb.insert(MSGS_TABLE, null, initialValues);
        
     }
+
+    //storeIncomingMessage(topic_name, "topic", msgSignature, ByteUtilities.bytesToHex(payload));
+   
+    
+
     
     public Cursor fetchMsgByType(String msgtype) {
 		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE, KEY_M_MSGID},

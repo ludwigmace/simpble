@@ -62,7 +62,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
 
 	private static final String TAG = "MAIN";
-	private static final int DEBUGLEVEL = 1;
+	private static final int DEBUGLEVEL = 0;
 
     private static final int ACTIVITY_CREATE=0;
     private static final int ACTIVITY_EDIT=1;
@@ -115,7 +115,6 @@ public class MainActivity extends Activity {
     SparseArray<BleMessage> topicMessages;
     
     private byte[] anonFP;
-    
     
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -173,7 +172,7 @@ public class MainActivity extends Activity {
         }
 
         // get an identifier for this installation
-        myIdentifier = Installation.id(this);
+        myIdentifier = Installation.id(this, true);
         
         // get your name (that name part isn't working on Android 5.0)
         //String userName = getUserName(this.getContentResolver());
@@ -220,8 +219,13 @@ public class MainActivity extends Activity {
 			logMessage("a: global myFingerprint is null");
 		}
 		
-		PopulateFriendsAndMessages();
+	}
+	
+	@Override
+	protected void onStart() {
+		super.onStart();
 		
+		PopulateFriendsAndMessages();
 	}
 	
 	/**
@@ -236,13 +240,14 @@ public class MainActivity extends Activity {
 		String fp = addressesToFriends.get(peerIndex);
 		
 		// update as sent using the messageSignature to identify
-		logMessage("call updateMsgSent(" + messageSignature + ", " + fp + ")");
 		boolean updated = mDbHelper.updateMsgSent(messageSignature, fp);
 		
 		if (updated) {
-			logMessage("success");
-		} else {
-			logMessage("failure");
+			if (messageSignature.length() > 8) {
+				logMessage("dbupdate as sent: " + messageSignature.substring(0,8));
+			} else {
+				logMessage("dbupdate as sent: " + messageSignature);
+			}
 		}
 		
 	}
@@ -294,7 +299,7 @@ public class MainActivity extends Activity {
 				msg_signature = "";
 			}
 			
-			logMessage("found msg to add for " + recipient_name);
+			logMessage("(" + recipient_name + ") " + msg_content);
 			
 			// if this is a drop (topic) message, the recipient shouldn't be in our friends list
 			// throw all our muleMessages into the SparseArray muleMessages 
@@ -308,6 +313,7 @@ public class MainActivity extends Activity {
 				m.SetSignature(msg_signature);
 				
 				topicMessages.put(topicMessages.size(), m);
+				
 			// if it's not a drop message, loop over all our friends to see if anything is headed their way!
 			// TODO: just fucking use a query; this is ridiculous
 			} else {
@@ -793,19 +799,23 @@ public class MainActivity extends Activity {
 				}
 				
 			} else if (mt == 90) {
+				
+				// this can be for topics; but need to differentiate if bytes or not
 				String topic_name = "";
 				
 				try {
-					topic_name = new String(senderFingerprint);
-					logMessage("a: received topic msg '" + topic_name + "' of size:" + String.valueOf(payload.length));
+					// since the fingerprint was passed in as a hex string, convert it to bytes, and then build a string
+					topic_name = new String(ByteUtilities.trimmedBytes(ByteUtilities.hexToBytes(recipientFingerprint)));
+					logMessage("a: received topic msg " + topic_name + " of size:" + String.valueOf(payload.length));
 				} catch (Exception x) {
 					logMessage("a: couldn't parse topic msg bytes into string");
 				}
+				// payload is missing the first 6 bytes
+				String msgSignature = ByteUtilities.digestAsHex(new String (payload) + "topic" + topic_name);
 				
-				// recipient fingerprint won't be ours . . .
-				// we need to store this message
-				// TODO: later on, we only store messages for topics to which we are subscribed
-				// for right now though, just assume everybody wants to be nice and store anything given them
+				long storedMsgId = -1;
+				
+				storedMsgId = mDbHelper.queueMsg(topic_name, new String (payload), "topic", msgSignature);
 				
 				if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
 					logMessage("a: message is for us (as follows, next line):");
@@ -813,6 +823,8 @@ public class MainActivity extends Activity {
 				} else {
 					logMessage("a: message isn't for us");
 				}
+				
+				logMessage("stored msg: " + String.valueOf(storedMsgId));
 				
 			}
 			
