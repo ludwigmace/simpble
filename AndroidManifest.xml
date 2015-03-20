@@ -48,10 +48,20 @@
             android:name="example.handshake.AddShamirActivity"
             android:label="@string/shares_msg" >
         </activity>
+
+		<activity
+            android:name="example.handshake.ShowMessagesActivity"
+            android:label="@string/messages_showall" >
+        </activity>
 	        
 	    <provider
 	       android:name="Friend"
 	       android:authorities="example.handshake.friend"
+	       android:exported="false" />
+	    
+	    <provider
+	       android:name="Message"
+	       android:authorities="example.handshake.message"
 	       android:exported="false" />
         
     </application>

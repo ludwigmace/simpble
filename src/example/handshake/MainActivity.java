@@ -172,9 +172,10 @@ public class MainActivity extends Activity {
         }
 
         // get an identifier for this installation
-        myIdentifier = Installation.id(this, true);
+        //myIdentifier = Installation.id(this, true);
+        myIdentifier = Installation.id(this);
         
-        // get your name (that name part isn't working on Android 5.0)
+        // get your name (that name part isn't working on Android 5)
         //String userName = getUserName(this.getContentResolver());
         String userName = btAdptr.getName();
         
@@ -500,6 +501,10 @@ public class MainActivity extends Activity {
 	        startActivityForResult(i, ACTIVITY_CREATE);
 		}
 
+		if (id == R.id.action_show_msgs) {
+	        Intent i = new Intent(this, ShowMessagesActivity.class);
+	        startActivityForResult(i, ACTIVITY_CREATE);
+		}
 		
 		
 		return super.onOptionsItemSelected(item);

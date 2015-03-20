@@ -24,7 +24,7 @@ public class FriendsDb extends SQLiteOpenHelper {
     public static final String KEY_F_ROWID = "_id";
 
     private static String DBNAME = "friends";
-    private static final int DBVERSION = 7;
+    private static final int DBVERSION = 1;
  
     private static final String MSGS_TABLE = "msgs";
     
@@ -131,6 +131,13 @@ public class FriendsDb extends SQLiteOpenHelper {
 				null, null, null, null, null);
     }
 
+    public Cursor fetchMsgsAbbrev() {
+    	Log.v(TAG, "fetchMsgsAbbrev is dun been run");
+    	
+		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_MSGTYPE, KEY_M_CONTENT},
+				null, null, null, null, null);
+    }
+    
     /**
      * Delete the friend with the given rowId
      * 
