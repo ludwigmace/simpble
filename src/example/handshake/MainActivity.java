@@ -305,7 +305,10 @@ public class MainActivity extends Activity {
 			// if this is a drop (topic) message, the recipient shouldn't be in our friends list
 			// throw all our muleMessages into the SparseArray muleMessages 
 			if (msg_type.equalsIgnoreCase("topic") && sendToAnybody) {
-				m.RecipientFingerprint = recipient_name.getBytes();
+				// need to make sure recipient fingerprint is 20 bytes
+				byte[] rfp = new byte[20];
+				rfp = Arrays.copyOf(recipient_name.getBytes(), 20);
+				m.RecipientFingerprint = rfp;
 				m.SenderFingerprint = anonFP;
 				m.MessageType = (byte)(90 & 0xFF); // just throwing out 90 as indicating a secret share
 				// TODO: for the above, have these all be constants and use msg_type (that'll be a constant too)
@@ -597,7 +600,7 @@ public class MainActivity extends Activity {
 				logMessage("a: connection status changed for " + peerIndex);
 			}
 			
-			if (notification.equalsIgnoreCase("server_disconnnected")) {
+			if (notification.equalsIgnoreCase("server_disconnected")) {
 				logMessage("a: disconnected from " + peerIndex);
 			}
 			
@@ -663,7 +666,7 @@ public class MainActivity extends Activity {
 
 					if (mTopic != null) { 
 					
-						String topic_name = new String(mTopic.RecipientFingerprint);
+						String topic_name = new String(ByteUtilities.trimmedBytes(mTopic.RecipientFingerprint));
 						
 						// need to check against what we've already sent for this "topic name" so that
 						// we don't send another share

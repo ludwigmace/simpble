@@ -432,6 +432,7 @@ public class BleMessenger {
 			bleCentral.submitCharacteristicReadRequest(peerAddress, uuidFromBase("105"));
 		} else {
 			if (sent == bps.size()) {
+				// TODO: the peripheral should check send status
 				bleStatusCallback.headsUp("m: connected as Perph, assuming send success");
 				bleStatusCallback.peerNotification(peerAddress, "msg_sent_" + String.valueOf(m.GetMessageNumber()));
 				peer.RemoveBleMessage(m.GetMessageNumber());
@@ -512,6 +513,8 @@ public class BleMessenger {
 
     private void incomingMessage(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
 		int parentMessagePacketTotal = 0;
+		
+		Log.v(TAG, ByteUtilities.bytesToHex(incomingBytes));
 		
 		// if our msg is under a few bytes it can't be valid; return
     	if (incomingBytes.length < 5) {
@@ -849,7 +852,7 @@ public class BleMessenger {
 		
 		@Override
 		public void reportDisconnect(String remoteAddress) {
-			// what to do when disconnected?
+			// report disconnection to MainActivity
 			bleStatusCallback.peerNotification(remoteAddress, "server_disconnected");
 		}
     	
