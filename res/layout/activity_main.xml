@@ -61,11 +61,11 @@
 	        android:enabled="true" />
 	    	    
 	    <Button
-	        android:id="@+id/pullmsgs"
+	        android:id="@+id/show_combined_shares"
 	        android:layout_width="wrap_content"
 	        android:layout_height="wrap_content"
-	        android:text="@string/msgs_pull"
-	        android:onClick="handleButtonPull"
+	        android:text="@string/caption_show_combined_shares"
+	        android:onClick="handleButtonShowCombinedShares"
 	        android:enabled="true" />
 	    
 		<Button

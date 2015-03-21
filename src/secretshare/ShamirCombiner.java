@@ -11,6 +11,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
+import simpble.ByteUtilities;
 import android.util.Log;
 import android.util.SparseArray;
 
@@ -33,15 +34,17 @@ public final class ShamirCombiner {
 	
 	static List<ShareInfo> shares;
 	
-	static int paramK = 3;
+	static int paramK;
 
-    public static void Workin() {
+    public static String Workin(int k, SparseArray<String> shares) {
     	os = new ByteArrayOutputStream();
     	ps = new PrintStream(os);
     	
-    	shareHolders = new SparseArray<String>();
+    	String original_value = "";
     	
-    	shares = new ArrayList<ShareInfo>();
+    	shareHolders = shares;
+    	
+    	paramK = k;
     	
     	/* 
     	 * 1 - 7352982178009263086080134442619255798685951
@@ -51,24 +54,19 @@ public final class ShamirCombiner {
     	 * 5 - 7353489116061097156937843173774334137863559
     	 * 6 - 7353716211053105688922884299153664087565376
     	 */
-    	shareHolders.append(2, "7353048696234791595232193259853689164535904");
-    	shareHolders.append(4, "7353302165260708630661047625431228334124708");
-    	shareHolders.append(6, "7353716211053105688922884299153664087565376");
     	
     	CombineInput input = CombineInput.buildCombineInput();
         CombineOutput output = input.output();
 
         output.print(ps);
-        String results = "";
         
         try {
-			results = os.toString("UTF8");
+			original_value = os.toString("UTF8");
 		} catch (UnsupportedEncodingException e) {
-			results = "error";
+			original_value = "error";
 		}
         
-        Log.v(TAG, results);
-
+        return original_value;
 
     }
 

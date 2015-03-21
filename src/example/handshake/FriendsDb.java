@@ -24,7 +24,7 @@ public class FriendsDb extends SQLiteOpenHelper {
     public static final String KEY_F_ROWID = "_id";
 
     private static String DBNAME = "friends";
-    private static final int DBVERSION = 1;
+    private static final int DBVERSION = 2;
  
     private static final String MSGS_TABLE = "msgs";
     
@@ -34,6 +34,11 @@ public class FriendsDb extends SQLiteOpenHelper {
     public static final String KEY_M_MSGTYPE = "type";
     public static final String KEY_M_RECIP = "recipient";
     public static final String KEY_M_MSGID = "signature";
+    
+    public static final String CONSTANTS_TABLE = "constants";
+    
+    public static final String KEY_C_CONSTANT = "constant_name";
+    public static final String KEY_C_VALUE = "constant_value";
     
     private static final String TAG = "FriendsDbAdapter";
     private SQLiteDatabase mDb;
@@ -47,6 +52,11 @@ public class FriendsDb extends SQLiteOpenHelper {
         + KEY_F_FP + " text not null, "
         + KEY_F_NAME + " text not null, "
         + KEY_F_PUK + " blob null); ";
+    
+    private static final String CONSTANTS_CREATE =
+            "create table " + CONSTANTS_TABLE + " ("
+            + KEY_C_CONSTANT + " text not null, "
+            + KEY_C_VALUE + " text not null); ";
 
     private static final String MSGS_CREATE =
     	"create table " + MSGS_TABLE + " ("
@@ -68,6 +78,7 @@ public class FriendsDb extends SQLiteOpenHelper {
     public void onCreate(SQLiteDatabase db) {
         db.execSQL(FRIENDS_CREATE);
         db.execSQL(MSGS_CREATE);
+        db.execSQL(CONSTANTS_CREATE);
     }
 
     @Override
@@ -113,8 +124,7 @@ public class FriendsDb extends SQLiteOpenHelper {
 
     //storeIncomingMessage(topic_name, "topic", msgSignature, ByteUtilities.bytesToHex(payload));
    
-    
-
+ 
     
     public Cursor fetchMsgByType(String msgtype) {
 		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE, KEY_M_MSGID},
@@ -135,7 +145,12 @@ public class FriendsDb extends SQLiteOpenHelper {
 		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE, KEY_M_MSGID},
 				KEY_M_RECIP + " = '' OR " + KEY_M_RECIP + " IS NULL", null, null, null, null);
     }
-
+    
+    public Cursor fetchUnsentDirectMsgs() {
+		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE, KEY_M_MSGID},
+				"(" + KEY_M_RECIP + " = '' OR " + KEY_M_RECIP + " IS NULL) AND " +  KEY_M_MSGTYPE + " <> 'topic'", null, null, null, null);
+    }
+    
     public Cursor fetchMsgsAbbrev() {
     	Log.v(TAG, "fetchMsgsAbbrev is dun been run");
     	
@@ -236,6 +251,78 @@ public class FriendsDb extends SQLiteOpenHelper {
         return mDb.update(MSGS_TABLE, args, criteria, null) > 0;
     }
     
+    public ArrayList<String> topicsSentToRecipient(String recipient_fp) {
+    	
+    	ArrayList<String> topics = new ArrayList<String>();
+        Cursor mCursor =
+        	mDb.query(true, MSGS_TABLE, new String[] {KEY_M_FNAME}, KEY_M_RECIP + "='" + recipient_fp + "'", null, null, null, null, null);
+        
+            if (mCursor != null) {
+            	while (mCursor.moveToNext()) {
+            		topics.add(mCursor.getString(0));
+            	}
+            }
+            
+            return topics;
+    }
+    
+    public Cursor topicsNotSentToRecipient(String recipient_fp) {
+    	
+    	// if anything is off-limits, exclude
+    	ArrayList<String> alreadySentTopics = topicsSentToRecipient(recipient_fp);
+    	String topicList = "";
+    	if (alreadySentTopics.size() > 0) {
+
+    		for (String s: alreadySentTopics) {
+    			topicList = topicList + "'" + s + "', ";
+    		}
+        
+    		// remove trailing space and comma
+    		topicList = topicList.substring(0, topicList.length()-2);
+    	}
+    	
+    	// set up criteria for our topix query
+    	String crit = "";
+    	if (topicList.length() > 0) {
+    		crit = " AND " + KEY_M_FNAME + " NOT IN (" + topicList + ")";
+    	}
+    	
+    				//KEY_M_RECIP + " = '' OR " + KEY_M_RECIP + " IS NULL", null, null, null, null);
+    	Cursor mCursor =
+        	mDb.query(true, MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE, KEY_M_MSGID},
+        			 "(" + KEY_M_RECIP + " = '' OR " + KEY_M_RECIP + " IS NULL) AND " + KEY_M_MSGTYPE + "='topic'" + crit, 
+        			null, null, null, null, null);
+        
+            if (mCursor != null) {
+                mCursor.moveToFirst();
+            }
+            
+            return mCursor;
+    }
+    
+    /**
+     * Given a topic, return an ArrayList<String> of all the shares that make this up
+     * 
+     * @param topic_name
+     * @return
+     */
+    public ArrayList<String> getMsgSharesForTopic(String topic_name) {
+    	
+    	ArrayList<String> shares = new ArrayList<String>();
+    	
+    	Cursor c = mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE, KEY_M_MSGID},
+				KEY_M_MSGTYPE + " = 'topic' AND " + KEY_M_FNAME + " = ?", new String[] {topic_name}, null, null, null);
+
+    	if (c != null) {
+    		while (c.moveToNext()) {
+    			shares.add(c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT)));
+    		}
+    	}
+    	
+    	return shares;
+    	
+    }
+    
     public ArrayList<String> recipientsForTopic(String topic_name) {
     	
     	ArrayList<String> recipients = new ArrayList<String>();
@@ -243,11 +330,10 @@ public class FriendsDb extends SQLiteOpenHelper {
         	mDb.query(true, MSGS_TABLE, new String[] {KEY_M_RECIP}, KEY_M_FNAME + "='" + topic_name + "'", null, null, null, null, null);
         
             if (mCursor != null) {
-                mCursor.moveToFirst();
-            }
-            
-            while (mCursor.moveToNext()) {
-            	recipients.add(mCursor.getString(0));
+             
+            	while (mCursor.moveToNext()) {
+            		recipients.add(mCursor.getString(0));
+            	}
             }
             
             return recipients;

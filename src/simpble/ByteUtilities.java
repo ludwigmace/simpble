@@ -29,6 +29,8 @@ public class ByteUtilities {
     	return bytes;
     }
     
+
+    
     public static byte[] trimmedBytes(byte[] bytes) {
     	
     	int i = bytes.length - 1;

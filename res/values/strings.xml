@@ -28,6 +28,7 @@
 	<string name="action_add_deaddrops">Add Dead Drop Msg</string>
 	<string name="messages_showall">The Messages</string>
 	<string name="action_show_msgs">Show Messages</string>
+	<string name="caption_show_combined_shares">Show</string>
 	
 	<string-array name="shares_total">
 	    <item>2</item>
