@@ -42,33 +42,25 @@ public class ShowMessagesActivity extends Activity implements LoaderManager.Load
         
         mListView.setAdapter(mAdapter);
         
-/*        mListView.setOnItemClickListener(new OnItemClickListener() {
+        mListView.setOnItemClickListener(new OnItemClickListener() {
 
 			@Override
 			public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
 				FriendsDb mDbHelper;
 				mDbHelper = new FriendsDb(getApplicationContext());
 				
-				Cursor c = mDbHelper.fetchFriend(id);
+				boolean success = mDbHelper.updateMsgMarkUnsent(id);
 				
-				c.moveToFirst();
-				
-				String peer_fp = c.getString(c.getColumnIndex(FriendsDb.KEY_F_FP));
-				byte[] peer_puk = c.getBlob(c.getColumnIndex(FriendsDb.KEY_F_PUK));
-				
-				boolean keyvalid = KeyStuff.CheckFingerprint(peer_puk, peer_fp);
-				
-				if (keyvalid) {
-					showMessage("fp matches the puk");
+				if (success) {
+					showMessage("msg recipient cleared out");
 				} else {
-					showMessage("fp doesn't match the puk");
+					showMessage("nothing happened");
 				}
 				
-				Log.v(TAG, "puk: " + ByteUtilities.bytesToHex(peer_puk));
 			}
         
         	}); 
-     */   
+   
         getLoaderManager().initLoader(0, null, this);
 
     }

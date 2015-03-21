@@ -26,9 +26,6 @@ public class BleMessage {
 	
 	private SparseArray<BlePacket> pendingPackets;
 	
-	// hash of the payload of the message contents, which identifies the msg payload
-	private byte[] BleMsgDigest;
-	
 	// number of packets that make up this message
 	private int BlePacketCount;
 	
@@ -61,6 +58,10 @@ public class BleMessage {
 	private String messageSignature;
 	
 	public boolean ReceiptAcknowledged;
+	
+	// the raw bytes of this message
+	private byte[] allBytes;
+	
 	
 
 	// initializes our list of BlePackets, current counter, and sent status
@@ -220,7 +221,7 @@ public class BleMessage {
 	}
 	
 
-	private byte[] calculateHash() {
+	public byte[] BuildMessageMIC() {
 		
         // get a digest for the message, to define it
         MessageDigest md = null;
@@ -239,41 +240,6 @@ public class BleMessage {
         // (i want my digest to be the packet size less the 5 bytes needed for header info)
         return Arrays.copyOfRange(md.digest(ByteUtilities.trimmedBytes(MessageBytes)), 0, MessagePacketSize - 5);
 		
-	}
-	
-	public boolean checkHash() {
-
-        if (Arrays.equals(calculateHash(), MessageHash)) {
-        	return true;
-        } else {
-        	return false;
-        }
-        
-	}
-
-	/**
-	 * Build or Rebuild the stored message hash
-	 * SHA-1 of (new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload) 
-	 */
-	public void rebuildHash() {
-		
-		byte[] MessageBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
-		
-	    // get a digest for the message, to define it
-        MessageDigest md = null;
-        
-        try {
-			md = MessageDigest.getInstance("SHA-1");
-		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
-		}
-        
-        // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
-        // (i want my digest to be the packet size less the 5 bytes needed for header info)
-        byte[] myDigest = Arrays.copyOfRange(md.digest(MessageBytes), 0, MessagePacketSize - 5);
-        
-        // set our global variable for the hash to this digest
-        MessageHash = myDigest;	
 	}
 	
 	
@@ -418,8 +384,8 @@ public class BleMessage {
 		 * set our pending packet flag to false (flag set in above addPacket method)
 		 */
 		if (!pendingPacketStatus) {
-			// now act on the fact this message has all its packets
-			unbundleMessage();
+			// now that we've got all the packets, build the raw bytes for this message
+			allBytes = dePacketize();
 		}
 		
 	}
@@ -438,11 +404,15 @@ public class BleMessage {
 		messagePackets = new SparseArray<BlePacket>();
 		BlePacketCount = messageSize;
 		pendingPacketStatus = true;
+		
 		BuildMessageFromPackets(packetCounter, packetPayload);
 	}
 
-	// Fills RecipientFingerprint, SenderFingerprint, MessageType, and MessagePayload
-	private void unbundleMessage() {
+	
+	private boolean BuildMessageDetails(byte[] RawBytes) {
+		
+		boolean success = false;
+		
 		/*
 		 * - message type
 		 * - recipient fingerprint
@@ -451,19 +421,20 @@ public class BleMessage {
 		 * - payload
 		 */
 		
-		// pull all the packets, less counters, into a byte array
-		byte[] allBytes = dePacketize();
-		
-		// we need this to be 41+ bytes
-		if (allBytes.length > 41) {
-		
-			MessageType = Arrays.copyOfRange(allBytes, 0, 1)[0]; // byte 0
-			RecipientFingerprint = Arrays.copyOfRange(allBytes, 1, 21); // bytes 1-20
-			SenderFingerprint = Arrays.copyOfRange(allBytes, 21, 41); // bytes 21-40
-			MessagePayload = Arrays.copyOfRange(allBytes, 41, allBytes.length+1); //bytes 41 through end
-		
+		if (RawBytes != null) {
+			// we need this to be 41+ bytes
+			if (RawBytes.length > 41) {
+			
+				MessageType = Arrays.copyOfRange(RawBytes, 0, 1)[0]; // byte 0
+				RecipientFingerprint = Arrays.copyOfRange(RawBytes, 1, 21); // bytes 1-20
+				SenderFingerprint = Arrays.copyOfRange(RawBytes, 21, 41); // bytes 21-40
+				MessagePayload = Arrays.copyOfRange(RawBytes, 41, RawBytes.length+1); //bytes 41 through end
+	
+				success = true;
+			}
 		}
 		
+		return success;
 		
 	}
 
@@ -497,11 +468,36 @@ public class BleMessage {
 		return missing;
 	}
 	
-	// loop over all the BlePackets in the message - packet0 is the hash; write the rest to MessageBytes
+	public byte[] GetAllBytes() {
+		return allBytes;
+	}
+	
+	/**
+	 * 
+	 * 
+	 * @param RawMessageBytes The raw bytes that make up this message
+	 * @return If this message could be properly constructed from these bytes, return TRUE
+	 */
+	public boolean SetRawBytes(byte[] RawMessageBytes) {
+		
+		boolean success = false;
+		
+		allBytes = RawMessageBytes;
+		
+		success = BuildMessageDetails(RawMessageBytes);
+		
+		return success;
+	}
+	
+	/** 
+	 * Loop over all the BlePackets in the message - packet0 is the hash; write the rest to MessageBytes
+	 * 
+	 * @return Byte array of the message packets
+	 */
 	private byte[] dePacketize() {
 		
 		ByteArrayOutputStream os = new ByteArrayOutputStream();
-
+		byte[] failure = new byte[] {0x00};
 			
 		// this will write these packets out in order
 		for (int i = 0; i < messagePackets.size(); i++) {
@@ -509,21 +505,22 @@ public class BleMessage {
 			// get the packet corresponding to the current index
 			BlePacket b = messagePackets.valueAt(i);
         	
-			if (b != null ){
+			if (b != null ) {
 				try {
+					// if this is the first packet in the sequence, the first couple of bytes are header and the rest are the Hash
 		        	if (b.MessageSequence == 0) {
 		        		MessageHash = Arrays.copyOfRange(b.MessageBytes, 2, b.MessageBytes.length);
 		        	} else {
 		        		try {
 							os.write(b.MessageBytes);
 						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
+							// if we can't write to our output stream, return a NUL byte
+							return failure;
 						}
 		        	}
 				} catch (Exception e) {
-					Log.v(TAG, "err:" + e.getMessage());
-					Log.v(TAG, "b.MessageSequence didn't return anything, or couldn't build MessageHash");
+					Log.e(TAG, "b.MessageSequence didn't return anything, or couldn't build MessageHash: " + e.getMessage());
+					return failure;
 				}
 			} else {
 				Log.v(TAG, "no packet returned for messagePackets.valueAt(" + String.valueOf(i) + ")");

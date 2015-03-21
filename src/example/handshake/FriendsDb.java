@@ -130,6 +130,11 @@ public class FriendsDb extends SQLiteOpenHelper {
 		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE, KEY_M_MSGID},
 				null, null, null, null, null);
     }
+    
+    public Cursor fetchUnsentMsgs() {
+		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE, KEY_M_MSGID},
+				KEY_M_RECIP + " = '' OR " + KEY_M_RECIP + " IS NULL", null, null, null, null);
+    }
 
     public Cursor fetchMsgsAbbrev() {
     	Log.v(TAG, "fetchMsgsAbbrev is dun been run");
@@ -220,6 +225,15 @@ public class FriendsDb extends SQLiteOpenHelper {
         args.put(KEY_M_RECIP, fp);
 
         return mDb.update(MSGS_TABLE, args, KEY_M_MSGID + " = ?", new String[] {signature}) > 0;
+    }
+    
+    // the message id from the database OBVIOUSLY doesn't match the message id for a message session
+    public boolean updateMsgMarkUnsent(long id) {
+        ContentValues args = new ContentValues();
+        args.put(KEY_M_RECIP, "");
+        String criteria = KEY_M_ROWID + " = " + String.valueOf(id);
+        
+        return mDb.update(MSGS_TABLE, args, criteria, null) > 0;
     }
     
     public ArrayList<String> recipientsForTopic(String topic_name) {

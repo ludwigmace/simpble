@@ -53,9 +53,6 @@ public class BleMessenger {
     // callback for handling events from BleCentral and BlePeripheral
     private BleStatusCallback bleStatusCallback;
 
-    // peers to keep an eye out for
-    private Map<String, BlePeer> friendsFpMap;
-    
     // allows us to look up peers by connected addresses
     public Map<String, BlePeer> peerMap;
     
@@ -108,7 +105,6 @@ public class BleMessenger {
 		
 		// i need a place to put my found peers
 		peerMap = new HashMap<String, BlePeer>();
-		friendsFpMap = new HashMap<String, BlePeer>();
 		
 		// create your server for listening and your client for looking; Android can be both at the same time
 		
@@ -428,12 +424,12 @@ public class BleMessenger {
 			// need to make sure I requeue all the packets if the other message doesn't know what happened
 			bleStatusCallback.headsUp("m: finished send; checking if rcvd");
 		
+			// TODO: this part about checking needs to be set from the calling application
 			// see if we're missing any pending packets
 			bleCentral.submitCharacteristicReadRequest(peerAddress, uuidFromBase("105"));
 		} else {
 			if (sent == bps.size()) {
 				// TODO: the peripheral should check send status
-				bleStatusCallback.headsUp("m: connected as Perph, assuming send success");
 				bleStatusCallback.peerNotification(peerAddress, "msg_sent_" + String.valueOf(m.GetMessageNumber()));
 				peer.RemoveBleMessage(m.GetMessageNumber());
 			} else {
@@ -487,30 +483,13 @@ public class BleMessenger {
 		blePeripheral.advertiseOff();
 	}
 	
-    /**
-     * Adds a friend from the calling application to the list of peers that BleMessenger keeps an eye out for.  When you
-     * reference this particular peer in the future, use the method GetBlePeerByFingerprint() or GetBlePeerByRemoteAddress()
-     * 
-     * @param BlePeer instance of a BlePeer you want BleMessenger to keep an eye out for
-     * 
-     */
-	public void PutMessageForFriend(String FriendFingerprint, BleMessage MessageToSend) {
-		
-		// try to get this peer by their fingerprint
-		BlePeer p = friendsFpMap.get(FriendFingerprint);
-		
-		// if this peer isn't found, then create him
-		if (p == null) {
-			p = new BlePeer("");
-			p.SetFingerprint(FriendFingerprint);
-			friendsFpMap.put(FriendFingerprint, p);
-		}
-		
-		// add the message
-		p.addBleMessageOut(MessageToSend);
-		
-	}
-
+	/**
+	 * Takes the bytes of each incoming packet and assigns them to a message
+	 * 
+	 * @param remoteAddress The Bluetooth address of the device sending the packets to this one
+	 * @param remoteCharUUID The UUID of the GATT characteristic being used for transport
+	 * @param incomingBytes The raw bytes of the incoming packet
+	 */
     private void incomingMessage(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
 		int parentMessagePacketTotal = 0;
 		
@@ -522,6 +501,8 @@ public class BleMessenger {
     		return;
     	}
 
+    	// Process the header of this packet, whicg entails parsing out the parentMessage and which packet this is in the message
+    	
     	// get the Message to which these packets belong as well as the current counter
     	int parentMessage = incomingBytes[0] & 0xFF; //00
     	int packetCounter = (incomingBytes[1] << 8) | incomingBytes[2] & 0xFF; //0001
@@ -534,64 +515,39 @@ public class BleMessenger {
     	
     	// find the message we're building, identified by the first byte (cast to an integer 0-255)
     	// if this message wasn't already created, then the getBleMessageIn method will create it
-    	//bleStatusCallback.headsUp("m: msg<- " + String.valueOf(parentMessage) + ", pckt " + String.valueOf(packetCounter));
-    	BleMessage b = p.getBleMessageIn(parentMessage);
+    	BleMessage msgBeingBuilt = p.getBleMessageIn(parentMessage);
     	
-    	// your packet payload will be the size of the incoming bytes less our 3 needed for the header (ref'd above)
+    	// your packet payload will be the size of the incoming bytes less our 3 needed for the header
     	byte[] packetPayload = Arrays.copyOfRange(incomingBytes, 3, incomingBytes.length);
     	
     	// if our current packet counter is ZERO, then we can expect our payload to be:
     	// the number of packets we're expecting
     	if (packetCounter == 0) {
-    		// right now this is only going to be a couple of bytes
-    		parentMessagePacketTotal = (incomingBytes[3] << 8) | incomingBytes[4] & 0xFF; //0240
+
+    		// get the number of packets we're expecting - 2 bytes can indicate 0 through 65,535 packets 
+    		parentMessagePacketTotal = (packetPayload[0] << 8) | packetPayload[1] & 0xFF;
     		
-    		Log.v(TAG, "parent message packet total is:" + String.valueOf(parentMessagePacketTotal));
-    		b.BuildMessageFromPackets(packetCounter, packetPayload, parentMessagePacketTotal);
+    		// since this is the first packet in the message, pass in the number of packets we're expecting
+    		msgBeingBuilt.BuildMessageFromPackets(packetCounter, packetPayload, parentMessagePacketTotal);
     	} else {
     		
     		// otherwise throw this packet payload into the message
-    		b.BuildMessageFromPackets(packetCounter, packetPayload);	
+    		msgBeingBuilt.BuildMessageFromPackets(packetCounter, packetPayload);	
     	}
     	
-    	// if this particular message is done; ie, is it still pending packets?
-    	if (b.PendingPacketStatus() == false) {
-    		bleStatusCallback.headsUp("m: pending packet status now false, all packets rcvd");
+    	// If all the expected packets have been received, process this message
+    	if (msgBeingBuilt.PendingPacketStatus() == false) {
+    		// hash was pulled in last BuildMessageFromPackets called
     		
-    		// if there's a fingerprint for the sender, handle this message (you should always have a sender fingerprint, else the message is malformed)
-    		
-    		// Add the sender's fingerprint to our map of senderfingerprint and remoteAddress
-    		// Should this be elsewhere?
-    		if (b.SenderFingerprint != null) {
-	    		if (b.SenderFingerprint.length > 0) {
-	    			bleStatusCallback.headsUp("m: sender has fp, handling msg");
-	    			
-	    			if (b.checkHash()) {
-	    				bleStatusCallback.headsUp("m: hash good: " + ByteUtilities.bytesToHex(b.MessageHash).substring(0,8));
-	    			} else {
-	    				bleStatusCallback.headsUp("m: hash bad: " + b.GetCalcHash());
-	    				bleStatusCallback.headsUp("m: shouldbe: " + ByteUtilities.bytesToHex(b.MessageHash).substring(0,8));
-	    			}
-	    			
-	    			// we don't want to overwrite the friend we put in earlier, but if it's not
-	    			// already in friendsFpMap then add
-	    			if (friendsFpMap.get(ByteUtilities.bytesToHex(b.SenderFingerprint)) == null) {
-	    				friendsFpMap.put(ByteUtilities.bytesToHex(b.SenderFingerprint), p);
-	    			}
-	    			
-	    			bleStatusCallback.handleReceivedMessage(remoteAddress, ByteUtilities.bytesToHex(b.RecipientFingerprint), ByteUtilities.bytesToHex(b.SenderFingerprint), b.MessagePayload, b.MessageType, b.MessageHash);
-	    			
-	    		} else {
-	    			bleStatusCallback.headsUp("m: msg error: SenderFingerprint.length=0");	
-	    		}
-    		} else {
-    			bleStatusCallback.headsUp("m: msg error: SenderFingerprint NULL");
-    		}
-    		
-    		// check message integrity here?
-    		// what about encryption?
-    		
-    		// how do i parse the payload if the message contains handshake/identity?
+    		// TODO: the hash part is iffy here; right now hash part won't be here
+    		// need to add a transport level hash!
+    		// right now we have a message level hash!
+    		bleStatusCallback.handleReceivedMessage(remoteAddress, msgBeingBuilt.GetAllBytes());
+
+    	} else {
+    		// TODO: we need to have some kind of deal where we set a timer, and if no more packets are received for this message then we . . . do something?
+    		// or we just clear out this half-built message and give up on ever getting it?
+    		// or clear it out completely - if the sender wants to make sure we've got it, they'all ask
     	}
     	
 		

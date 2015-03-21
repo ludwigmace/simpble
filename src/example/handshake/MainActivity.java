@@ -172,8 +172,8 @@ public class MainActivity extends Activity {
         }
 
         // get an identifier for this installation
-        //myIdentifier = Installation.id(this, true);
-        myIdentifier = Installation.id(this);
+        myIdentifier = Installation.id(this, false);
+        //myIdentifier = Installation.id(this);
         
         // get your name (that name part isn't working on Android 5)
         //String userName = getUserName(this.getContentResolver());
@@ -277,7 +277,7 @@ public class MainActivity extends Activity {
 			logMessage("adding peer " + peer_fp.substring(0,8));
 		}
 
-		c = mDbHelper.fetchMsgs();
+		c = mDbHelper.fetchUnsentMsgs();
 		
 		// we want to send some messages
 		if (c.getCount() > 0) {
@@ -638,12 +638,25 @@ public class MainActivity extends Activity {
 		// this is when all the packets have come in, and a message is received in its entirety (hopefully)
 		// TODO: too much happens in this callback; need to move things out of here!
 		@Override
-		public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, byte msgType, byte[] messageHash) {
+		//public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, byte msgType, byte[] messageHash) {
+		public void handleReceivedMessage(String remoteAddress, byte[] MessageBytes) {
 
-			logMessage("a: rcvd " + msgType + " msg for " + recipientFingerprint.substring(0, 10) + "...");
+			BleMessage incomingMsg = new BleMessage();
+			
+			boolean bMessageBuilt = incomingMsg.SetRawBytes(MessageBytes);
+			
+			if (!bMessageBuilt) {
+				return;
+			}
+			
 			
 			// get the message type in integer form; should be between 0 and 255 so &0xFF should work
-			int mt = msgType & 0xFF;
+			int mt = incomingMsg.MessageType & 0xFF;
+			String recipientFingerprint = ByteUtilities.bytesToHex(incomingMsg.RecipientFingerprint);
+			String senderFingerprint = ByteUtilities.bytesToHex(incomingMsg.SenderFingerprint);
+			byte[] payload = incomingMsg.MessagePayload;
+			byte[] messageHash = incomingMsg.BuildMessageMIC();
+			
 			
 			// this is an identity message so handle it as such
 			if (mt == 1) {
@@ -658,8 +671,16 @@ public class MainActivity extends Activity {
 					// TODO: what if it's being forwarded?
 				}
 				
-				// if we'll send to anybody, then retrieve and queue up our anybody msgs
-				// check muleMessages
+				/* so we just got an id
+				 * we need to see if we've already sent this particular peer a message for this topic
+				 * the "peer-ready-to-receive" notification means we can now to see if this peer needs a message
+				 * 1)for dead-drop purposes; as an original sender, don't send more than one message for a 
+				 *   topic to the same person
+				 *   BUT, you also don't want to do it for other reasons that the calling app can consider
+				 *   the most obvious one i can think of is Location
+				 * - 
+				 * 
+				 * */
 				if (sendToAnybody) {
 					// well this is certainly indiscriminate, but will get only 1
 					BleMessage mTopic = topicMessages.get(0);
@@ -671,6 +692,9 @@ public class MainActivity extends Activity {
 						// need to check against what we've already sent for this "topic name" so that
 						// we don't send another share
 						ArrayList<String> avoidSending = mDbHelper.recipientsForTopic(topic_name);
+						
+						
+						// inspect avoidSending - because you're just not sending to 
 						
 						boolean OkToSend = false;
 	
