@@ -1100,6 +1100,12 @@ public class MainActivity extends Activity {
 		
 	}
 	
+	/**
+	 * Returns a secret message share for any topic that this person hasn't received a share for yet
+	 * 
+	 * @param candidateFingerprint The PukFP of the person we're ensure only gets a single share of a particular topic
+	 * @return A message in a BleMessage object 
+	 */
 	private BleMessage GetUnsentEligibleTopicMessage(String candidateFingerprint) {
 		
 		// topic messages eligible to go to this recipient
