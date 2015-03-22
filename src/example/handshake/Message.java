@@ -49,10 +49,7 @@ public class Message extends ContentProvider {
     	Log.v(TAG, "public Cursor query() called");
         if(uriMatcher.match(uri)==MESSAGES){
         	
-        	
         	Cursor c = mFriendsDB.fetchMsgsAbbrev(); 
-        	
-        	Log.v(TAG, "found " + String.valueOf(c.getCount()) + " messages");
         	
             return c;
         }else{

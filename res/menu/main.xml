@@ -22,15 +22,14 @@
 	
 	<item
         android:id="@+id/action_add_deaddrops"
-        android:orderInCategory="300"
+        android:orderInCategory="400"
         android:showAsAction="never"
         android:title="@string/action_add_deaddrops"/>
 	
 	<item
         android:id="@+id/action_show_msgs"
-        android:orderInCategory="300"
+        android:orderInCategory="500"
         android:showAsAction="never"
         android:title="@string/action_show_msgs"/>
-    
-
+	
 </menu>

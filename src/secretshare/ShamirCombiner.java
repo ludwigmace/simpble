@@ -28,8 +28,7 @@ import android.util.SparseArray;
 public final class ShamirCombiner {
 
 	private static final String TAG = "shamir";
-	static ByteArrayOutputStream os;
-	static PrintStream ps;
+
 	static SparseArray<String> shareHolders;
 	
 	static List<ShareInfo> shares;
@@ -37,9 +36,6 @@ public final class ShamirCombiner {
 	static int paramK;
 
     public static String Workin(int k, SparseArray<String> shares) {
-    	os = new ByteArrayOutputStream();
-    	ps = new PrintStream(os);
-    	
     	
     	shareHolders = shares;
     	

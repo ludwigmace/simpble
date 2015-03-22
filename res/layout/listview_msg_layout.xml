@@ -20,18 +20,28 @@
  
     <TextView
         android:id="@+id/msg_msgtype"
-        android:layout_width="150dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_toRightOf="@id/msg_rowid"
         android:layout_centerVertical="true"
         android:layout_marginRight="5dp"
         />
- 
+    
     <TextView
-        android:id="@+id/msg_content"
+        android:id="@+id/msg_msgtarget"	
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_toRightOf="@id/msg_msgtype"
-        android:layout_centerVertical="true" />
+        android:layout_centerVertical="true"
+        android:layout_marginRight="5dp"
+        />
+ 
+    <TextView
+        android:id="@+id/msg_msgcontent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_toRightOf="@id/msg_msgtarget"
+        android:layout_centerVertical="true" 
+        />
  
 </RelativeLayout>

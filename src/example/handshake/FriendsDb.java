@@ -154,7 +154,7 @@ public class FriendsDb extends SQLiteOpenHelper {
     public Cursor fetchMsgsAbbrev() {
     	Log.v(TAG, "fetchMsgsAbbrev is dun been run");
     	
-		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_MSGTYPE, KEY_M_CONTENT},
+		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_MSGTYPE, KEY_M_FNAME, KEY_M_CONTENT},
 				null, null, null, null, null);
     }
     

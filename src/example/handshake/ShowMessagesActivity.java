@@ -4,11 +4,14 @@ import simpble.ByteUtilities;
 import android.app.Activity;
 import android.app.LoaderManager;
 import android.content.CursorLoader;
+import android.content.Intent;
 import android.content.Loader;
 import android.database.Cursor;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
@@ -20,6 +23,7 @@ import android.widget.Toast;
 public class ShowMessagesActivity extends Activity implements LoaderManager.LoaderCallbacks<Cursor> {
 
 	private static final String TAG = "ShowMessagesActivity";
+    private static final int ACTIVITY_CREATE=0;
 	long current_msg;
 	SimpleCursorAdapter mAdapter;
     ListView mListView;
@@ -34,8 +38,8 @@ public class ShowMessagesActivity extends Activity implements LoaderManager.Load
         mAdapter = new SimpleCursorAdapter(getBaseContext(),
                 R.layout.listview_msg_layout,
                 null,
-                new String[] { FriendsDb.KEY_M_ROWID, FriendsDb.KEY_M_MSGTYPE, FriendsDb.KEY_M_CONTENT},
-                new int[] { R.id.msg_rowid, R.id.msg_msgtype, R.id.msg_content }, 0);
+                new String[] { FriendsDb.KEY_M_ROWID, FriendsDb.KEY_M_MSGTYPE, FriendsDb.KEY_M_FNAME, FriendsDb.KEY_M_CONTENT},
+                new int[] { R.id.msg_rowid, R.id.msg_msgtype, R.id.msg_msgtarget, R.id.msg_msgcontent }, 0);
         
         mListView = (ListView) findViewById(R.id.msgslistview);
         
@@ -46,16 +50,16 @@ public class ShowMessagesActivity extends Activity implements LoaderManager.Load
 
 			@Override
 			public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-				FriendsDb mDbHelper;
-				mDbHelper = new FriendsDb(getApplicationContext());
 				
-				boolean success = mDbHelper.updateMsgMarkUnsent(id);
-				
-				if (success) {
-					showMessage("msg recipient cleared out");
-				} else {
-					showMessage("nothing happened");
-				}
+				// http://stackoverflow.com/questions/4412449/how-to-highlight-listview-items
+	            for(int a = 0; a < parent.getChildCount(); a++)
+	            {
+	                parent.getChildAt(a).setBackgroundColor(Color.TRANSPARENT);
+	            }
+
+	            view.setBackgroundColor(Color.LTGRAY);
+	            
+	            current_msg = id;
 				
 			}
         
@@ -75,11 +79,40 @@ public class ShowMessagesActivity extends Activity implements LoaderManager.Load
     static final String[] MSGS_SUMMARY_PROJECTION = new String[] {
     	FriendsDb.KEY_M_ROWID,
     	FriendsDb.KEY_M_MSGTYPE,
+    	FriendsDb.KEY_M_FNAME,
     	FriendsDb.KEY_M_CONTENT
     };
 
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		// Inflate the menu; this adds items to the action bar if it is present.
+		getMenuInflater().inflate(R.menu.msgs_menu, menu);
+		return true;
+	}
+    
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+    	
+		int id = item.getItemId();
+		if (id == R.id.action_mark_unsent) {
+			FriendsDb mDbHelper;
+			mDbHelper = new FriendsDb(getApplicationContext());
+			
+			boolean success = mDbHelper.updateMsgMarkUnsent(current_msg);
+			
+			if (success) {
+				showMessage("msg recipient cleared out");
+			} else {
+				showMessage("nothing happened");
+			}
+			
+		}
+		
+		if (id == R.id.action_secret_combine) {
+			// pass in the current_msg id to pull the topic; then the topic to get all the shares to rebuild and display
+		}	
+    
+    	
         return super.onOptionsItemSelected(item);
     }
     

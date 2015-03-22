@@ -1,0 +1,17 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context="example.handshake.ShowMessageActivity" >
+
+    <item
+        android:id="@+id/action_mark_unsent"
+        android:orderInCategory="100"
+        android:showAsAction="never"
+        android:title="@string/caption_mark_unsent"/>
+    
+    <item
+        android:id="@+id/action_secret_combine"
+        android:orderInCategory="200"
+        android:showAsAction="never"
+        android:title="@string/caption_secret_combine"/>
+
+</menu>

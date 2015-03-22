@@ -29,6 +29,11 @@
 	<string name="messages_showall">The Messages</string>
 	<string name="action_show_msgs">Show Messages</string>
 	<string name="caption_show_combined_shares">Show</string>
+	<string name="messages_showsecrets">Secrets</string>
+	<string name="action_show_secrets">Show Secrets</string>
+	<string name="caption_mark_unsent">Mark Unsent</string>
+	<string name="caption_secret_combine">Combine Shares</string>
+	
 	
 	<string-array name="shares_total">
 	    <item>2</item>
@@ -47,4 +52,5 @@
 	</string-array>
 	
 </resources>
+
 

@@ -53,6 +53,11 @@
             android:name="example.handshake.ShowMessagesActivity"
             android:label="@string/messages_showall" >
         </activity>
+        
+		<activity
+            android:name="example.handshake.ShowSecretsActivity"
+            android:label="@string/messages_showsecrets" >
+        </activity>
 	        
 	    <provider
 	       android:name="Friend"
