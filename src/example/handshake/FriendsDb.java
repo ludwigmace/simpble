@@ -24,7 +24,7 @@ public class FriendsDb extends SQLiteOpenHelper {
     public static final String KEY_F_ROWID = "_id";
 
     private static String DBNAME = "friends";
-    private static final int DBVERSION = 2;
+    private static final int DBVERSION = 5;
  
     private static final String MSGS_TABLE = "msgs";
     
@@ -37,8 +37,12 @@ public class FriendsDb extends SQLiteOpenHelper {
     
     public static final String CONSTANTS_TABLE = "constants";
     
+    public static final String KEY_C_ROWID = "_id";
     public static final String KEY_C_CONSTANT = "constant_name";
     public static final String KEY_C_VALUE = "constant_value";
+    
+    public static final String CONSTANT_SEND_ID = "send_id";
+    public static final String CONSTANT_RECV_ID = "recv_id";
     
     private static final String TAG = "FriendsDbAdapter";
     private SQLiteDatabase mDb;
@@ -55,6 +59,7 @@ public class FriendsDb extends SQLiteOpenHelper {
     
     private static final String CONSTANTS_CREATE =
             "create table " + CONSTANTS_TABLE + " ("
+            + KEY_C_ROWID + " integer primary key autoincrement, "
             + KEY_C_CONSTANT + " text not null, "
             + KEY_C_VALUE + " text not null); ";
 
@@ -79,6 +84,8 @@ public class FriendsDb extends SQLiteOpenHelper {
         db.execSQL(FRIENDS_CREATE);
         db.execSQL(MSGS_CREATE);
         db.execSQL(CONSTANTS_CREATE);
+        
+        createDefaultConstants(db);
     }
 
     @Override
@@ -87,23 +94,24 @@ public class FriendsDb extends SQLiteOpenHelper {
                 + newVersion + ", which will destroy all old data");
         db.execSQL("DROP TABLE IF EXISTS " + FRIENDS_TABLE);
         db.execSQL("DROP TABLE IF EXISTS " + MSGS_TABLE);
+        db.execSQL("DROP TABLE IF EXISTS " + CONSTANTS_TABLE);
         onCreate(db);
     }
 
     /**
      * Scaffold constants for what  mode we want to be in, sending, receiving, id-friendly, etc
      */
-    public void createDefaultConstants() {
+    public void createDefaultConstants(SQLiteDatabase db) {
     	
         ContentValues initialValues = new ContentValues();
         
-        initialValues.put(KEY_C_CONSTANT, "send_id");
+        initialValues.put(KEY_C_CONSTANT, CONSTANT_SEND_ID);
         initialValues.put(KEY_C_VALUE, "true");
-        mDb.insert(CONSTANTS_TABLE, null, initialValues);
+        db.insert(CONSTANTS_TABLE, null, initialValues);
         
-        initialValues.put(KEY_C_CONSTANT, "get_id");
+        initialValues.put(KEY_C_CONSTANT, CONSTANT_RECV_ID);
         initialValues.put(KEY_C_VALUE, "true");
-        mDb.insert(CONSTANTS_TABLE, null, initialValues);
+        db.insert(CONSTANTS_TABLE, null, initialValues);
         
     }
     
@@ -151,6 +159,11 @@ public class FriendsDb extends SQLiteOpenHelper {
     public Cursor fetchMsgById(String msgid) {
 		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE, KEY_M_MSGID},
 				KEY_M_MSGID + " = ?", new String[] {msgid}, null, null, null);
+    }
+
+    public Cursor fetchAllConstants() {
+		return mDb.query(CONSTANTS_TABLE, new String[] {KEY_C_ROWID, KEY_C_CONSTANT, KEY_C_VALUE},
+				null, null, null, null, null);
     }
     
     
@@ -268,6 +281,40 @@ public class FriendsDb extends SQLiteOpenHelper {
         
         return mDb.update(MSGS_TABLE, args, criteria, null) > 0;
     }
+
+    
+    public boolean updateToggleConstantByRow(long id) {
+        
+    	boolean success = false;
+    	
+    	Cursor c = mDb.query(CONSTANTS_TABLE, new String[] {KEY_C_VALUE}, KEY_C_ROWID + " = " + id, null, null, null, null);
+    	
+    	c.moveToFirst();
+    	
+    	String val = c.getString(0);
+    	String newval = "";
+    	
+    	if (val.equalsIgnoreCase("true")) {
+    		newval = "false";
+    	} else if (val.equalsIgnoreCase("false")) {
+    		newval = "true";
+    	}
+    	
+    	if (newval.length() > 0) {
+    	
+    		ContentValues args = new ContentValues();
+    		args.put(KEY_C_VALUE, newval);
+        
+    		String criteria = KEY_C_ROWID + " = " + String.valueOf(id);
+        
+    		success = mDb.update(CONSTANTS_TABLE, args, criteria, null) > 0;
+    	}
+    	
+    	return success;
+    }
+    
+    
+    
     
     public String getTopicForMsg(long id) {
     	String result = "";
@@ -285,7 +332,31 @@ public class FriendsDb extends SQLiteOpenHelper {
     	
     	return result;
     	
-    }    
+    }
+    
+    public String getConstant(String constant_name) {
+    	String result = "";
+    	
+    	Cursor c = mDb.query(CONSTANTS_TABLE, new String[] {KEY_C_VALUE}, KEY_C_CONSTANT + "='" + constant_name + "'", null, null, null, null);
+    	
+    	c.moveToFirst();
+    	
+    	result = c.getString(0);
+    	
+    	return result;
+    	
+    }
+    
+    public boolean setConstant(String constant_name, String constant_value) {
+
+        ContentValues args = new ContentValues();
+        args.put(KEY_C_VALUE, constant_value);
+
+        return mDb.update(CONSTANTS_TABLE, args, KEY_C_CONSTANT + "= ?", new String[] {constant_name}) > 0;
+    	
+
+    }
+    
     
     
     public ArrayList<String> topicsSentToRecipient(String recipient_fp) {

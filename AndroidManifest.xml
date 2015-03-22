@@ -58,6 +58,11 @@
             android:name="example.handshake.ShowSecretsActivity"
             android:label="@string/messages_showsecrets" >
         </activity>
+        
+		<activity
+            android:name="example.handshake.ConstantsActivity"
+            android:label="@string/messages_constants" >
+        </activity>
 	        
 	    <provider
 	       android:name="Friend"
@@ -67,6 +72,11 @@
 	    <provider
 	       android:name="Message"
 	       android:authorities="example.handshake.message"
+	       android:exported="false" />
+	    
+	    <provider
+	       android:name="Constant"
+	       android:authorities="example.handshake.constant"
 	       android:exported="false" />
         
     </application>

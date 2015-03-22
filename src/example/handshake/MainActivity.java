@@ -121,6 +121,19 @@ public class MainActivity extends Activity {
 		
 		mDbHelper = new FriendsDb(this);
 		
+		if (mDbHelper.getConstant(FriendsDb.CONSTANT_SEND_ID).equalsIgnoreCase("true")) {
+			EnableSendID = true;
+		} else {
+			EnableSendID = false;
+		}
+		
+		if (mDbHelper.getConstant(FriendsDb.CONSTANT_RECV_ID).equalsIgnoreCase("true")) {
+			EnableReceiveID = true;
+		} else {
+			EnableReceiveID = false;
+		}
+		
+		
 		// initialize an anonymous fingerprint of 20 bytes of zeroes!
 		// use this when you don't want to use your fingerprint
 		anonFP = new byte[20];
@@ -467,6 +480,10 @@ public class MainActivity extends Activity {
 	        startActivityForResult(i, ACTIVITY_CREATE);
 		}
 		
+		if (id == R.id.action_constants) {
+	        Intent i = new Intent(this, ConstantsActivity.class);
+	        startActivityForResult(i, ACTIVITY_CREATE);
+		}
 		
 		return super.onOptionsItemSelected(item);
 	}
