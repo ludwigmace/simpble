@@ -40,7 +40,6 @@ public final class ShamirCombiner {
     	os = new ByteArrayOutputStream();
     	ps = new PrintStream(os);
     	
-    	String original_value = "";
     	
     	shareHolders = shares;
     	
@@ -55,29 +54,11 @@ public final class ShamirCombiner {
     	 * 6 - 7353716211053105688922884299153664087565376
     	 */
     	
-    	CombineInput input = CombineInput.buildCombineInput();
-        CombineOutput output = input.output();
-
-        output.print(ps);
+    	CombineInput combinedInput = CombineInput.buildCombineInput();
+        String secret = combinedInput.output();
         
-        try {
-			original_value = os.toString("UTF8");
-		} catch (UnsupportedEncodingException e) {
-			original_value = "error";
-		}
-        
-        return original_value;
+        return secret;
 
-    }
-
-
-
-    private static BigInteger parseBigInteger(String argname, String[] args, int index) {
-        return ShamirSplitter.parseBigInteger(argname, args, index);
-    }
-
-    private static Integer parseInt(String argname, String[] args, int index) {
-        return ShamirSplitter.parseInt(argname, args, index);
     }
 
     public static class CombineInput {
@@ -182,37 +163,7 @@ public final class ShamirCombiner {
             return new PublicInfo(this.n, this.k, this.modulus, "MainCombine:" + where);
         }
 
-        //  Share (x:2) = bigintcs:005468-69732d-4e02c5-7b11d2-9d4426-e26c88-8a6f94-9809A9
-        private int parseXcolon(String line) {
-            String i = after(line, ":");
-            int end = i.indexOf(")");
-            i = i.substring(0, end);
-
-            return Integer.valueOf(i);
-        }
-
-        private String after(String line, String lookfor) {
-            return line.substring(line.indexOf(lookfor) + 1).trim();
-        }
-
-        private Integer parseEqualInt(String fieldname, String line) {
-            String s = after(line, "=");
-            return Integer.valueOf(s);
-        }
-
-        private static void checkRequired(String argname, Object obj) {
-            if (obj == null)
-            {
-                throw new SecretShareException("Argument '" + argname + "' is required.");
-            }
-        }
-
-        // ==================================================
-        // public methods
-        // ==================================================
-        public CombineOutput output() {
-            CombineOutput ret = new CombineOutput();
-            ret.combineInput = this;
+        public String output() {
 
             // it is a "copy" since it should be equal to this.publicInfo
             PublicInfo copyPublicInfo = constructPublicInfoFromFields("output");
@@ -221,32 +172,13 @@ public final class ShamirCombiner {
 
             SecretShare.CombineOutput combine = secretShare.combine(shares);
 
-            ret.secret = combine.getSecret();
-
-            return ret;
+            String s = BigIntUtilities.Human.createHumanString(combine.getSecret());
+           
+            return s;
         }
 
-        // ==================================================
-        // non public methods
-        // ==================================================
     }
 
-    public static class CombineOutput {
-        private BigInteger secret;
-
-        private SecretShare.CombineOutput combineOutput;
-        private CombineInput combineInput;
-
-        public void print(PrintStream out) {
-
-            out.println("secret.number = '" + secret + "'");
-            String s = BigIntUtilities.Human.createHumanString(secret);
-            out.println("secret.string = '" + s + "'");
-
-        }
-
-
-    }
 
 
 }
