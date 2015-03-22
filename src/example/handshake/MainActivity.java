@@ -101,6 +101,9 @@ public class MainActivity extends Activity {
     private boolean messageSending = false;
     private boolean sendToAnybody = true;
     
+    private boolean EnableSendID;
+    private boolean EnableReceiveID;
+    
     private Map<String, byte[]> hashToKey;
     private Map<String, byte[]> hashToPayload;
     
@@ -284,8 +287,6 @@ public class MainActivity extends Activity {
 			if (msg_signature == null) {
 				msg_signature = "";
 			}
-			
-			logMessage("(" + recipient_name + ") " + msg_content);
 			
 			// inefficient way to get peer stuff
 			for (BlePeer p: bleFriends.values()) {
@@ -702,28 +703,20 @@ public class MainActivity extends Activity {
 				}
 				
 			} else if (mt == 2) {
-				logMessage("a: received raw msg of size:" + String.valueOf(payload.length));
 				
-				if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
-					logMessage("a: message is for us (as follows, next line):");
-					logMessage(new String(payload));
-				} else {
-					logMessage("a: message isn't for us");
-				}
+				// TODO: store in database
+				logMessage("message recvd of size " + String.valueOf(payload.length));
+
 				
-				Log.v(TAG, "received data msg, payload size:"+ String.valueOf(payload.length));
 			} else if (mt == 20) {
-				logMessage("a: received encrypted msg of size:" + String.valueOf(payload.length));
-				Log.v(TAG, "received encrypted msg, payload size:"+ String.valueOf(payload.length));
+				logMessage("received encrypted msg of size:" + String.valueOf(payload.length));
 				
 				// payload might be padded with zeroes, strip out trailing null bytes
 				payload = ByteUtilities.trimmedBytes(payload);
 				
 				// load this payload into our hash to payload lookup
 				hashToPayload.put(ByteUtilities.bytesToHex(messageHash), payload);
-				
 
-				
 				Log.v("DOIT", "encrypted payload: " + ByteUtilities.bytesToHex(payload));
 				
 				byte[] aesKeyBytes = hashToKey.get(ByteUtilities.bytesToHex(messageHash));
@@ -760,8 +753,7 @@ public class MainActivity extends Activity {
 				}
 				
 			} else if (mt == 21) {
-				logMessage("a: received encrypted key of size:" + String.valueOf(payload.length));
-				Log.v(TAG, "received encrypted key, payload size:"+ String.valueOf(payload.length));
+				logMessage("received encrypted key of size:" + String.valueOf(payload.length));
 				
 				byte[] incomingMessageHash = processIncomingKeyMsg(payload);
 				
@@ -770,9 +762,9 @@ public class MainActivity extends Activity {
 				byte[] encryptedPayload = hashToPayload.get(ByteUtilities.bytesToHex(incomingMessageHash));
 				
 				if (encryptedPayload != null ) {
-					logMessage("a: found encrypted payload for the key we just got");
+					logMessage("found encrypted payload for the key we just got");
 				} else {
-					logMessage("a: NO encrypted payload found for this new key");
+					logMessage("NO encrypted payload found for this new key");
 				}
 				
 			} else if (mt == 90) {
@@ -985,42 +977,7 @@ public class MainActivity extends Activity {
 		
 	}
 	
-	private byte[] benchGenerateMessage(int MessageSize) {
-		// get the lorem text from file
-		byte[] bytesLorem = null;
-		byte[] bytesMessage = null;
-		InputStream is = getResources().openRawResource(R.raw.lorem);
-    			
-		int currentMessageLength = 0;
-		int maxcount = 0;
-		
-		while ((currentMessageLength < MessageSize) && maxcount < 1000) {
-			maxcount++;
-	    	try {
-	    		if (currentMessageLength == 0) {
-	    			bytesMessage = ByteStreams.toByteArray(is);
-	    		}
-	    		is.reset();
-	    		bytesLorem = ByteStreams.toByteArray(is);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-	    	
-	    	try {
-				is.reset();
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-	    	
-	    	bytesMessage = Bytes.concat(bytesMessage, bytesLorem);
-	    	
-	    	currentMessageLength = bytesMessage.length;
-    	
-		}
-		
-		return Arrays.copyOf(bytesMessage, MessageSize);
-	}
+
 	
 	private String getUserName(ContentResolver cr) {
         

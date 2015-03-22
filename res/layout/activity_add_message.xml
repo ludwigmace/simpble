@@ -40,13 +40,40 @@
         android:layout_height="wrap_content"
         android:text="@string/chk_encrypt" />
         
-        
+		        
+   	    </LinearLayout>
+    
+   <LinearLayout 
+    android:id="@+id/nextrow_msgsize" 
+    android:layout_height="wrap_content" 
+    android:layout_width="fill_parent">
+   	    
+
+	    <Button
+	        android:id="@+id/btn_gen_msg_of_size"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:text="@string/gen_arbitary_msg"
+	        android:onClick="handleButtonGenArbitraryMsg"
+	        android:enabled="true" />   
+   
+   	    <EditText
+	        android:id="@+id/message_size"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:ems="10"
+	        android:maxLength="7"
+	        />
+   	    
+	    
+		        
    	    </LinearLayout>
     
     <LinearLayout 
     android:id="@+id/nextrow_friendmsg" 
     android:layout_height="wrap_content" 
-    android:layout_width="fill_parent">
+    android:layout_width="fill_parent"
+    android:orientation="vertical">
    
 		<TextView
 	        android:id="@+id/friend_fp_caption"
@@ -57,9 +84,9 @@
         
    	    <EditText
 	        android:id="@+id/message_content"
-	        android:layout_width="wrap_content"
+	        android:layout_width="match_parent"
 	        android:layout_height="wrap_content"
-	        android:ems="10"
+	        android:ems="8"
 	        android:maxLines="20"
 	        android:inputType="textMultiLine"
 	        />

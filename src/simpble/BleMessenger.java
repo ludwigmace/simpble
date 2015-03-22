@@ -395,6 +395,7 @@ public class BleMessenger {
 	    			if (peer.ConnectedAs.equalsIgnoreCase("central")) {
 	    				Thread.sleep(100);
 	    				flag_sent = bleCentral.submitCharacteristicWriteRequest(peerAddress, uuidFromBase("101"), nextPacket);
+	    				Log.v(TAG, "writing packet #" + i);
 	    			} else {
 	    				flag_sent = blePeripheral.updateCharValue(uuid, nextPacket);
 	    			}
@@ -406,7 +407,7 @@ public class BleMessenger {
 	    		}
 	    		
 			}  catch (Exception e) {
-    			Log.v(TAG, "packet send error: " + e.getMessage());
+    			Log.e(TAG, "packet send error: " + e.getMessage());
     			bleStatusCallback.headsUp("m: packet send error");
     		}
 			

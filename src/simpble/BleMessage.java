@@ -255,9 +255,6 @@ public class BleMessage {
 		
 		byte[] MessageBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
 		
-		Log.v(TAG, "b: " + ByteUtilities.bytesToHex(MessageBytes));
-		Log.v(TAG, "s: " + new String(MessageBytes));
-		
 	    // get a digest for the message, to define it
         MessageDigest md = null;
         

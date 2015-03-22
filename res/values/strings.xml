@@ -33,7 +33,7 @@
 	<string name="action_show_secrets">Show Secrets</string>
 	<string name="caption_mark_unsent">Mark Unsent</string>
 	<string name="caption_secret_combine">Combine Shares</string>
-	
+	<string name="gen_arbitary_msg">Create Msg of Size -></string>
 	
 	<string-array name="shares_total">
 	    <item>2</item>

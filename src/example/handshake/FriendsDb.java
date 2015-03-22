@@ -91,6 +91,23 @@ public class FriendsDb extends SQLiteOpenHelper {
     }
 
     /**
+     * Scaffold constants for what  mode we want to be in, sending, receiving, id-friendly, etc
+     */
+    public void createDefaultConstants() {
+    	
+        ContentValues initialValues = new ContentValues();
+        
+        initialValues.put(KEY_C_CONSTANT, "send_id");
+        initialValues.put(KEY_C_VALUE, "true");
+        mDb.insert(CONSTANTS_TABLE, null, initialValues);
+        
+        initialValues.put(KEY_C_CONSTANT, "get_id");
+        initialValues.put(KEY_C_VALUE, "true");
+        mDb.insert(CONSTANTS_TABLE, null, initialValues);
+        
+    }
+    
+    /**
      * Create a new friend using the name and fp provided. If the friend is
      * successfully created return the new rowId for that friend, otherwise return
      * a -1 to indicate failure.

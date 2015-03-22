@@ -17,6 +17,7 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 
+import bench.MessageUtils;
 import simpble.ByteUtilities;
 import android.app.Activity;
 import android.app.LoaderManager;
@@ -43,6 +44,7 @@ public class AddMessageActivity extends Activity  {
 	private static final String TAG = "AddMessageActivity";
 	
 	EditText messageContent;
+	EditText messageSize;
 	Spinner friendSpinner;
 	CheckBox chkEncrypt;
 	
@@ -65,6 +67,9 @@ public class AddMessageActivity extends Activity  {
         
 		friendSpinner = (Spinner) findViewById(R.id.friend_spinner);
 		messageContent = (EditText) findViewById(R.id.message_content);
+		messageSize = (EditText) findViewById(R.id.message_size);
+		
+		messageSize.setText("1114095");
 		
 		mAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 		
@@ -82,13 +87,19 @@ public class AddMessageActivity extends Activity  {
     
 
 	public void handleButtonQueueMsg(View view) {
+		
+		String msg_content = messageContent.getText().toString();
+		
+		queueMsg(msg_content);
+	}
 
+	
+	private void queueMsg(String msgContent) {
+		
 		String msgtype = "";
 		if (chkEncrypt.isChecked()) {
 			msgtype = "encrypted";
 		}
-		
-		String msg_content = messageContent.getText().toString();
 		
 		Cursor cursorFriends = (Cursor) friendSpinner.getSelectedItem();
 
@@ -99,10 +110,10 @@ public class AddMessageActivity extends Activity  {
 		mDbHelper = new FriendsDb(this);
 		
 		long new_msg_id = 0;
-		String msgSignature = ByteUtilities.digestAsHex(msg_content + msgtype + friend_name);
+		String msgSignature = ByteUtilities.digestAsHex(msgContent + msgtype + friend_name);
 		
 		try {			
-			new_msg_id = mDbHelper.queueMsg(friend_name, msg_content, msgtype, msgSignature);
+			new_msg_id = mDbHelper.queueMsg(friend_name, msgContent, msgtype, msgSignature);
 		} catch (Exception x) {
 			Log.v(TAG, "can't add msg " + x.getMessage());
 			Toast.makeText(this, x.getMessage(), Toast.LENGTH_SHORT).show();
@@ -113,6 +124,20 @@ public class AddMessageActivity extends Activity  {
 		Toast.makeText(this, "created msg with id " + String.valueOf(new_msg_id), Toast.LENGTH_SHORT).show();
 		
 		this.finish();
+	}
+	
+	public void handleButtonGenArbitraryMsg(View view) {
+		MessageUtils utils = new MessageUtils(this);
+		
+		String msgsize = messageSize.getText().toString();
+		
+		int size = Integer.valueOf(msgsize);
+		byte[] generatedText = utils.GenerateMessage(size);
+		
+		String msgText = new String(generatedText);
+		
+		queueMsg(msgText);
+		
 		
 	}
     
