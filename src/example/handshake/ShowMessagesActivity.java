@@ -1,5 +1,8 @@
 package example.handshake;
 
+import java.util.ArrayList;
+
+import secretshare.ShamirCombiner;
 import simpble.ByteUtilities;
 import android.app.Activity;
 import android.app.LoaderManager;
@@ -11,6 +14,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
+import android.util.SparseArray;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -106,10 +110,56 @@ public class ShowMessagesActivity extends Activity implements LoaderManager.Load
 				showMessage("nothing happened");
 			}
 			
+			mDbHelper.close();
+			
 		}
 		
 		if (id == R.id.action_secret_combine) {
 			// pass in the current_msg id to pull the topic; then the topic to get all the shares to rebuild and display
+			String topicName = "";
+			
+			FriendsDb mDbHelper = new FriendsDb(getApplicationContext());
+			
+			topicName = mDbHelper.getTopicForMsg(current_msg);
+
+			String share_threshold = "";
+			SparseArray<String> shares = new SparseArray<String>();
+			
+			try {
+				ArrayList<String> sharesRaw = mDbHelper.getMsgSharesForTopic(topicName);
+				
+				for (String s: sharesRaw) {
+					share_threshold = s.substring(0,1);
+		    		String counter_as_string = s.substring(1, 2);
+		    		int counter = Integer.valueOf(counter_as_string);
+		    		
+		    		// the first index is the threshold, the second is the share#, and the next 40 chars are the digest
+		    		String shareText = s.substring(42);
+		    		byte[] b = shareText.getBytes();
+		    		b = ByteUtilities.trimmedBytes(b);
+		    		shareText = new String(b);
+		    		
+		    		shares.append(counter, shareText);
+		    		
+				}
+			} catch (Exception x) {
+				Log.v(TAG, "problem building shares");
+			}
+
+	        String result = "";
+			
+	        if (share_threshold.length() > 0 && shares.size() > 1) {
+				try {	
+					ShamirCombiner combineMsg = new ShamirCombiner();
+					result = combineMsg.Workin(Integer.valueOf(share_threshold), shares);
+				} catch (Exception x) {
+					result = "err!";
+				}
+	        } else {
+	        	result = "wrong deal";
+	        }
+			
+			Toast.makeText(this, result, Toast.LENGTH_LONG).show();
 		}	
     
     	

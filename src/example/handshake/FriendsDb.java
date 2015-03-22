@@ -136,6 +136,7 @@ public class FriendsDb extends SQLiteOpenHelper {
 				KEY_M_MSGID + " = ?", new String[] {msgid}, null, null, null);
     }
     
+    
     public Cursor fetchMsgs() {
 		return mDb.query(MSGS_TABLE, new String[] {KEY_M_ROWID, KEY_M_FNAME, KEY_M_CONTENT, KEY_M_MSGTYPE, KEY_M_MSGID},
 				null, null, null, null, null);
@@ -250,6 +251,25 @@ public class FriendsDb extends SQLiteOpenHelper {
         
         return mDb.update(MSGS_TABLE, args, criteria, null) > 0;
     }
+    
+    public String getTopicForMsg(long id) {
+    	String result = "";
+    	
+    	Cursor c = mDb.query(MSGS_TABLE, new String[] {KEY_M_FNAME},
+				KEY_M_ROWID + " = " + String.valueOf(id), null, null, null, null);
+    	
+    	if (c.getCount() > 0) {
+    		c.moveToFirst();
+    		
+    		result = c.getString(0);
+    	}
+    	
+    	
+    	
+    	return result;
+    	
+    }    
+    
     
     public ArrayList<String> topicsSentToRecipient(String recipient_fp) {
     	

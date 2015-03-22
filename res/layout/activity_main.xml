@@ -59,14 +59,6 @@
 	        android:text="@string/caption_toggle_busy"
 	        android:onClick="handleButtonToggleBusy"
 	        android:enabled="true" />
-	    	    
-	    <Button
-	        android:id="@+id/show_combined_shares"
-	        android:layout_width="wrap_content"
-	        android:layout_height="wrap_content"
-	        android:text="@string/caption_show_combined_shares"
-	        android:onClick="handleButtonShowCombinedShares"
-	        android:enabled="true" />
 	    
 		<Button
 	        android:id="@+id/startpair"

@@ -81,7 +81,6 @@ public class MainActivity extends Activity {
 	TextView statusText;
 	
 	private Button btnAdvertise;
-	private Button btnShow;
 	
 	private boolean visible;
 	
@@ -146,9 +145,6 @@ public class MainActivity extends Activity {
 		
 		// get a pointer to our Be A Friend button, and our transfer packet button
 		btnAdvertise = (Button)findViewById(R.id.be_a_friend);
-		
-		// show a shamir msg
-		btnShow = (Button)findViewById(R.id.show_combined_shares);
 		
 		// because this is using BLE, we'll need to get the adapter and manager from the main context and thread 
 		btMgr = (BluetoothManager) this.getSystemService(Context.BLUETOOTH_SERVICE);
@@ -467,11 +463,6 @@ public class MainActivity extends Activity {
 
 		if (id == R.id.action_show_msgs) {
 	        Intent i = new Intent(this, ShowMessagesActivity.class);
-	        startActivityForResult(i, ACTIVITY_CREATE);
-		}
-		
-		if (id == R.id.action_show_secrets) {
-	        Intent i = new Intent(this, ShowSecretsActivity.class);
 	        startActivityForResult(i, ACTIVITY_CREATE);
 		}
 		
@@ -938,44 +929,6 @@ public class MainActivity extends Activity {
 		
 	}
 	
-		
-	public void handleButtonShowCombinedShares(View view) {
-		Log.v(TAG, "Start Get ID");
-		
-		String topicName = "foof";
-		
-		ArrayList<String> sharesRaw = mDbHelper.getMsgSharesForTopic(topicName);
-	
-		SparseArray<String> shares = new SparseArray<String>();
-		
-		String share_threshold = "";
-		
-		for (String s: sharesRaw) {
-			share_threshold = s.substring(0,1);
-    		String counter_as_string = s.substring(1, 2);
-    		int counter = Integer.valueOf(counter_as_string);
-    		
-    		// the first index is the threshold, the second is the share#, and the next 40 chars are the digest
-    		String shareText = s.substring(42);
-    		byte[] b = shareText.getBytes();
-    		b = ByteUtilities.trimmedBytes(b);
-    		shareText = new String(b);
-    		
-    		shares.append(counter, shareText);
-    		
-		}
-		
-		
-			
-        ShamirCombiner combineMsg = new ShamirCombiner();
-        
-        String result = "";
-        
-        result = combineMsg.Workin(Integer.valueOf(share_threshold), shares);
-		
-		Toast.makeText(this, result, Toast.LENGTH_LONG).show();
-		
-	}
 	
 	public void handleButtonToggleBusy(View view) {
 		
