@@ -43,12 +43,6 @@ public class BleMessage {
 	
 	public byte MessageType;
 	
-	// sha1 of public key for recipient
-	public byte[] RecipientFingerprint;
-	
-	// sha1 of public key for sender
-	public byte[] SenderFingerprint;
-	
 	// truncated sha1 of message; carried in Packet 0 of every message
 	public byte[] MessageHash;
 	
@@ -208,11 +202,9 @@ public class BleMessage {
 		}
         
         
-        byte[] MessageBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
-        
         // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
         // (i want my digest to be the packet size less the 5 bytes needed for header info)
-        byte[] calcDigest = Arrays.copyOfRange(md.digest(ByteUtilities.trimmedBytes(MessageBytes)), 0, MessagePacketSize - 5);
+        byte[] calcDigest = Arrays.copyOfRange(md.digest(ByteUtilities.trimmedBytes(allBytes)), 0, MessagePacketSize - 5);
 		
 		//return ByteUtilities.bytesToHexShort(calcDigest);
         
@@ -233,34 +225,14 @@ public class BleMessage {
 			e.printStackTrace();
 		}
         
-        
-        byte[] MessageBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
-        
+       
         // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
         // (i want my digest to be the packet size less the 5 bytes needed for header info)
-        return Arrays.copyOfRange(md.digest(ByteUtilities.trimmedBytes(MessageBytes)), 0, MessagePacketSize - 5);
+        return Arrays.copyOfRange(md.digest(ByteUtilities.trimmedBytes(allBytes)), 0, MessagePacketSize - 5);
 		
 	}
 	
-	
-	/**
-	 * Sets the MessagePayload class variable to the bytes you pass in.  Combines the MessageType, RecipientFP,
-	 * SenderFP, and MessagePayload, and stores into allBytes.  Constructs a SHA1 hash based on
-	 * this, strips off the last 5 bytes, and stores this value in MessageHash.
-	 * 
-	 * @param Payload
-	 */
-	public void setPayload(byte[] Payload) {
-		MessagePayload = Payload;
-		
-		allBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
-		
-        // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
-        // (i want my digest to be the packet size less the 5 bytes needed for header info)
-		MessageHash  = Arrays.copyOfRange(ByteUtilities.digestAsBytes(allBytes), 0, MessagePacketSize - 5);
-        
-		
-	}
+
 	
 	/**
 	 * Takes the message payload from the calling method and builds the list
@@ -277,17 +249,13 @@ public class BleMessage {
 		// next 20 bytes are sender fingerprint
 		// final arbitrary bytes are the payload
 		
-		
-		// Message Type, RFP, SFP, and payload
-		byte[] MessageBytes = Bytes.concat(new byte[] {MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
-		
 		// clear the list of packets; we're building a new message using packets!
         messagePackets.clear();
         
         // how many packets?  divide msg length by packet size, w/ trick to round up
         // so the weird thing is we've got to leave a byte in each msg, so effectively our
         // msg blocks are decreased by an extra byte, hence the -4 and -3 below
-        int msgCount  = (MessageBytes.length + MessagePacketSize - 4) / (MessagePacketSize - 3);
+        int msgCount  = (allBytes.length + MessagePacketSize - 4) / (MessagePacketSize - 3);
         
         // first byte is counter; 0 provides meta info about msg
         // right now it's just how many packets to expect
@@ -326,7 +294,7 @@ public class BleMessage {
 			int currentReadIndex = ((msgSequence - 1) * (MessagePacketSize - 3));
 		
 			// leave room for the message counters (the -3 at the end)
-			byte[] val = Arrays.copyOfRange(MessageBytes, currentReadIndex, currentReadIndex + MessagePacketSize - 3);
+			byte[] val = Arrays.copyOfRange(allBytes, currentReadIndex, currentReadIndex + MessagePacketSize - 3);
 
 			// the current packet counter is the message sequence, in two bytes
 	        byte[] currentPacketCounter = new byte[2];
@@ -393,34 +361,6 @@ public class BleMessage {
 	}
 
 	
-	private boolean BuildMessageDetails(byte[] RawBytes) {
-		
-		boolean success = false;
-		
-		/*
-		 * - message type
-		 * - recipient fingerprint
-		 * - sender fingerprint
-		 * - hash/mic
-		 * - payload
-		 */
-		
-		if (RawBytes != null) {
-			// we need this to be 41+ bytes
-			if (RawBytes.length > 41) {
-			
-				MessageType = Arrays.copyOfRange(RawBytes, 0, 1)[0]; // byte 0
-				RecipientFingerprint = Arrays.copyOfRange(RawBytes, 1, 21); // bytes 1-20
-				SenderFingerprint = Arrays.copyOfRange(RawBytes, 21, 41); // bytes 21-40
-				MessagePayload = Arrays.copyOfRange(RawBytes, 41, RawBytes.length+1); //bytes 41 through end
-	
-				success = true;
-			}
-		}
-		
-		return success;
-		
-	}
 
 	// make sure all the packets are there, and in the right order
 	public ArrayList<Integer> GetMissingPackets() {
@@ -467,12 +407,7 @@ public class BleMessage {
 		boolean success = false;
 		
 		allBytes = RawMessageBytes;
-        // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
-        // (i want my digest to be the packet size less the 5 bytes needed for header info)
-		MessageHash  = Arrays.copyOfRange(ByteUtilities.digestAsBytes(allBytes), 0, MessagePacketSize - 5);
-		
-		success = BuildMessageDetails(RawMessageBytes);
-		
+
 		return success;
 	}
 	
