@@ -252,26 +252,12 @@ public class BleApplicationMessage {
 	public void setPayload(byte[] Payload) {
 		MessagePayload = Payload;
 		
-		byte[] MessageBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
+		allBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
 		
-	    // get a digest for the message, to define it
-        MessageDigest md = null;
-        
-        try {
-			md = MessageDigest.getInstance("SHA-1");
-		} catch (NoSuchAlgorithmException e) {
-
-			e.printStackTrace();
-		}
-        
         // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
         // (i want my digest to be the packet size less the 5 bytes needed for header info)
-        byte[] myDigest = Arrays.copyOfRange(md.digest(MessageBytes), 0, MessagePacketSize - 5);
-        
-        // set our global variable for the hash to this digest
-        MessageHash = myDigest;
-		
-		
+		MessageHash  = Arrays.copyOfRange(ByteUtilities.digestAsBytes(allBytes), 0, MessagePacketSize - 5);
+     	
 	}
 	
 	/**
@@ -479,6 +465,9 @@ public class BleApplicationMessage {
 		boolean success = false;
 		
 		allBytes = RawMessageBytes;
+        // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
+        // (i want my digest to be the packet size less the 5 bytes needed for header info)
+		MessageHash  = Arrays.copyOfRange(ByteUtilities.digestAsBytes(allBytes), 0, MessagePacketSize - 5);
 		
 		success = BuildMessageDetails(RawMessageBytes);
 		

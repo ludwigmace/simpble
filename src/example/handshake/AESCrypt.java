@@ -41,7 +41,6 @@ public AESCrypt(byte[] EncryptionKeyRawBytes, byte[] iV) throws Exception
 
 private AlgorithmParameterSpec getIV()
 {
-    //byte[] iv = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, };
     IvParameterSpec ivParameterSpec;
     ivParameterSpec = new IvParameterSpec(initVector);
 
@@ -52,25 +51,14 @@ public byte[] encrypt(byte[] BytesToEncrypt) throws Exception
 {	
 	int msglength = BytesToEncrypt.length;
 	
-	// let's make this thing at least 16
-	/*
-	if (BytesToEncrypt.length < 16) {
-		BytesToEncrypt = Arrays.copyOf(BytesToEncrypt, 16);
-	}*/
-
+	// pad to at least 16 bytes
 	if ((msglength % 16) != 0) {
 		int pad = 16 - (msglength % 16);
 		BytesToEncrypt = Arrays.copyOf(BytesToEncrypt, msglength + pad);
 	}
 	
-	
     cipher.init(Cipher.ENCRYPT_MODE, key, spec);
     byte[] encrypted = cipher.doFinal(BytesToEncrypt);
-
-    Log.v(TAG, "plainmsg:" + new String(BytesToEncrypt));
-    Log.v(TAG, "encrypting bytes:" + ByteUtilities.bytesToHex(BytesToEncrypt));
-    Log.v(TAG, "using key:" + ByteUtilities.bytesToHex(key.getEncoded()));
-    //String encryptedText = new String(Base64.encode(encrypted, Base64.DEFAULT), "UTF-8");
 
     return encrypted;
 }

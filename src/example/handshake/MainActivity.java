@@ -31,9 +31,9 @@ import javax.crypto.spec.SecretKeySpec;
 
 import secretshare.ShamirCombiner;
 import secretshare.ShamirSplitter;
-import simpble.BleMessage;
+import simpble.BleApplicationMessage;
+import simpble.BleApplicationPeer;
 import simpble.BleMessenger;
-import simpble.BlePeer;
 import simpble.BleStatusCallback;
 import simpble.ByteUtilities;
 
@@ -73,7 +73,7 @@ public class MainActivity extends Activity {
 	// maybe for these guys I should leave these inside of the BleMessenger class?
 	// because if I reference a BlePeer from here, I'm not hitting up the same memory address in BleMessenger 
 	
-	Map <String, BlePeer> bleFriends;  // folks whom i have previously connected to, or i have their id info	
+	Map <String, BleApplicationPeer> bleFriends;  // folks whom i have previously connected to, or i have their id info	
 	
 	String myFingerprint;
 	String myIdentifier;
@@ -258,13 +258,13 @@ public class MainActivity extends Activity {
 	private void PopulateFriendsAndMessages() {
 		
 		// let's build our friends that we've got stored up in the database
-		bleFriends = new HashMap<String, BlePeer>();
+		bleFriends = new HashMap<String, BleApplicationPeer>();
 		
 		Cursor c = mDbHelper.fetchAllFriends();
 		
 		while (c.moveToNext()) {
 			
-			BlePeer new_peer = new BlePeer("");
+			BleApplicationPeer new_peer = new BleApplicationPeer("");
 			
 			String peer_name = c.getString(c.getColumnIndex(FriendsDb.KEY_F_NAME));
 			String peer_fp = c.getString(c.getColumnIndex(FriendsDb.KEY_F_FP));
@@ -291,7 +291,7 @@ public class MainActivity extends Activity {
 		// loop over all our messages
 		while (c.moveToNext()) {
 
-			BleMessage appMsg = new BleMessage();
+			BleApplicationMessage appMsg = new BleApplicationMessage();
 			
 			String recipient_name = c.getString(c.getColumnIndex(FriendsDb.KEY_M_FNAME));
 			String msg_content = c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT));
@@ -303,7 +303,7 @@ public class MainActivity extends Activity {
 			}
 			
 			// inefficient way to get peer stuff
-			for (BlePeer p: bleFriends.values()) {
+			for (BleApplicationPeer p: bleFriends.values()) {
 
 				// if the peer in our friends list equals the name we've pulled out of the database for this message
 				if (p.GetName().equalsIgnoreCase(recipient_name)) {
@@ -377,7 +377,7 @@ public class MainActivity extends Activity {
 						appMsg.MessageType = (byte)(20 & 0xFF);  // just throwing out 20 as indicating an encrypted msg
 						appMsg.setPayload(msgbytes);
 						
-						BleMessage m_key = new BleMessage();
+						BleApplicationMessage m_key = new BleApplicationMessage();
 						
 						// get the fingerprint from the Friend object
 						m_key.RecipientFingerprint = p.GetFingerprintBytes();
@@ -394,7 +394,7 @@ public class MainActivity extends Activity {
 						byte[] aes_payload = Bytes.concat(appMsg.MessageHash, aesKeyEncrypted);
 						m_key.setPayload(aes_payload);
 						
-						p.addBleMessageOut(m_key);
+						p.addBleApplicationMessageOut(m_key);
 					
 					} else {
 						appMsg.MessageType = (byte)(2 & 0xFF);  // raw data is 2
@@ -402,7 +402,7 @@ public class MainActivity extends Activity {
 						
 					}
 					
-					p.addBleMessageOut(appMsg);
+					p.addBleApplicationMessageOut(appMsg);
 					
 					try {
 						msgHash = ByteUtilities.bytesToHex(appMsg.MessageHash).substring(0, 8);
@@ -506,7 +506,7 @@ public class MainActivity extends Activity {
 				// if we're willing to receive messages then we need to transmit our info to the other peer
 				if (messageReceiving) {
 					
-					BleMessage idenM = identityMessage();
+					BleApplicationMessage idenM = identityMessage();
 					String queuedMsg = "";
 					
 					if (idenM != null && EnableSendID) {
@@ -525,7 +525,7 @@ public class MainActivity extends Activity {
 
 				ourMostRecentFriendsAddress = peerIndex;
 				logMessage("a: connected to " + peerIndex);
-				BleMessage idenM = identityMessage();
+				BleApplicationMessage idenM = identityMessage();
 				String queuedMsg = "";
 				if (idenM != null && EnableSendID) {
 					queuedMsg = bleMessenger.peerMap.get(peerIndex).BuildBleMessageOut(idenM.GetAllBytes()).substring(0,8);
@@ -543,7 +543,7 @@ public class MainActivity extends Activity {
 				logMessage("a: connected to " + peerIndex);
 
 				// since i've just accepted a connection, queue up an identity message
-				BleMessage idenM = identityMessage();
+				BleApplicationMessage idenM = identityMessage();
 				String queuedMsg = "";
 				
 				if (idenM != null && EnableSendID) {
@@ -560,7 +560,7 @@ public class MainActivity extends Activity {
 				logMessage("a: connected to " + peerIndex);
 
 				// since i've just accepted a connection, queue up an identity message
-				BleMessage idenM = identityMessage();
+				BleApplicationMessage idenM = identityMessage();
 				String queuedMsg = "";
 				
 				if (idenM != null && EnableSendID) {
@@ -592,7 +592,7 @@ public class MainActivity extends Activity {
 					logMessage("!" + notification);
 				}
 
-				BleMessage sentMsg = new BleMessage();
+				BleApplicationMessage sentMsg = new BleApplicationMessage();
 				
 				sentMsg.SetRawBytes(bleMessenger.peerMap.get(peerIndex).getBleMessageOut(msg_id).GetAllBytes());
 				
@@ -619,7 +619,7 @@ public class MainActivity extends Activity {
 		//public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, byte msgType, byte[] messageHash) {
 		public void handleReceivedMessage(String remoteAddress, byte[] MessageBytes) {
 
-			BleMessage incomingMsg = new BleMessage();
+			BleApplicationMessage incomingMsg = new BleApplicationMessage();
 			
 			boolean bMessageBuilt = incomingMsg.SetRawBytes(MessageBytes);
 			
@@ -661,7 +661,7 @@ public class MainActivity extends Activity {
 				 * */
 				if (sendToAnybody) {
 					
-					BleMessage mTopic = null;
+					BleApplicationMessage mTopic = null;
 					
 					try {
 					// TODO: consider location as well
@@ -673,7 +673,7 @@ public class MainActivity extends Activity {
 					if (mTopic != null) { 
 						
 						String queuedMsg = "";
-						queuedMsg = bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(mTopic).substring(0,8);
+						queuedMsg = bleMessenger.peerMap.get(remoteAddress).BuildBleMessageOut(mTopic.GetAllBytes()).substring(0,8);
 						
 						logMessage("a5: queued " + queuedMsg + " for " + remoteAddress);
 						ourMostRecentFriendsAddress = remoteAddress;
@@ -696,7 +696,7 @@ public class MainActivity extends Activity {
 
 					// queue up all the messages we've got for this dude
 					for (int i = 0; i < bleFriends.get(senderFingerprint).GetMessagesOut().size(); i++) {
-						BleMessage m = bleFriends.get(senderFingerprint).GetMessagesOut().get(i);
+						BleApplicationMessage m = bleFriends.get(senderFingerprint).GetMessagesOut().get(i);
 
 						String queuedMsg = "";
 						
@@ -823,31 +823,11 @@ public class MainActivity extends Activity {
 			}
 			
 		}
-		
-		@Override
-		public void messageSent(byte[] MessageHash, BlePeer blePeer) {
-			logMessage("a: message sent to " + blePeer.GetFingerprint().substring(0,20));
-			
-			// maybe add re-check of sending next message on UI thread?
-		}
+
 
 		@Override
 		public void remoteServerAdded(String serverName) {
 			showMessage(serverName);
-		}
-
-		@Override
-		public void foundPeer(BlePeer blePeer) {
-			final String peerName = blePeer.GetName(); 
-			
-            runOnUiThread(new Runnable() {
-
-                @Override
-                public void run() {
-                	showMessage("peer found:" + peerName);
-                }
-            });
-			
 		}
 
 		@Override
@@ -1088,18 +1068,18 @@ public class MainActivity extends Activity {
 	 * @param candidateFingerprint The PukFP of the person we're ensure only gets a single share of a particular topic
 	 * @return A message in a BleMessage object 
 	 */
-	private BleMessage GetUnsentEligibleTopicMessage(String candidateFingerprint) {
+	private BleApplicationMessage GetUnsentEligibleTopicMessage(String candidateFingerprint) {
 		
 		// topic messages eligible to go to this recipient
 		Cursor c = mDbHelper.topicsNotSentToRecipient(candidateFingerprint);
 		
-		BleMessage m = null; 
+		BleApplicationMessage m = null; 
 		
 		if (c.getCount() > 0) {
 			c.moveToFirst();
 			
 			// found an eligible message in the database, so build it for the application
-			m = new BleMessage();
+			m = new BleApplicationMessage();
 			
 			String recipient_name = c.getString(c.getColumnIndex(FriendsDb.KEY_M_FNAME));
 			String msg_content = c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT));
@@ -1133,8 +1113,8 @@ public class MainActivity extends Activity {
 	}
 	
 	// creates a message formatted for identity exchange
-	private BleMessage identityMessage() {
-		BleMessage m = new BleMessage();
+	private BleApplicationMessage identityMessage() {
+		BleApplicationMessage m = new BleApplicationMessage();
 		m.MessageType = (byte)1 & 0xFF;
 		m.SenderFingerprint = rsaKey.PuFingerprint();
 		m.RecipientFingerprint = new byte[20];

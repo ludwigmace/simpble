@@ -3,14 +3,9 @@ package simpble;
 import java.util.UUID;
 
 public interface BleStatusCallback {
-
-	public void messageSent(byte[] MessageHash, BlePeer blePeer);
 	
 	public void remoteServerAdded(String serverName);
 	
-	public void foundPeer(BlePeer blePeer);
-	
-	//public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, byte msgType, byte[] messageHash);
 	public void handleReceivedMessage(String remoteAddress, byte[] MessageBytes);
 	
 
