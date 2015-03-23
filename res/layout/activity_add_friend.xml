@@ -18,7 +18,7 @@
 	        android:id="@+id/friend_name_caption"
 	        android:layout_width="wrap_content"
 	        android:layout_height="wrap_content"
-	        android:text="Friend Name:"
+	        android:text="Name:"
 	        android:textAppearance="?android:attr/textAppearanceSmall" />
         
    	    <EditText
@@ -49,6 +49,7 @@
 	        android:layout_width="wrap_content"
 	        android:layout_height="wrap_content"
 	        android:text="FP:"
+	        android:textSize="10sp"
 	        android:textAppearance="?android:attr/textAppearanceSmall" />
         
    	    <EditText
@@ -65,7 +66,8 @@
     <LinearLayout 
     android:id="@+id/nextrow_friendpuk" 
     android:layout_height="wrap_content" 
-    android:layout_width="fill_parent">
+    android:layout_width="fill_parent"
+    android:orientation="vertical">
    
 		<TextView
 	        android:id="@+id/friend_puk_caption"
@@ -76,10 +78,10 @@
         
    	    <EditText
 	        android:id="@+id/friend_puk"
-	        android:layout_width="200dp"
+	        android:layout_width="wrap_content"
 	        android:layout_height="wrap_content"
-	        android:ems="10"
-	        android:maxLines="20"
+	        android:textSize="8sp"
+	        android:maxLines="50"
 	        android:inputType="textMultiLine"
 	        />
 

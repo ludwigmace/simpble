@@ -10,6 +10,7 @@ import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
@@ -326,36 +327,37 @@ public class MainActivity extends Activity {
 						// get our friend's public key from the friend's object
 						byte[] friendPuk = p.GetPublicKey();
 						
-						//TODO: make this a random encryption key
-						String encryption_key = "thisismydamnpassphrasepleaseacceptthisasthegodshonestthruthofmine!";
+						//make this a random encryption key
+						SecureRandom sr = new SecureRandom();
+						byte[] aeskey = new byte[32]; // 512 bit key
+						sr.nextBytes(aeskey);
+
+						// and random IV
+						byte[] iv = new byte[16];
+						sr.nextBytes(iv);
 						
 						AESCrypt aes = null;
 						
 						try {
-							aes = new AESCrypt(encryption_key.getBytes());
+							aes = new AESCrypt(aeskey, iv);
+
 						} catch (Exception e) {
 							Log.v(TAG, "can't instantiate AESCrypt");
 						}
 						
 						if (aes != null) {
-						
-							Log.v("DOIT", "encryption key raw: " + ByteUtilities.bytesToHex(encryption_key.getBytes()));
-							Log.v("DOIT", "encrypting bytes: " + ByteUtilities.bytesToHex(msg_content.getBytes()));
 							
 							try {
-								msgbytes = aes.encrypt(msg_content.getBytes());
+								// prepend the initialization vector to the encrypted payload
+								msgbytes = Bytes.concat(iv, aes.encrypt(msg_content.getBytes()));
 							} catch (Exception x) {
 								Log.v(TAG, "encrypt error: " + x.getMessage());
 							}
 							
 							if (msgbytes != null) {
-								Log.v("DOIT", "encrypted bytes: " + ByteUtilities.bytesToHex(msgbytes));
-								//Log.v("DOIT", "test decrypt bytes: " + ByteUtilities.bytesToHex(aes.decrypt(msgbytes)));
-								
 								// encrypt our encryption key using our recipient's public key 							
 								try {
-									aesKeyEncrypted = encryptedSymmetricKey(friendPuk, encryption_key);
-									Log.v(TAG, "encrypted key bytes: " + ByteUtilities.bytesToHex(aesKeyEncrypted));
+									aesKeyEncrypted = encryptedSymmetricKey(friendPuk, aeskey);
 								} catch (Exception e) {
 									Log.v(TAG, "couldn't encrypt aes key");	
 								}
@@ -389,7 +391,6 @@ public class MainActivity extends Activity {
 						// the payload needs to include the encrypted key, and the orig msg's fingerprint
 						// if the hash is a certain size, then we can assume the rest of the message is the
 						// encrypted portion of the aes key
-						logMessage("symmetric key " + ByteUtilities.bytesToHex(aesKeyEncrypted).substring(0,8));
 						byte[] aes_payload = Bytes.concat(m.MessageHash, aesKeyEncrypted);
 						m_key.setPayload(aes_payload);
 						
@@ -508,9 +509,9 @@ public class MainActivity extends Activity {
 					BleMessage idenM = identityMessage();
 					String queuedMsg = "";
 					
-					if (idenM != null) {
+					if (idenM != null && EnableSendID) {
 						queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM).substring(0,8);
-						logMessage("a1: queued " + queuedMsg + " for " + peerIndex);
+						logMessage("queued id msg for " + peerIndex);
 					}
 				}
 				
@@ -526,9 +527,9 @@ public class MainActivity extends Activity {
 				logMessage("a: connected to " + peerIndex);
 				BleMessage idenM = identityMessage();
 				String queuedMsg = "";
-				if (idenM != null) {
+				if (idenM != null && EnableSendID) {
 					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM).substring(0,8);
-					logMessage("a2: queued " + queuedMsg + " for " + peerIndex);
+					logMessage("queued id msg for " + peerIndex);
 					
 					// now let the other guy know you're ready to receive data
 					bleMessenger.initRequestForData(ourMostRecentFriendsAddress);
@@ -545,9 +546,9 @@ public class MainActivity extends Activity {
 				BleMessage idenM = identityMessage();
 				String queuedMsg = "";
 				
-				if (idenM != null) {
+				if (idenM != null && EnableSendID) {
 					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM).substring(0,8);
-					logMessage("a3: queued " + queuedMsg + " for " + peerIndex);
+					logMessage("queued id msg for " + peerIndex);
 				}
 				
 				// if you're a peripheral, you can't initiate message send until the peer has subscribed
@@ -562,9 +563,9 @@ public class MainActivity extends Activity {
 				BleMessage idenM = identityMessage();
 				String queuedMsg = "";
 				
-				if (idenM != null) {
+				if (idenM != null && EnableSendID) {
 					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM).substring(0,8);
-					logMessage("a4: queued " + queuedMsg + " for " + peerIndex);
+					logMessage("queued id msg for " + peerIndex);
 				}
 				
 				// if you're a peripheral, you can't initiate message send until the peer has subscribed
@@ -634,7 +635,7 @@ public class MainActivity extends Activity {
 			
 			
 			// this is an identity message so handle it as such
-			if (mt == 1) {
+			if (mt == BleMessenger.MSGTYPE_ID) {
 				Log.v(TAG, "received identity msg");
 								
 				if (recipientFingerprint.length() == 0) {
@@ -707,7 +708,7 @@ public class MainActivity extends Activity {
 						}						
 					}
 
-				} else {
+				} else if (EnableReceiveID) {  // if we actually care who this person is, then store their FP
 					logMessage("a: this guy's FP isn't known to me: " + senderFingerprint.substring(0,20));
 					
 			        Intent i = new Intent(ctx, AddFriendsActivity.class);
@@ -719,13 +720,13 @@ public class MainActivity extends Activity {
 					// parse the public key & friendly name out of the payload, and add this as a new person
 				}
 				
-			} else if (mt == 2) {
+			} else if (mt == BleMessenger.MSGTYPE_PLAIN) {
 				
 				// TODO: store in database
 				logMessage("message recvd of size " + String.valueOf(payload.length));
 
 				
-			} else if (mt == 20) {
+			} else if (mt == BleMessenger.MSGTYPE_ENCRYPTED_PAYLOAD) {
 				logMessage("received encrypted msg of size:" + String.valueOf(payload.length));
 				
 				// payload might be padded with zeroes, strip out trailing null bytes
@@ -745,12 +746,15 @@ public class MainActivity extends Activity {
 				
 					AESCrypt aes = null;
 					try {
-						aes = new AESCrypt(aesKeyBytes);
+						byte[] iv = Arrays.copyOf(payload, 16);
+						aes = new AESCrypt(aesKeyBytes, iv);
+						
 					} catch (Exception e) {
 						Log.v(TAG, "couldn't create AESCrypt class with String(aesKeyBytes):" + e.getMessage());
 					}
 				
 					try {
+						payload = Arrays.copyOfRange(payload, 16, payload.length);
 						decryptedPayload = aes.decrypt(payload);
 					} catch (Exception e) {
 						Log.v(TAG, "couldn't decrypt payload:" + e.getMessage());
@@ -769,7 +773,7 @@ public class MainActivity extends Activity {
 					Log.v(TAG, "no key for this message!");
 				}
 				
-			} else if (mt == 21) {
+			} else if (mt == BleMessenger.MSGTYPE_ENCRYPTED_KEY) {
 				logMessage("received encrypted key of size:" + String.valueOf(payload.length));
 				
 				byte[] incomingMessageHash = processIncomingKeyMsg(payload);
@@ -780,11 +784,12 @@ public class MainActivity extends Activity {
 				
 				if (encryptedPayload != null ) {
 					logMessage("found encrypted payload for the key we just got");
+					// now decrypt!
 				} else {
 					logMessage("NO encrypted payload found for this new key");
 				}
 				
-			} else if (mt == 90) {
+			} else if (mt == BleMessenger.MSGTYPE_DROP) {
 				
 				// this can be for topics; but need to differentiate if bytes or not
 				String topic_name = "";
@@ -1156,6 +1161,18 @@ public class MainActivity extends Activity {
         mCipher.init(Cipher.WRAP_MODE, publicKey);
         
         SecretKey symmkey = new SecretKeySpec(secretKeyText.getBytes("UTF-8"), "AES");
+        
+        byte[] encryptedSK = mCipher.wrap(symmkey);
+        
+        return encryptedSK;
+	}
+	
+	private byte[] encryptedSymmetricKey(byte[] friendPuk, byte[] secretKeyBytes) throws Exception {
+    	PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(friendPuk));
+    	Cipher mCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        mCipher.init(Cipher.WRAP_MODE, publicKey);
+        
+        SecretKey symmkey = new SecretKeySpec(secretKeyBytes, "AES");
         
         byte[] encryptedSK = mCipher.wrap(symmkey);
         

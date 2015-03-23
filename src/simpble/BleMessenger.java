@@ -31,6 +31,12 @@ public class BleMessenger {
 	private static int INACTIVE_TIMEOUT = 600000; // 5 minute timeout
 	private static int BUSINESS_TIMEOUT = 5000; // 5 second timeout
 	
+	public static int MSGTYPE_ID = 1;
+	public static int MSGTYPE_PLAIN = 2;
+	public static int MSGTYPE_ENCRYPTED_PAYLOAD = 20;
+	public static int MSGTYPE_ENCRYPTED_KEY = 21;
+	public static int MSGTYPE_DROP = 90;
+	
 	private boolean StayingBusy;
 	
 	private Timer longTimer;
@@ -347,19 +353,7 @@ public class BleMessenger {
 		// given a peer, get the first message in the queue to send out
 		BleMessage m = peer.getBleMessageOut();
 		
-		// 
-		for (int i = 0; i < peer.GetMessagesOut().size(); i++) {
-			BleMessage m1 = peer.GetMessagesOut().get(i);
-			String msgHash = "";
-			try {
-				msgHash = ByteUtilities.bytesToHex(m1.MessageHash).substring(0,6);
-			} catch (Exception x) {
-				msgHash = "can't get hash";
-			}
-			
-			bleStatusCallback.headsUp("m: msg#" + String.valueOf(i) + " " + msgHash);
-			
-		}
+
 	
 			
 		

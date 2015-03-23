@@ -21,9 +21,9 @@ private static final String TAG = "AESCrypt";
 private final Cipher cipher;
 private final SecretKeySpec key;
 private AlgorithmParameterSpec spec;
+private byte[] initVector;
 
-
-public AESCrypt(byte[] EncryptionKeyRawBytes) throws Exception
+public AESCrypt(byte[] EncryptionKeyRawBytes, byte[] iV) throws Exception
 {
     // hash password with SHA-256 and crop the output to 128-bit for key
     MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -33,16 +33,17 @@ public AESCrypt(byte[] EncryptionKeyRawBytes) throws Exception
 
     cipher = Cipher.getInstance("AES/CBC/PKCS7Padding");
     key = new SecretKeySpec(keyBytes, "AES");
+    initVector = iV;
     spec = getIV();
     
     
 }       
 
-public AlgorithmParameterSpec getIV()
+private AlgorithmParameterSpec getIV()
 {
-    byte[] iv = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, };
+    //byte[] iv = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, };
     IvParameterSpec ivParameterSpec;
-    ivParameterSpec = new IvParameterSpec(iv);
+    ivParameterSpec = new IvParameterSpec(initVector);
 
     return ivParameterSpec;
 }
