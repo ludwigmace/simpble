@@ -257,6 +257,21 @@ public class BlePeer {
 			
 	}
 	
+	public String BuildBleMessageOut(byte[] MsgBytes) {
+		
+		int messageidx = peerMessagesOut.size();
+		
+		BleMessage m = new BleMessage();
+		m.SetRawBytes(MsgBytes);
+		
+		Log.v(TAG, "added message #" + String.valueOf(messageidx) + " (" + ByteUtilities.bytesToHex(m.MessageHash) + "), peer " + this.toString());
+		m.SetMessageNumber(messageidx);
+		peerMessagesOut.append(messageidx, m);
+		
+		return ByteUtilities.bytesToHex(m.MessageHash);
+			
+	}
+	
 	public void SetName(String PeerName) {
 		peerName = PeerName;
 	}

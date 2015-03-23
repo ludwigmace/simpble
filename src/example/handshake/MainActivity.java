@@ -291,7 +291,7 @@ public class MainActivity extends Activity {
 		// loop over all our messages
 		while (c.moveToNext()) {
 
-			BleMessage m = new BleMessage();
+			BleMessage appMsg = new BleMessage();
 			
 			String recipient_name = c.getString(c.getColumnIndex(FriendsDb.KEY_M_FNAME));
 			String msg_content = c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT));
@@ -309,13 +309,13 @@ public class MainActivity extends Activity {
 				if (p.GetName().equalsIgnoreCase(recipient_name)) {
 					String msgHash = "";
 
-					m.RecipientFingerprint = p.GetFingerprintBytes();
+					appMsg.RecipientFingerprint = p.GetFingerprintBytes();
 					
 					// get the sending fingerprint from our global variable
 					// TODO: this won't work if the original sender is different
-					m.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint);
+					appMsg.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint);
 					
-					m.SetSignature(msg_signature);
+					appMsg.SetSignature(msg_signature);
 					
 					// in case we need to encrypt this message
 					byte[] msgbytes = null;
@@ -374,8 +374,8 @@ public class MainActivity extends Activity {
 					if (msg_type.equalsIgnoreCase("encrypted")) {
 						
 						
-						m.MessageType = (byte)(20 & 0xFF);  // just throwing out 20 as indicating an encrypted msg
-						m.setPayload(msgbytes);
+						appMsg.MessageType = (byte)(20 & 0xFF);  // just throwing out 20 as indicating an encrypted msg
+						appMsg.setPayload(msgbytes);
 						
 						BleMessage m_key = new BleMessage();
 						
@@ -386,26 +386,26 @@ public class MainActivity extends Activity {
 						m_key.MessageType = (byte)(21 & 0xFF);
 						
 						// get the sending fingerprint from the main message
-						m_key.SenderFingerprint = m.SenderFingerprint;
+						m_key.SenderFingerprint = appMsg.SenderFingerprint;
 						
 						// the payload needs to include the encrypted key, and the orig msg's fingerprint
 						// if the hash is a certain size, then we can assume the rest of the message is the
 						// encrypted portion of the aes key
-						byte[] aes_payload = Bytes.concat(m.MessageHash, aesKeyEncrypted);
+						byte[] aes_payload = Bytes.concat(appMsg.MessageHash, aesKeyEncrypted);
 						m_key.setPayload(aes_payload);
 						
 						p.addBleMessageOut(m_key);
 					
 					} else {
-						m.MessageType = (byte)(2 & 0xFF);  // raw data is 2
-						m.setPayload(msgbytes);
+						appMsg.MessageType = (byte)(2 & 0xFF);  // raw data is 2
+						appMsg.setPayload(msgbytes);
 						
 					}
 					
-					p.addBleMessageOut(m);
+					p.addBleMessageOut(appMsg);
 					
 					try {
-						msgHash = ByteUtilities.bytesToHex(m.MessageHash).substring(0, 8);
+						msgHash = ByteUtilities.bytesToHex(appMsg.MessageHash).substring(0, 8);
 					} catch (Exception e) {
 						msgHash = "err";
 					}
@@ -510,7 +510,7 @@ public class MainActivity extends Activity {
 					String queuedMsg = "";
 					
 					if (idenM != null && EnableSendID) {
-						queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM).substring(0,8);
+						queuedMsg = bleMessenger.peerMap.get(peerIndex).BuildBleMessageOut(idenM.GetAllBytes()).substring(0,8);
 						logMessage("queued id msg for " + peerIndex);
 					}
 				}
@@ -528,7 +528,7 @@ public class MainActivity extends Activity {
 				BleMessage idenM = identityMessage();
 				String queuedMsg = "";
 				if (idenM != null && EnableSendID) {
-					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM).substring(0,8);
+					queuedMsg = bleMessenger.peerMap.get(peerIndex).BuildBleMessageOut(idenM.GetAllBytes()).substring(0,8);
 					logMessage("queued id msg for " + peerIndex);
 					
 					// now let the other guy know you're ready to receive data
@@ -547,7 +547,7 @@ public class MainActivity extends Activity {
 				String queuedMsg = "";
 				
 				if (idenM != null && EnableSendID) {
-					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM).substring(0,8);
+					queuedMsg = bleMessenger.peerMap.get(peerIndex).BuildBleMessageOut(idenM.GetAllBytes()).substring(0,8);
 					logMessage("queued id msg for " + peerIndex);
 				}
 				
@@ -564,7 +564,7 @@ public class MainActivity extends Activity {
 				String queuedMsg = "";
 				
 				if (idenM != null && EnableSendID) {
-					queuedMsg = bleMessenger.peerMap.get(peerIndex).addBleMessageOut(idenM).substring(0,8);
+					queuedMsg = bleMessenger.peerMap.get(peerIndex).BuildBleMessageOut(idenM.GetAllBytes()).substring(0,8);
 					logMessage("queued id msg for " + peerIndex);
 				}
 				
@@ -592,7 +592,9 @@ public class MainActivity extends Activity {
 					logMessage("!" + notification);
 				}
 
-				BleMessage sentMsg = bleMessenger.peerMap.get(peerIndex).getBleMessageOut(msg_id);
+				BleMessage sentMsg = new BleMessage();
+				
+				sentMsg.SetRawBytes(bleMessenger.peerMap.get(peerIndex).getBleMessageOut(msg_id).GetAllBytes());
 				
 				final String peerSentTo = peerIndex;
 				String sig = "no_signature";
@@ -699,7 +701,8 @@ public class MainActivity extends Activity {
 						String queuedMsg = "";
 						
 						if (m != null) {
-							queuedMsg = bleMessenger.peerMap.get(remoteAddress).addBleMessageOut(m).substring(0,8);
+							// I just want to pass in raw bytes here
+							queuedMsg = bleMessenger.peerMap.get(remoteAddress).BuildBleMessageOut(m.GetAllBytes()).substring(0,8);
 							logMessage("a5: queued " + queuedMsg + " for " + remoteAddress);
 							ourMostRecentFriendsAddress = remoteAddress;
 							

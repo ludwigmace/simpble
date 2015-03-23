@@ -64,7 +64,7 @@ public class BleApplicationMessage {
 	
 
 	// initializes our list of BlePackets, current counter, and sent status
-	public BleMessage() {
+	public BleApplicationMessage() {
 		messagePackets = new SparseArray<BlePacket>();
 		currentPacketCounter = 0;
 		pendingPacketStatus = false;

@@ -244,34 +244,21 @@ public class BleMessage {
 	
 	
 	/**
-	 * Sets the MessagePayload class variable to the bytes you pass in.  Constructs a SHA1 hash based on
-	 * (MessageType, RecipientFingerprint, SenderFingerprint, MessagePayload), strips off the last 5 bytes,
-	 * and stores this value in the class variable MessagePayload.
+	 * Sets the MessagePayload class variable to the bytes you pass in.  Combines the MessageType, RecipientFP,
+	 * SenderFP, and MessagePayload, and stores into allBytes.  Constructs a SHA1 hash based on
+	 * this, strips off the last 5 bytes, and stores this value in MessageHash.
 	 * 
 	 * @param Payload
 	 */
 	public void setPayload(byte[] Payload) {
 		MessagePayload = Payload;
 		
-		byte[] MessageBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
+		allBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
 		
-	    // get a digest for the message, to define it
-        MessageDigest md = null;
-        
-        try {
-			md = MessageDigest.getInstance("SHA-1");
-		} catch (NoSuchAlgorithmException e) {
-
-			e.printStackTrace();
-		}
-        
         // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
         // (i want my digest to be the packet size less the 5 bytes needed for header info)
-        byte[] myDigest = Arrays.copyOfRange(md.digest(MessageBytes), 0, MessagePacketSize - 5);
+		MessageHash  = Arrays.copyOfRange(ByteUtilities.digestAsBytes(allBytes), 0, MessagePacketSize - 5);
         
-        // set our global variable for the hash to this digest
-        MessageHash = myDigest;
-		
 		
 	}
 	
@@ -480,6 +467,9 @@ public class BleMessage {
 		boolean success = false;
 		
 		allBytes = RawMessageBytes;
+        // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
+        // (i want my digest to be the packet size less the 5 bytes needed for header info)
+		MessageHash  = Arrays.copyOfRange(ByteUtilities.digestAsBytes(allBytes), 0, MessagePacketSize - 5);
 		
 		success = BuildMessageDetails(RawMessageBytes);
 		
@@ -500,16 +490,16 @@ public class BleMessage {
 		for (int i = 0; i < messagePackets.size(); i++) {
 			
 			// get the packet corresponding to the current index
-			BlePacket b = messagePackets.valueAt(i);
+			BlePacket packet = messagePackets.valueAt(i);
         	
-			if (b != null ) {
+			if (packet != null ) {
 				try {
 					// if this is the first packet in the sequence, the first couple of bytes are header and the rest are the Hash
-		        	if (b.MessageSequence == 0) {
-		        		MessageHash = Arrays.copyOfRange(b.MessageBytes, 2, b.MessageBytes.length);
+		        	if (packet.MessageSequence == 0) {
+		        		MessageHash = Arrays.copyOfRange(packet.MessageBytes, 2, packet.MessageBytes.length);
 		        	} else {
 		        		try {
-							os.write(b.MessageBytes);
+							os.write(packet.MessageBytes);
 						} catch (IOException e) {
 							// if we can't write to our output stream, return a NUL byte
 							return failure;
