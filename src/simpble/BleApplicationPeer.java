@@ -5,9 +5,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 
 import android.util.Log;
 import android.util.SparseArray;
@@ -58,7 +56,6 @@ public class BleApplicationPeer {
 	public BleApplicationPeer(String PeerAddress) {
 		peerAddress = PeerAddress;
 		peerName="";
-		peerMessagesIn = new HashMap<Integer, BleApplicationMessage>();
 		peerMessagesOut = new SparseArray<BleApplicationMessage>();
 		
 		ConnectedAs = "";
@@ -170,16 +167,6 @@ public class BleApplicationPeer {
 	
 	public void SetFingerprint(String fp) {
 		peerPublicKeyFingerprint = ByteUtilities.hexToBytes(fp);
-	}
-	
-	public BleApplicationMessage getBleApplicationMessageIn(int MessageIdentifier) {
-
-		// if there isn't already a message with this identifier, add one
-		if (!peerMessagesIn.containsKey(MessageIdentifier)) {
-			peerMessagesIn.put(MessageIdentifier, new BleApplicationMessage());
-		}
-		
-		return peerMessagesIn.get(MessageIdentifier);
 	}
 	
 	public BleApplicationMessage getBleApplicationMessageOut(int MessageIdentifier) {

@@ -20,15 +20,6 @@ public class BlePeer {
 	// is connected to multiple peripherals
 	private String peerAddress;
 	
-	// kind of unused, but will need to fill this
-	private String peerName;
-	
-	// this peer's public key, in byte array form
-	private byte[] peerPublicKey;
-	
-	// fingerprint to identify this user, in byte array form
-	private byte[] peerPublicKeyFingerprint;
-
 	// map of the BleMessages incoming from this peer
 	private Map<Integer, BleMessage> peerMessagesIn;
 	
@@ -56,8 +47,7 @@ public class BlePeer {
 	 */
 	public BlePeer(String PeerAddress) {
 		peerAddress = PeerAddress;
-		peerName="";
-		peerMessagesIn = new HashMap<Integer, BleMessage>();
+
 		peerMessagesOut = new SparseArray<BleMessage>();
 		
 		ConnectedAs = "";
@@ -86,28 +76,6 @@ public class BlePeer {
 		return isStale;
 	}
 	
-	/**
-	 * Verify if the SHA-1 digest matches that calculated from the payload
-	 * @param digest digest used to verify, in byte format
-	 * @param payload data to check, in byte format
-	 * @return true if matches, false if not
-	 */
-	private boolean checkDigest(byte[] digest, byte[] payload) {
-        MessageDigest md = null;
-        boolean status = false;
-        try {
-			md = MessageDigest.getInstance("SHA-1");
-		} catch (NoSuchAlgorithmException e) {
-
-			e.printStackTrace();
-		}
-        
-        if (Arrays.equals(md.digest(payload), digest)) {
-        	status = true;	
-        }
-
-        return status;
-	}
 	
 	public SparseArray<BleMessage> GetMessagesOut() {
 		return peerMessagesOut;
@@ -136,41 +104,7 @@ public class BlePeer {
 		peerAddress = newAddress;
 	}
 	
-	public byte[] GetPublicKey() {
-		return peerPublicKey;
-	}
-	
-	public boolean SetPublicKey(byte[] publicKey) {
-		boolean status = true;
 		
-		peerPublicKey = publicKey;
-		
-		status = checkDigest(peerPublicKeyFingerprint, publicKey);
-		
-		return status;
-	}
-	
-	
-	public String GetFingerprint() {
-		if (peerPublicKeyFingerprint != null) {
-			return ByteUtilities.bytesToHex(peerPublicKeyFingerprint);
-		} else {
-			return "";
-		}
-	}
-
-	public byte[] GetFingerprintBytes() {
-		return peerPublicKeyFingerprint;
-	}
-	
-	public void SetFingerprint(byte[] fp) {
-		peerPublicKeyFingerprint = fp;
-	}
-	
-	public void SetFingerprint(String fp) {
-		peerPublicKeyFingerprint = ByteUtilities.hexToBytes(fp);
-	}
-	
 	public BleMessage getBleMessageIn(int MessageIdentifier) {
 
 		// if there isn't already a message with this identifier, add one
@@ -245,18 +179,6 @@ public class BlePeer {
 	}
 	
 	
-	public String addBleMessageOut(BleMessage m) {
-	
-		int messageidx = peerMessagesOut.size();
-		
-		Log.v(TAG, "added message #" + String.valueOf(messageidx) + " (" + ByteUtilities.bytesToHex(m.MessageHash) + "), peer " + this.toString());
-		m.SetMessageNumber(messageidx);
-		peerMessagesOut.append(messageidx, m);
-		
-		return ByteUtilities.bytesToHex(m.MessageHash);
-			
-	}
-	
 	public String BuildBleMessageOut(byte[] MsgBytes) {
 		
 		int messageidx = peerMessagesOut.size();
@@ -271,15 +193,6 @@ public class BlePeer {
 		return ByteUtilities.bytesToHex(m.MessageHash);
 			
 	}
-	
-	public void SetName(String PeerName) {
-		peerName = PeerName;
-	}
-	
-	public String GetName() {
-		return peerName;
-	}
-	
 	
 
     

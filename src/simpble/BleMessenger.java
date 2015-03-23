@@ -194,24 +194,6 @@ public class BleMessenger {
 		return p;
 	}
 
-	public BlePeer GetBlePeerByFingerprint(String fingerprint) {
-		String remoteAddress = "";
-		
-		for (String peerAddress : peerMap.keySet()) {
-			
-			BlePeer p = peerMap.get(peerAddress);
-			
-			if (p.GetFingerprint().equalsIgnoreCase(fingerprint)) {
-				remoteAddress = peerAddress;
-				break;
-			}
-		}
-		
-		bleStatusCallback.headsUp("m: found address: " + remoteAddress + " for fingerprint: " + fingerprint);
-		
-		// now call your normal function
-		return GetBlePeerByAddress(remoteAddress);
-	}
 	
 	private String getFirstChars(String str, int index) {
 		if (str.length() >= index) {
