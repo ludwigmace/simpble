@@ -407,6 +407,7 @@ public class BleMessage {
 		boolean success = false;
 		
 		allBytes = RawMessageBytes;
+		MessageHash  = Arrays.copyOfRange(ByteUtilities.digestAsBytes(allBytes), 0, MessagePacketSize - 5);
 
 		return success;
 	}

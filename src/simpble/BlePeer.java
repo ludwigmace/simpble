@@ -49,6 +49,7 @@ public class BlePeer {
 		peerAddress = PeerAddress;
 
 		peerMessagesOut = new SparseArray<BleMessage>();
+		peerMessagesIn = new HashMap<Integer, BleMessage>();
 		
 		ConnectedAs = "";
 		CurrentMessageIndex = 0;
