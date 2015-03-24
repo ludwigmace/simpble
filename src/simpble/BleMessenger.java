@@ -31,11 +31,11 @@ public class BleMessenger {
 	private static int INACTIVE_TIMEOUT = 600000; // 5 minute timeout
 	private static int BUSINESS_TIMEOUT = 5000; // 5 second timeout
 	
-	public static int MSGTYPE_ID = 1;
-	public static int MSGTYPE_PLAIN = 2;
-	public static int MSGTYPE_ENCRYPTED_PAYLOAD = 20;
-	public static int MSGTYPE_ENCRYPTED_KEY = 21;
-	public static int MSGTYPE_DROP = 90;
+	public static final int MSGTYPE_ID = 1;
+	public static final int MSGTYPE_PLAIN = 2;
+	public static final int MSGTYPE_ENCRYPTED_PAYLOAD = 20;
+	public static final int MSGTYPE_ENCRYPTED_KEY = 21;
+	public static final int MSGTYPE_DROP = 90;
 	
 	private boolean StayingBusy;
 	
@@ -618,10 +618,11 @@ public class BleMessenger {
 	    		
 	    		peerMap.put(device, p);
 	    		
-	    		// let the calling activity know we've been connected to by a dude
+	    		// let the calling activity know that as a peripheral, we've accepted a connection
 	    		bleStatusCallback.peerNotification(device, "accepted_connection");
 
     		} else {
+	    		// let the calling activity know that as a peripheral, we've lost or connection
     			bleStatusCallback.peerNotification(device, "connection_change");
     		}
     		
@@ -645,8 +646,6 @@ public class BleMessenger {
     		p.MarkActive();
     		p.subscribedChars = uuid.toString() + ";" + p.subscribedChars;
     		
-    		// should i really comment this out?
-    		//writeOut(device, uuid);
 		}
 
 		@Override
@@ -769,19 +768,18 @@ public class BleMessenger {
 		
 		@Override
 		public void connectedServiceGood(String remoteAddress) {
-			// so now we're connected; not going to do anything else yet
-			// so we literally have no info about this particular person
-			bleStatusCallback.headsUp("m: connected and ready to exchange w/ " + remoteAddress);
+
+			// get a handle to this peer
 			BlePeer p = peerMap.get(remoteAddress);
 			
-			// since we're parlaying, reset our timeout timer
+			// reset our timeout timer
 			p.MarkActive();
+
 			
+			// let the calling activity know that we've connected to a peer who meets the contract
 			bleStatusCallback.peerNotification(remoteAddress, "new_contract");
 			
-			// can't get the PuF because we haven't done the ID dance
 		}
-		
 		
 		@Override
 		public void reportDisconnect(String remoteAddress) {

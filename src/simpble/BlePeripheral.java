@@ -240,14 +240,14 @@ public class BlePeripheral {
         UUID tUID = new UUID((long) 0x46, (long) 0x41);
         ParcelUuid serviceDataID = new ParcelUuid(tUID);
         
-        // API 5.0
+        // API 5
         dataBuilder.addServiceData(serviceDataID, serviceData);
         
         // i guess we need all these things for our settings
         settingsBuilder.setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY);
         settingsBuilder.setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH);
                 
-        // API 5.0 
+        // API 5
         settingsBuilder.setConnectable(true);
         
         // we created this earlier with bluetoothAdapter.getBluetoothLeAdvertiser();

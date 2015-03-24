@@ -1,43 +1,33 @@
 package example.handshake;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
-import java.math.BigInteger;
 import java.security.GeneralSecurityException;
-import java.security.InvalidKeyException;
+
 import java.security.KeyFactory;
-import java.security.NoSuchAlgorithmException;
+
 import java.security.PublicKey;
 import java.security.SecureRandom;
-import java.security.spec.InvalidKeySpecException;
+
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+
 import java.util.HashMap;
-import java.util.List;
+
 import java.util.Map;
-import java.util.UUID;
+
 
 import javax.crypto.Cipher;
-import javax.crypto.CipherOutputStream;
-import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
-import secretshare.ShamirCombiner;
-import secretshare.ShamirSplitter;
 import simpble.BleApplicationMessage;
 import simpble.BleApplicationPeer;
 import simpble.BleMessenger;
 import simpble.BleStatusCallback;
 import simpble.ByteUtilities;
 
-import com.google.common.io.ByteStreams;
 import com.google.common.primitives.Bytes;
 
 import android.app.Activity;
@@ -47,11 +37,11 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
-import android.os.Build;
+
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.util.Log;
-import android.util.SparseArray;
+
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -88,8 +78,6 @@ public class MainActivity extends Activity {
 	private BluetoothManager btMgr;
 	private BluetoothAdapter btAdptr;
 	
-	// this is just temporary to allow setting an address for subscription that we can call manually later
-	String ourMostRecentFriendsAddress;
 	String statusLogText;
 	
     private FriendsDb mDbHelper;
@@ -228,7 +216,7 @@ public class MainActivity extends Activity {
 	protected void onStart() {
 		super.onStart();
 		
-		PopulateFriendsAndMessages();
+		PopulateFriends();
 	}
 	
 	/**
@@ -255,7 +243,7 @@ public class MainActivity extends Activity {
 		
 	}
 	
-	private void PopulateFriendsAndMessages() {
+	private void PopulateFriends() {
 		
 		// let's build our friends that we've got stored up in the database
 		bleFriends = new HashMap<String, BleApplicationPeer>();
@@ -278,148 +266,9 @@ public class MainActivity extends Activity {
 			bleFriends.put(peer_fp, new_peer);
 			logMessage("adding peer " + peer_fp.substring(0,8));
 		}
-
-		c = mDbHelper.fetchUnsentDirectMsgs();
-		
-		// we want to send some messages
-		if (c.getCount() > 0) {
-			messageSending = true;
-		} else {
-			logMessage("no messages to send");
-		}
-		
-		// loop over all our messages
-		while (c.moveToNext()) {
-
-			BleApplicationMessage appMsg = new BleApplicationMessage();
-			
-			String recipient_name = c.getString(c.getColumnIndex(FriendsDb.KEY_M_FNAME));
-			String msg_content = c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT));
-			String msg_type = c.getString(c.getColumnIndex(FriendsDb.KEY_M_MSGTYPE));
-			String msg_signature = c.getString(c.getColumnIndex(FriendsDb.KEY_M_MSGID));
-			
-			if (msg_signature == null) {
-				msg_signature = "";
-			}
-			
-			// inefficient way to get peer stuff
-			for (BleApplicationPeer p: bleFriends.values()) {
-
-				// if the peer in our friends list equals the name we've pulled out of the database for this message
-				if (p.GetName().equalsIgnoreCase(recipient_name)) {
-					String msgHash = "";
-
-					appMsg.RecipientFingerprint = p.GetFingerprintBytes();
-					
-					// get the sending fingerprint from our global variable
-					// TODO: this won't work if the original sender is different
-					appMsg.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint);
-					
-					appMsg.SetSignature(msg_signature);
-					
-					// in case we need to encrypt this message
-					byte[] msgbytes = null;
-					byte[] aesKeyEncrypted = null;
-
-					// if our message is meant to be encrypted, do that first
-					if (msg_type.equalsIgnoreCase("encrypted")) {
-						
-						// get our friend's public key from the friend's object
-						byte[] friendPuk = p.GetPublicKey();
-						
-						//make this a random encryption key
-						SecureRandom sr = new SecureRandom();
-						byte[] aeskey = new byte[32]; // 512 bit key
-						sr.nextBytes(aeskey);
-
-						// and random IV
-						byte[] iv = new byte[16];
-						sr.nextBytes(iv);
-						
-						AESCrypt aes = null;
-						
-						try {
-							aes = new AESCrypt(aeskey, iv);
-
-						} catch (Exception e) {
-							Log.v(TAG, "can't instantiate AESCrypt");
-						}
-						
-						if (aes != null) {
-							
-							try {
-								// prepend the initialization vector to the encrypted payload
-								msgbytes = Bytes.concat(iv, aes.encrypt(msg_content.getBytes()));
-							} catch (Exception x) {
-								Log.v(TAG, "encrypt error: " + x.getMessage());
-							}
-							
-							if (msgbytes != null) {
-								// encrypt our encryption key using our recipient's public key 							
-								try {
-									aesKeyEncrypted = encryptedSymmetricKey(friendPuk, aeskey);
-								} catch (Exception e) {
-									Log.v(TAG, "couldn't encrypt aes key");	
-								}
-							} else {
-								logMessage("couldnt encrypt message");
-								break;
-							}
-						}
-						
-					} else {
-						msgbytes = msg_content.getBytes();
-					}
-					
-					if (msg_type.equalsIgnoreCase("encrypted")) {
-						
-						
-						appMsg.MessageType = (byte)(20 & 0xFF);  // just throwing out 20 as indicating an encrypted msg
-						appMsg.setPayload(msgbytes);
-						
-						BleApplicationMessage m_key = new BleApplicationMessage();
-						
-						// get the fingerprint from the Friend object
-						m_key.RecipientFingerprint = p.GetFingerprintBytes();
-						
-						// gotta give it a pre-determined messagetype to know this is an encryption key
-						m_key.MessageType = (byte)(21 & 0xFF);
-						
-						// get the sending fingerprint from the main message
-						m_key.SenderFingerprint = appMsg.SenderFingerprint;
-						
-						// the payload needs to include the encrypted key, and the orig msg's fingerprint
-						// if the hash is a certain size, then we can assume the rest of the message is the
-						// encrypted portion of the aes key
-						byte[] aes_payload = Bytes.concat(appMsg.MessageHash, aesKeyEncrypted);
-						m_key.setPayload(aes_payload);
-						
-						p.addBleApplicationMessageOut(m_key);
-					
-					} else {
-						appMsg.MessageType = (byte)(2 & 0xFF);  // raw data is 2
-						appMsg.setPayload(msgbytes);
-						
-					}
-					
-					p.addBleApplicationMessageOut(appMsg);
-					
-					try {
-						msgHash = ByteUtilities.bytesToHex(appMsg.MessageHash).substring(0, 8);
-					} catch (Exception e) {
-						msgHash = "err";
-					}
-					
-					logMessage("queued " + msgHash  + " for " + recipient_name);						
-					
-					break;
-
-				}
-			}
-					
-		}
-		
 	}
+
+
 		
 	private void SetUpBle() {
 		if (btAdptr != null) {
@@ -498,10 +347,8 @@ public class MainActivity extends Activity {
 		public void peerNotification(String peerIndex, String notification) {
 			
 			// you don't know who this person is yet
-			if (notification.equalsIgnoreCase("new_contract") && currentTask.equalsIgnoreCase("normal")) {
+			if (notification.equalsIgnoreCase("new_contract")) {
 				logMessage("a: peripheral peer meets contract");
-				
-				ourMostRecentFriendsAddress = peerIndex;
 				
 				// if we're willing to receive messages then we need to transmit our info to the other peer
 				if (messageReceiving) {
@@ -516,47 +363,12 @@ public class MainActivity extends Activity {
 				}
 				
 				// subscribe to the peripheral's transport
-				bleMessenger.initRequestForData(ourMostRecentFriendsAddress);
+				bleMessenger.initRequestForData(peerIndex);
 			}
 			
-			// this notification is that BleMessenger just found a peer that met the service contract
-			// only central mode gets this
-			if (notification.equalsIgnoreCase("new_contract") && currentTask.equalsIgnoreCase("pair")) {
-
-				ourMostRecentFriendsAddress = peerIndex;
-				logMessage("a: connected to " + peerIndex);
-				BleApplicationMessage idenM = identityMessage();
-				String queuedMsg = "";
-				if (idenM != null && EnableSendID) {
-					queuedMsg = bleMessenger.peerMap.get(peerIndex).BuildBleMessageOut(idenM.GetAllBytes()).substring(0,8);
-					logMessage("queued id msg for " + peerIndex);
-					
-					// now let the other guy know you're ready to receive data
-					bleMessenger.initRequestForData(ourMostRecentFriendsAddress);
-					
-				}
-				
-			}
-			
+						
 			// only peripheral mode gets this; we've accepted a connection and we're either wanting to pair or just data stuff
-			if (notification.equalsIgnoreCase("accepted_connection") && currentTask.equalsIgnoreCase("pair")) {
-				logMessage("a: connected to " + peerIndex);
-
-				// since i've just accepted a connection, queue up an identity message
-				BleApplicationMessage idenM = identityMessage();
-				String queuedMsg = "";
-				
-				if (idenM != null && EnableSendID) {
-					queuedMsg = bleMessenger.peerMap.get(peerIndex).BuildBleMessageOut(idenM.GetAllBytes()).substring(0,8);
-					logMessage("queued id msg for " + peerIndex);
-				}
-				
-				// if you're a peripheral, you can't initiate message send until the peer has subscribed
-				
-			}
-			
-			// only peripheral mode gets this; we've accepted a connection and we're either wanting to pair or just data stuff
-			if (notification.equalsIgnoreCase("accepted_connection") && currentTask.equalsIgnoreCase("normal")) {
+			if (notification.equalsIgnoreCase("accepted_connection")) {
 				logMessage("a: connected to " + peerIndex);
 
 				// since i've just accepted a connection, queue up an identity message
@@ -613,10 +425,9 @@ public class MainActivity extends Activity {
 			
 		}
 		
-		// this is when all the packets have come in, and a message is received in its entirety (hopefully)
+		// this is when all the packets have come in, and a message is received in its entirety
 		// TODO: too much happens in this callback; need to move things out of here!
 		@Override
-		//public void handleReceivedMessage(String remoteAddress, String recipientFingerprint, String senderFingerprint, byte[] payload, byte msgType, byte[] messageHash) {
 		public void handleReceivedMessage(String remoteAddress, byte[] MessageBytes) {
 
 			BleApplicationMessage incomingMsg = new BleApplicationMessage();
@@ -634,192 +445,184 @@ public class MainActivity extends Activity {
 			String senderFingerprint = ByteUtilities.bytesToHex(incomingMsg.SenderFingerprint);
 			byte[] payload = incomingMsg.MessagePayload;
 			byte[] messageHash = incomingMsg.BuildMessageMIC();
-			
-			
-			// this is an identity message so handle it as such
-			if (mt == BleMessenger.MSGTYPE_ID) {
-				Log.v(TAG, "received identity msg");
-								
-				if (recipientFingerprint.length() == 0) {
-					// there is no recipient; this is just an identifying message
-					logMessage("a: no particular recipient for this msg");
-				} else if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
-					logMessage("a: msg intended for us");
-				} else {
-					// TODO: what if it's being forwarded?
-				}
-				
-				/* so we just got an id
-				 * we need to see if we've already sent this particular peer a message for this topic
-				 * the "peer-ready-to-receive" notification means we can now to see if this peer needs a message
-				 * 1)for dead-drop purposes; as an original sender, don't send more than one message for a 
-				 *   topic to the same person
-				 *   BUT, you also don't want to do it for other reasons that the calling app can consider
-				 *   the most obvious one i can think of is Location
-				 * - 
-				 * 
-				 * */
-				if (sendToAnybody) {
-					
-					BleApplicationMessage mTopic = null;
-					
-					try {
-					// TODO: consider location as well
-						mTopic = GetUnsentEligibleTopicMessage(senderFingerprint);
-					} catch (Exception x) {
-						Log.v(TAG, "error trying to pull an eligible topic message");
-					}
-
-					if (mTopic != null) { 
 						
-						String queuedMsg = "";
-						queuedMsg = bleMessenger.peerMap.get(remoteAddress).BuildBleMessageOut(mTopic.GetAllBytes()).substring(0,8);
-						
-						logMessage("a5: queued " + queuedMsg + " for " + remoteAddress);
-						ourMostRecentFriendsAddress = remoteAddress;
-						
-					} else {
-						logMessage("no topic messages to send");
-					}
-				}
-				
-				// if the sender is in our friends list
-				if (bleFriends.containsKey(senderFingerprint)) {
+			switch (mt) {
+				case BleMessenger.MSGTYPE_ID:
+					Log.v(TAG, "received identity msg");
 					
-					// we need to be able to look this person up by incoming address
-					// TODO: remove this association upon disconnect
-					addressesToFriends.put(remoteAddress, senderFingerprint);
-
-					logMessage("a: known peer: " + senderFingerprint.substring(0,20));
-					
-					// we know that we have this peer as a friend
-
-					// queue up all the messages we've got for this dude
-					for (int i = 0; i < bleFriends.get(senderFingerprint).GetMessagesOut().size(); i++) {
-						BleApplicationMessage m = bleFriends.get(senderFingerprint).GetMessagesOut().get(i);
-
-						String queuedMsg = "";
+	
+					// if we'll send to any old person, shouldn't this be on connect?
+					// or how do we know when the other person wants messages?
+					if (sendToAnybody) {
 						
-						if (m != null) {
-							// I just want to pass in raw bytes here
-							queuedMsg = bleMessenger.peerMap.get(remoteAddress).BuildBleMessageOut(m.GetAllBytes()).substring(0,8);
+						BleApplicationMessage mTopic = null;
+						
+						try {
+						// TODO: consider location as well
+							mTopic = GetUnsentEligibleTopicMessage(senderFingerprint);
+						} catch (Exception x) {
+							Log.v(TAG, "error trying to pull an eligible topic message");
+						}
+	
+						if (mTopic != null) {
+							
+							String queuedMsg = "";
+							queuedMsg = bleMessenger.peerMap.get(remoteAddress).BuildBleMessageOut(mTopic.GetAllBytes()).substring(0,8);
+							
 							logMessage("a5: queued " + queuedMsg + " for " + remoteAddress);
-							ourMostRecentFriendsAddress = remoteAddress;
+
 							
 						} else {
-							logMessage("a: no msg found for " + remoteAddress);
-						}						
+							logMessage("no topic messages to send");
+						}
 					}
-
-				} else if (EnableReceiveID) {  // if we actually care who this person is, then store their FP
-					logMessage("a: this guy's FP isn't known to me: " + senderFingerprint.substring(0,20));
-					
-			        Intent i = new Intent(ctx, AddFriendsActivity.class);
-			        i.putExtra("fp", senderFingerprint);
-			        i.putExtra("puk", payload);
-			        startActivityForResult(i, ACTIVITY_CREATE);
-										
-					// we don't know the sender and maybe should add them?
-					// parse the public key & friendly name out of the payload, and add this as a new person
-				}
 				
-			} else if (mt == BleMessenger.MSGTYPE_PLAIN) {
-				
-				// TODO: store in database
-				logMessage("message recvd of size " + String.valueOf(payload.length));
-
-				
-			} else if (mt == BleMessenger.MSGTYPE_ENCRYPTED_PAYLOAD) {
-				logMessage("received encrypted msg of size:" + String.valueOf(payload.length));
-				
-				// payload might be padded with zeroes, strip out trailing null bytes
-				payload = ByteUtilities.trimmedBytes(payload);
-				
-				// load this payload into our hash to payload lookup
-				hashToPayload.put(ByteUtilities.bytesToHex(messageHash), payload);
-
-				Log.v("DOIT", "encrypted payload: " + ByteUtilities.bytesToHex(payload));
-				
-				byte[] aesKeyBytes = hashToKey.get(ByteUtilities.bytesToHex(messageHash));
-				
-				if (aesKeyBytes != null) {
-				
-					// if we have a key for this thing already, decrypt and display messages
-					byte[] decryptedPayload = null;
-				
-					AESCrypt aes = null;
-					try {
-						byte[] iv = Arrays.copyOf(payload, 16);
-						aes = new AESCrypt(aesKeyBytes, iv);
+					// if the sender is in our friends list
+					if (bleFriends.containsKey(senderFingerprint)) {
 						
-					} catch (Exception e) {
-						Log.v(TAG, "couldn't create AESCrypt class with String(aesKeyBytes):" + e.getMessage());
-					}
-				
-					try {
-						payload = Arrays.copyOfRange(payload, 16, payload.length);
-						decryptedPayload = aes.decrypt(payload);
-					} catch (Exception e) {
-						Log.v(TAG, "couldn't decrypt payload:" + e.getMessage());
+						// we need to be able to look this person up by incoming address
+						// TODO: remove this association upon disconnect
+						addressesToFriends.put(remoteAddress, senderFingerprint);
+						
+						ArrayList<BleApplicationMessage> outMsgs = GetMessageForFriend(senderFingerprint);
+	
+						logMessage("a: known peer: " + senderFingerprint.substring(0,20));
+						
+						// we know that we have this peer as a friend
+	
+						// queue up all the messages we've got for this dude
+						for (BleApplicationMessage m : outMsgs) {
+	
+							String queuedMsg = "";
+							
+							if (m != null) {
+								// I just want to pass in raw bytes here
+								queuedMsg = bleMessenger.peerMap.get(remoteAddress).BuildBleMessageOut(m.GetAllBytes()).substring(0,8);
+								logMessage("a5: queued " + queuedMsg + " for " + remoteAddress);
+								
+							} else {
+								logMessage("a: no msg found for " + remoteAddress);
+							}						
+						}
+	
+					} else if (EnableReceiveID) {  // if we actually care who this person is, then store their FP
+						logMessage("a: this guy's FP isn't known to me: " + senderFingerprint.substring(0,20));
+						
+				        Intent i = new Intent(ctx, AddFriendsActivity.class);
+				        i.putExtra("fp", senderFingerprint);
+				        i.putExtra("puk", payload);
+				        startActivityForResult(i, ACTIVITY_CREATE);
+											
+						// we don't know the sender and maybe should add them?
+						// parse the public key & friendly name out of the payload, and add this as a new person
 					}
 					
-					if (decryptedPayload != null) {
-						String msgtext = new String(decryptedPayload);
-						logMessage("decrypted: " + msgtext);
+					break;
+					
+				case BleMessenger.MSGTYPE_PLAIN:
+				
+					// TODO: store in database
+					logMessage("message recvd of size " + String.valueOf(payload.length));
+	
+					break;
+					
+				case BleMessenger.MSGTYPE_ENCRYPTED_PAYLOAD:
+					logMessage("received encrypted msg of size:" + String.valueOf(payload.length));
+					
+					// payload might be padded with zeroes, strip out trailing null bytes
+					payload = ByteUtilities.trimmedBytes(payload);
+					
+					// load this payload into our hash to payload lookup
+					hashToPayload.put(ByteUtilities.bytesToHex(messageHash), payload);
+	
+					Log.v("DOIT", "encrypted payload: " + ByteUtilities.bytesToHex(payload));
+					
+					byte[] aesKeyBytes = hashToKey.get(ByteUtilities.bytesToHex(messageHash));
+					
+					if (aesKeyBytes != null) {
+					
+						// if we have a key for this thing already, decrypt and display messages
+						byte[] decryptedPayload = null;
+					
+						AESCrypt aes = null;
+						try {
+							byte[] iv = Arrays.copyOf(payload, 16);
+							aes = new AESCrypt(aesKeyBytes, iv);
+							
+						} catch (Exception e) {
+							Log.v(TAG, "couldn't create AESCrypt class with String(aesKeyBytes):" + e.getMessage());
+						}
+					
+						try {
+							payload = Arrays.copyOfRange(payload, 16, payload.length);
+							decryptedPayload = aes.decrypt(payload);
+						} catch (Exception e) {
+							Log.v(TAG, "couldn't decrypt payload:" + e.getMessage());
+						}
+						
+						if (decryptedPayload != null) {
+							String msgtext = new String(decryptedPayload);
+							logMessage("decrypted: " + msgtext);
+						} else {
+							logMessage("empty decrypted payload!");
+						}
+						
+						
 					} else {
-						logMessage("empty decrypted payload!");
+						logMessage("a: no key for this message!");
+						Log.v(TAG, "no key for this message!");
 					}
 					
+					break;
 					
-				} else {
-					logMessage("a: no key for this message!");
-					Log.v(TAG, "no key for this message!");
-				}
+				case BleMessenger.MSGTYPE_ENCRYPTED_KEY:
+					logMessage("received encrypted key of size:" + String.valueOf(payload.length));
+					
+					byte[] incomingMessageHash = processIncomingKeyMsg(payload);
+					
+					Log.v(TAG, "added key for incoming msg hash " + ByteUtilities.bytesToHex(incomingMessageHash));
+	
+					byte[] encryptedPayload = hashToPayload.get(ByteUtilities.bytesToHex(incomingMessageHash));
+					
+					if (encryptedPayload != null ) {
+						logMessage("found encrypted payload for the key we just got");
+						// now decrypt!
+					} else {
+						logMessage("NO encrypted payload found for this new key");
+					}
+					
+					break;
 				
-			} else if (mt == BleMessenger.MSGTYPE_ENCRYPTED_KEY) {
-				logMessage("received encrypted key of size:" + String.valueOf(payload.length));
-				
-				byte[] incomingMessageHash = processIncomingKeyMsg(payload);
-				
-				Log.v(TAG, "added key for incoming msg hash " + ByteUtilities.bytesToHex(incomingMessageHash));
-
-				byte[] encryptedPayload = hashToPayload.get(ByteUtilities.bytesToHex(incomingMessageHash));
-				
-				if (encryptedPayload != null ) {
-					logMessage("found encrypted payload for the key we just got");
-					// now decrypt!
-				} else {
-					logMessage("NO encrypted payload found for this new key");
-				}
-				
-			} else if (mt == BleMessenger.MSGTYPE_DROP) {
-				
-				// this can be for topics; but need to differentiate if bytes or not
-				String topic_name = "";
-				
-				try {
-					// since the fingerprint was passed in as a hex string, convert it to bytes, and then build a string
-					topic_name = new String(ByteUtilities.trimmedBytes(ByteUtilities.hexToBytes(recipientFingerprint)));
-					logMessage("a: received topic msg " + topic_name + " of size:" + String.valueOf(payload.length));
-				} catch (Exception x) {
-					logMessage("a: couldn't parse topic msg bytes into string");
-				}
-				// payload is missing the first 6 bytes
-				String msgSignature = ByteUtilities.digestAsHex(new String (payload) + "topic" + topic_name);
-				
-				long storedMsgId = -1;
-				
-				storedMsgId = mDbHelper.queueMsg(topic_name, new String (payload), "topic", msgSignature);
-				
-				if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
-					logMessage("a: message is for us (as follows, next line):");
-					logMessage(new String(payload));
-				} else {
-					logMessage("a: message isn't for us");
-				}
-				
-				logMessage("stored msg: " + String.valueOf(storedMsgId));
-				
+				case BleMessenger.MSGTYPE_DROP:
+					
+					// this can be for topics; but need to differentiate if bytes or not
+					String topic_name = "";
+					
+					try {
+						// since the fingerprint was passed in as a hex string, convert it to bytes, and then build a string
+						topic_name = new String(ByteUtilities.trimmedBytes(ByteUtilities.hexToBytes(recipientFingerprint)));
+						logMessage("a: received topic msg " + topic_name + " of size:" + String.valueOf(payload.length));
+					} catch (Exception x) {
+						logMessage("a: couldn't parse topic msg bytes into string");
+					}
+					// payload is missing the first 6 bytes
+					String msgSignature = ByteUtilities.digestAsHex(new String (payload) + "topic" + topic_name);
+					
+					long storedMsgId = -1;
+					
+					storedMsgId = mDbHelper.queueMsg(topic_name, new String (payload), "topic", msgSignature);
+					
+					if (recipientFingerprint.equalsIgnoreCase(myFingerprint)) {
+						logMessage("a: message is for us (as follows, next line):");
+						logMessage(new String(payload));
+					} else {
+						logMessage("a: message isn't for us");
+					}
+					
+					logMessage("stored msg: " + String.valueOf(storedMsgId));
+					
+					break;
+					
 			}
 			
 		}
@@ -860,12 +663,6 @@ public class MainActivity extends Activity {
 		@Override
 		public void headsUp(String msg) {
 			logMessage(msg, 1);
-		}
-
-		@Override
-		public void readyToTalk(String remo) {
-			// TODO Auto-generated method stub
-			
 		}
 
 		@Override
@@ -1059,6 +856,130 @@ public class MainActivity extends Activity {
 			});
 			
 		}
+		
+	}
+	
+	
+	private ArrayList<BleApplicationMessage> GetMessageForFriend(String candidateFingerprint) {
+		Cursor c = mDbHelper.fetchMsgsForFriend(candidateFingerprint);
+		
+		ArrayList<BleApplicationMessage> results = new ArrayList<BleApplicationMessage>();
+		
+		BleApplicationMessage m = null; 
+
+		// if we have any messages
+		if (c.getCount() > 0) {
+				//loop over these messages
+				while (c.moveToNext()) {
+				
+				m = new BleApplicationMessage();
+				
+				String recipient_name = c.getString(c.getColumnIndex(FriendsDb.KEY_M_FNAME));
+				String msg_content = c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT));
+				String msg_type = c.getString(c.getColumnIndex(FriendsDb.KEY_M_MSGTYPE));
+				String msg_signature = c.getString(c.getColumnIndex(FriendsDb.KEY_M_MSGID));
+				byte[] puk = c.getBlob(c.getColumnIndex(FriendsDb.KEY_F_PUK));
+				
+				if (msg_signature == null) {
+					msg_signature = "";
+				}
+		
+				if (msg_type.equalsIgnoreCase("encrypt")) {
+					
+				}
+				
+				m.RecipientFingerprint = candidateFingerprint.getBytes();
+				m.SenderFingerprint = myFingerprint.getBytes();  // should probably pull from database instead; for relaying of messages
+				m.SetSignature(msg_signature);
+				
+				// in case we need to encrypt this message
+				byte[] msgbytes = null;
+				byte[] aesKeyEncrypted = null;
+
+				// if our message is meant to be encrypted, do that first
+				if (msg_type.equalsIgnoreCase("encrypted")) {
+					
+					//make this a random encryption key
+					SecureRandom sr = new SecureRandom();
+					byte[] aeskey = new byte[32]; // 512 bit key
+					sr.nextBytes(aeskey);
+
+					// and random IV
+					byte[] iv = new byte[16];
+					sr.nextBytes(iv);
+					
+					AESCrypt aes = null;
+					
+					try {
+						aes = new AESCrypt(aeskey, iv);
+
+					} catch (Exception e) {
+						Log.v(TAG, "can't instantiate AESCrypt");
+					}
+					
+					if (aes != null) {
+						
+						try {
+							// prepend the initialization vector to the encrypted payload
+							msgbytes = Bytes.concat(iv, aes.encrypt(msg_content.getBytes()));
+						} catch (Exception x) {
+							Log.v(TAG, "encrypt error: " + x.getMessage());
+						}
+						
+						if (msgbytes != null) {
+							// encrypt our encryption key using our recipient's public key 							
+							try {
+								aesKeyEncrypted = encryptedSymmetricKey(puk, aeskey);
+							} catch (Exception e) {
+								Log.v(TAG, "couldn't encrypt aes key");	
+							}
+						} else {
+							logMessage("couldnt encrypt message");
+							break;
+						}
+					}
+					
+				} else {
+					msgbytes = msg_content.getBytes();
+				}
+				
+				if (msg_type.equalsIgnoreCase("encrypted")) {
+					
+					
+					m.MessageType = (byte)BleMessenger.MSGTYPE_ENCRYPTED_PAYLOAD;
+					m.setPayload(msgbytes);
+					
+					BleApplicationMessage m_key = new BleApplicationMessage();
+					
+					// get the fingerprint from the Friend object
+					m_key.RecipientFingerprint = m.RecipientFingerprint;
+					
+					// gotta give it a pre-determined messagetype to know this is an encryption key
+					m_key.MessageType = (byte)BleMessenger.MSGTYPE_ENCRYPTED_KEY;
+					
+					// get the sending fingerprint from the main message
+					m_key.SenderFingerprint = m.SenderFingerprint;
+					
+					// the payload needs to include the encrypted key, and the orig msg's fingerprint
+					// if the hash is a certain size, then we can assume the rest of the message is the
+					// encrypted portion of the aes key
+					byte[] aes_payload = Bytes.concat(m.MessageHash, aesKeyEncrypted);
+					m_key.setPayload(aes_payload);
+					
+					results.add(m_key);
+				
+				} else {
+					m.MessageType = (byte)BleMessenger.MSGTYPE_PLAIN;
+					m.setPayload(msgbytes);
+					
+				}
+				
+				results.add(m);
+			}
+			
+		}
+		
+		return results;
 		
 	}
 	

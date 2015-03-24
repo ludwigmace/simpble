@@ -161,6 +161,16 @@ public class FriendsDb extends SQLiteOpenHelper {
 				KEY_M_MSGID + " = ?", new String[] {msgid}, null, null, null);
     }
 
+    public Cursor fetchMsgsForFriend(String friendFP) {
+		
+		String qry = "SELECT " + KEY_M_ROWID + ", " + KEY_M_CONTENT + ", " + KEY_M_MSGTYPE + ", " + KEY_M_MSGID + ", " + KEY_F_PUK;
+		qry += " FROM " + MSGS_TABLE + " a INNER JOIN " + FRIENDS_TABLE + " b ON ";
+		qry += "a." + KEY_M_FNAME + " = b." + KEY_F_NAME + " WHERE b." + KEY_F_FP + " = ?";
+		
+		return mDb.rawQuery(qry, new String[]{friendFP});
+		
+    }
+    
     public Cursor fetchAllConstants() {
 		return mDb.query(CONSTANTS_TABLE, new String[] {KEY_C_ROWID, KEY_C_CONSTANT, KEY_C_VALUE},
 				null, null, null, null, null);
