@@ -725,6 +725,14 @@ public class BleMessenger {
     BleCentralHandler centralHandler = new BleCentralHandler() {
     	
     	@Override
+    	public void subscribeSuccess(String remoteAddress, UUID remoteCharUUID) {
+    		
+    		BlePeer p  = peerMap.get(remoteAddress);
+    		p.TransportFrom = true;
+    		
+    	}
+    	
+    	@Override
     	public void incomingMissive(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
     		
     		// if the UUID is 102, it's the notify
@@ -775,6 +783,7 @@ public class BleMessenger {
 			// reset our timeout timer
 			p.MarkActive();
 
+			p.TransportTo = true;
 			
 			// let the calling activity know that we've connected to a peer who meets the contract
 			bleStatusCallback.peerNotification(remoteAddress, "new_contract");
@@ -806,6 +815,8 @@ public class BleMessenger {
 				// pass our remote address and desired uuid to our gattclient
 				// who will look up the gatt object and uuid and issue the read request
 				bleStatusCallback.headsUp("m: subscribing to 102 on " + remoteAddress);
+				
+				// onDescriptorWrite callback will be called
 				bleCentral.submitSubscription(remoteAddress, uuidFromBase("102"));
 				
 				// we should be expecting data on 102 now

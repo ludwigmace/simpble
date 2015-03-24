@@ -16,4 +16,6 @@ public interface BleCentralHandler {
 	public void incomingMissive(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes);
 	public void reportDisconnect(String remoteAddress);
 	
+	public void subscribeSuccess(String remoteAddress, UUID remoteCharUUID);
+	
 }

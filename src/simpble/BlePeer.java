@@ -41,6 +41,9 @@ public class BlePeer {
 	// this needs to be a private collection referenced w/ getters and setters
 	public String subscribedChars;
 	
+	public boolean TransportTo;
+	public boolean TransportFrom;
+	
 	/**
 	 * 
 	 * @param PeerAddress Network address of the peer, or really anything that uniquely identifies this peer for the current connection
@@ -54,6 +57,9 @@ public class BlePeer {
 		ConnectedAs = "";
 		CurrentMessageIndex = 0;
 		subscribedChars ="";
+		
+		TransportTo = false;
+		TransportFrom = false;
 		
 		// set the last activity date to right now
 		MarkActive();
