@@ -604,6 +604,8 @@ public class BleMessenger {
     	
     	
     	public void ConnectionState(String device, int status, int newStatus) {
+
+    		BlePeer p = new BlePeer(device);
     		
     		// if connected
     		if (newStatus == 2) {
@@ -613,17 +615,22 @@ public class BleMessenger {
 	    		bleStatusCallback.headsUp("m: accepted connection from a central");
 	    		
 	    		 // create a new peer to hold messages and such for this network device
-	    		BlePeer p = new BlePeer(device);
 	    		p.ConnectedAs = "peripheral";
 	    		
 	    		peerMap.put(device, p);
 	    		
+	    		// if we've been connected to, we can assume the central can write out to us
+	    		p.TransportFrom = true;
+	    		// we can't set TransportTo, because we haven't been subscribed to yet
+	    		
 	    		// let the calling activity know that as a peripheral, we've accepted a connection
-	    		bleStatusCallback.peerNotification(device, "accepted_connection");
+	    		//bleStatusCallback.peerNotification(device, "accepted_connection");
 
     		} else {
 	    		// let the calling activity know that as a peripheral, we've lost or connection
     			bleStatusCallback.peerNotification(device, "connection_change");
+    			p.TransportFrom = false;
+    			p.TransportTo = false;
     		}
     		
     	}
@@ -645,6 +652,7 @@ public class BleMessenger {
     		BlePeer p = peerMap.get(device);
     		p.MarkActive();
     		p.subscribedChars = uuid.toString() + ";" + p.subscribedChars;
+    		p.TransportTo = true;
     		
 		}
 
@@ -727,6 +735,7 @@ public class BleMessenger {
     	@Override
     	public void subscribeSuccess(String remoteAddress, UUID remoteCharUUID) {
     		
+    		bleStatusCallback.headsUp("TransportFrom:true");
     		BlePeer p  = peerMap.get(remoteAddress);
     		p.TransportFrom = true;
     		
@@ -777,16 +786,20 @@ public class BleMessenger {
 		@Override
 		public void connectedServiceGood(String remoteAddress) {
 
+			bleStatusCallback.headsUp("connectedServiceGood: submitSubscription");
 			// get a handle to this peer
 			BlePeer p = peerMap.get(remoteAddress);
 			
 			// reset our timeout timer
 			p.MarkActive();
-
+			
+			// as a Central, when we know the service is good, we know we can send msgs to this peer
 			p.TransportTo = true;
 			
-			// let the calling activity know that we've connected to a peer who meets the contract
-			bleStatusCallback.peerNotification(remoteAddress, "new_contract");
+			// now let's subscribe so we can get inbound stuff
+			
+			// onDescriptorWrite callback will be called, which will call blecentralhandler's subscribeSuccess
+			bleCentral.submitSubscription(remoteAddress, uuidFromBase("102"));
 			
 		}
 		
@@ -799,36 +812,5 @@ public class BleMessenger {
     };
     
     
-    // if you're a central, identify a particular peripheral
-    // this function probably won't be called directly
-	public void initRequestForData(String remoteAddress) {
-		
-		BlePeer p = peerMap.get(remoteAddress);
-		
-		if (p != null) {
-		
-			if (p.ConnectedAs.equalsIgnoreCase("central")) {
-			
-				// so at this point we should still be connected with our remote device
-				// and we wouldn't have gotten here if the remote device didn't meet our service spec
-		
-				// pass our remote address and desired uuid to our gattclient
-				// who will look up the gatt object and uuid and issue the read request
-				bleStatusCallback.headsUp("m: subscribing to 102 on " + remoteAddress);
-				
-				// onDescriptorWrite callback will be called
-				bleCentral.submitSubscription(remoteAddress, uuidFromBase("102"));
-				
-				// we should be expecting data on 102 now
-			} else {
-				bleStatusCallback.headsUp("m: you're not connected as a central");	
-			}
-
-		} else {
-			bleStatusCallback.headsUp("m: peerMap pulls up nobody");
-		}
-
-		
-	}
     
 }

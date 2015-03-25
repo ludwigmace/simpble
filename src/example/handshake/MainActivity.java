@@ -2,46 +2,32 @@ package example.handshake;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
-
 import java.security.KeyFactory;
-
 import java.security.PublicKey;
 import java.security.SecureRandom;
-
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Arrays;
-
 import java.util.HashMap;
-
 import java.util.Map;
-
-
 import javax.crypto.Cipher;
-import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-
 import simpble.BleApplicationMessage;
 import simpble.BleApplicationPeer;
 import simpble.BleMessenger;
+import simpble.BlePeer;
 import simpble.BleStatusCallback;
 import simpble.ByteUtilities;
-
 import com.google.common.primitives.Bytes;
-
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
-
 import android.os.Bundle;
-import android.provider.ContactsContract;
 import android.util.Log;
-
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -53,7 +39,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
 
 	private static final String TAG = "MAIN";
-	private static final int DEBUGLEVEL = 0;
+	private static final int DEBUGLEVEL = 1;
 
     private static final int ACTIVITY_CREATE=0;
 
@@ -99,6 +85,8 @@ public class MainActivity extends Activity {
     private Map<String, String> addressesToFriends;
     
     private byte[] anonFP;
+    
+    
     
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -343,9 +331,20 @@ public class MainActivity extends Activity {
 	// then i don't need to volunteer my info
 	BleStatusCallback bleMessageStatus = new BleStatusCallback() {
 
+		/**
+		 * peer connected doesn't really tell me what i need to know at the
+		 * application level . . . i need to know if i can send messages or not
+		 */
+		public void peerConnected(String peerIndex) {
+
+			//MEANS - if i have any messages for anonymous folks, send them
+			//MEANS - i can initiate 
+						
+		}
+		
 		// we just got a notification
 		public void peerNotification(String peerIndex, String notification) {
-			
+			/*
 			// you don't know who this person is yet
 			if (notification.equalsIgnoreCase("new_contract")) {
 				logMessage("a: peripheral peer meets contract");
@@ -361,11 +360,10 @@ public class MainActivity extends Activity {
 						logMessage("queued id msg for " + peerIndex);
 					}
 				}
-				
-				// subscribe to the peripheral's transport
 				bleMessenger.initRequestForData(peerIndex);
+				
 			}
-			
+			*/
 						
 			// only peripheral mode gets this; we've accepted a connection and we're either wanting to pair or just data stuff
 			if (notification.equalsIgnoreCase("accepted_connection")) {
@@ -735,7 +733,21 @@ public class MainActivity extends Activity {
 			bleMessenger.StartBusy();
 			btnToggleBusy.setText("Busy!");
 		}*/
+	
+		// i really want BlePeer to not be used outside of BleMessenger!
+		for (Map.Entry<String, BlePeer> entry : bleMessenger.peerMap.entrySet()) {
+		
+			BlePeer p  = entry.getValue();
+			
+			if (p.TransportTo) {
+				p.BuildBleMessageOut(identityMessage().GetAllBytes());
+				logMessage("build message for: " + entry.getKey());
+			}
+		}
+		
+		
 		bleMessenger.GooseBusy();
+		
 		
 	}
     
@@ -780,30 +792,6 @@ public class MainActivity extends Activity {
 	}
 	
 
-	
-	private String getUserName(ContentResolver cr) {
-        
-        String displayName = "";
-         
-        Cursor c = cr.query(ContactsContract.Profile.CONTENT_URI, null, null, null, null); 
-         
-        try {
-            if (c.moveToFirst()) {
-                displayName = c.getString(c.getColumnIndex("display_name"));
-            }  else {
-            	displayName = "nexus5";
-            	Log.v(TAG, "can't get user name; no error");	
-            }
-            
-        } catch (Exception x) {
-        	Log.v(TAG, "can't get user name; error");
-        	
-		} finally {
-            c.close();
-        }
-        
-        return displayName;
-	}
 
     final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
     public static String bytesToHex(byte[] bytes) {
@@ -874,7 +862,7 @@ public class MainActivity extends Activity {
 				
 				m = new BleApplicationMessage();
 				
-				String recipient_name = c.getString(c.getColumnIndex(FriendsDb.KEY_M_FNAME));
+				
 				String msg_content = c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT));
 				String msg_type = c.getString(c.getColumnIndex(FriendsDb.KEY_M_MSGTYPE));
 				String msg_signature = c.getString(c.getColumnIndex(FriendsDb.KEY_M_MSGID));
@@ -1025,13 +1013,7 @@ public class MainActivity extends Activity {
 		return m;
 
 	}
-		
-	private static byte[] trim(byte[] bytes) {
-		int i = bytes.length - 1;
-		while(i >= 0 && bytes[i] == 0) { --i; }
-		
-		return Arrays.copyOf(bytes,  i+1);
-	}
+	
 	
 	// creates a message formatted for identity exchange
 	private BleApplicationMessage identityMessage() {
@@ -1045,31 +1027,6 @@ public class MainActivity extends Activity {
 		return m;
 	}
 
-	
-	private SecretKey genAesKey() {
-	
-		// generate a symmetric key
-		SecretKey key = null;
-		try {
-			key = KeyGenerator.getInstance("AES").generateKey();
-		} catch (Exception e) {
-			Log.v(TAG, "couldn't generate AES key");
-		}
-		return key;
-		
-	}
-	
-	private byte[] encryptedSymmetricKey(byte[] friendPuk, String secretKeyText) throws Exception {
-    	PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(friendPuk));
-    	Cipher mCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-        mCipher.init(Cipher.WRAP_MODE, publicKey);
-        
-        SecretKey symmkey = new SecretKeySpec(secretKeyText.getBytes("UTF-8"), "AES");
-        
-        byte[] encryptedSK = mCipher.wrap(symmkey);
-        
-        return encryptedSK;
-	}
 	
 	private byte[] encryptedSymmetricKey(byte[] friendPuk, byte[] secretKeyBytes) throws Exception {
     	PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(friendPuk));
