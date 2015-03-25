@@ -206,27 +206,23 @@ public class BleMessenger {
 	private void LoopSendMessages() {
 		//setupBusinessTimer(BUSINESS_TIMEOUT);
 
-		Log.v(TAG, "LoopSendMessages on thread " + Thread.currentThread().getName());
-		
-		// if we're not sending messages, then we need to see if we need to send any
-		if (!areWeSendingMessages) {
+		Log.v(TAG, "LoopSendMessages on thread " + Thread.currentThread().getName());	
 			
-			// loop over all the peers i have that i'm connected to	
-			for (BlePeer p: peerMap.values()) {
-				
-				// get the first message i see
-				BleMessage m = p.getBleMessageOut();
-				
-				// funny, we're not actually sending a particular message per se, even though we asked for a particular message
-				// we're calling a method to send any pending messages for a particular peer
-				// mainly because we don't store the identifier for the peer in a particular BleMessage (although we could?)
-				if (m != null) {
-					Log.v("DOIT", "pulled msg #" + String.valueOf(m.GetMessageNumber()) + ", " + ByteUtilities.bytesToHex(m.MessageHash).substring(0,8));
-					areWeSendingMessages = true;
-					sendMessagesToPeer(p);
-				}
-	
+		// loop over all the peers i have that i'm connected to	
+		for (BlePeer p: peerMap.values()) {
+			
+			// get the first message i see
+			BleMessage m = p.getBleMessageOut();
+			
+			// funny, we're not actually sending a particular message per se, even though we asked for a particular message
+			// we're calling a method to send any pending messages for a particular peer
+			// mainly because we don't store the identifier for the peer in a particular BleMessage (although we could?)
+			if (m != null) {
+				Log.v("DOIT", "pulled msg #" + String.valueOf(m.GetMessageNumber()) + ", " + ByteUtilities.bytesToHex(m.MessageHash).substring(0,8));
+				areWeSendingMessages = true;
+				sendMessagesToPeer(p);
 			}
+
 		}
 	}
 	
@@ -603,6 +599,10 @@ public class BleMessenger {
     BlePeripheralHandler peripheralHandler = new BlePeripheralHandler() {
     	
     	
+    	/**
+    	 * The Gatt Peripheral handler provides an update for the connection state; here we handle that
+    	 * If we're connected
+    	 */
     	public void ConnectionState(String device, int status, int newStatus) {
 
     		BlePeer p = new BlePeer(device);
@@ -623,9 +623,9 @@ public class BleMessenger {
 	    		p.TransportFrom = true;
 	    		// we can't set TransportTo, because we haven't been subscribed to yet
 	    		
-	    		// let the calling activity know that as a peripheral, we've accepted a connection
-	    		//bleStatusCallback.peerNotification(device, "accepted_connection");
-
+	    		// we also need to indicate to the calling application that this peer has just connected,
+	    		// so that we can do some "this dude has just connected!" types of things
+	    		
     		} else {
 	    		// let the calling activity know that as a peripheral, we've lost or connection
     			bleStatusCallback.peerNotification(device, "connection_change");

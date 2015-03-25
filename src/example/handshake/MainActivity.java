@@ -10,16 +10,20 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+
 import simpble.BleApplicationMessage;
 import simpble.BleApplicationPeer;
 import simpble.BleMessenger;
 import simpble.BlePeer;
 import simpble.BleStatusCallback;
 import simpble.ByteUtilities;
+
 import com.google.common.primitives.Bytes;
+
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
@@ -86,6 +90,7 @@ public class MainActivity extends Activity {
     
     private byte[] anonFP;
     
+    private ArrayList<String> connectedAddresses;
     
     
 	@Override
@@ -128,6 +133,8 @@ public class MainActivity extends Activity {
 		}
 		
 		addressesToFriends = new HashMap<String, String>();
+		
+		connectedAddresses = new ArrayList<String>();
 		
 		// do you want to be able to receive messages?
 		// TODO: have the UI capture this
@@ -331,56 +338,9 @@ public class MainActivity extends Activity {
 	// then i don't need to volunteer my info
 	BleStatusCallback bleMessageStatus = new BleStatusCallback() {
 
-		/**
-		 * peer connected doesn't really tell me what i need to know at the
-		 * application level . . . i need to know if i can send messages or not
-		 */
-		public void peerConnected(String peerIndex) {
-
-			//MEANS - if i have any messages for anonymous folks, send them
-			//MEANS - i can initiate 
-						
-		}
 		
 		// we just got a notification
 		public void peerNotification(String peerIndex, String notification) {
-			/*
-			// you don't know who this person is yet
-			if (notification.equalsIgnoreCase("new_contract")) {
-				logMessage("a: peripheral peer meets contract");
-				
-				// if we're willing to receive messages then we need to transmit our info to the other peer
-				if (messageReceiving) {
-					
-					BleApplicationMessage idenM = identityMessage();
-					String queuedMsg = "";
-					
-					if (idenM != null && EnableSendID) {
-						queuedMsg = bleMessenger.peerMap.get(peerIndex).BuildBleMessageOut(idenM.GetAllBytes()).substring(0,8);
-						logMessage("queued id msg for " + peerIndex);
-					}
-				}
-				bleMessenger.initRequestForData(peerIndex);
-				
-			}
-			*/
-						
-			// only peripheral mode gets this; we've accepted a connection and we're either wanting to pair or just data stuff
-			if (notification.equalsIgnoreCase("accepted_connection")) {
-				logMessage("a: connected to " + peerIndex);
-
-				// since i've just accepted a connection, queue up an identity message
-				BleApplicationMessage idenM = identityMessage();
-				String queuedMsg = "";
-				
-				if (idenM != null && EnableSendID) {
-					queuedMsg = bleMessenger.peerMap.get(peerIndex).BuildBleMessageOut(idenM.GetAllBytes()).substring(0,8);
-					logMessage("queued id msg for " + peerIndex);
-				}
-				
-				// if you're a peripheral, you can't initiate message send until the peer has subscribed
-				// you don't have the fingerprint yet, you just know that this person meets the contract
-			}
 			
 			if (notification.equalsIgnoreCase("connection_change")) {
 				logMessage("a: connection status changed for " + peerIndex);
@@ -668,7 +628,6 @@ public class MainActivity extends Activity {
 			logMessage(msg);			
 		}
 		
-		
 	};
 	
 	public SecretKey getKeyForMessageHash(byte[] incomingHash) {
@@ -738,13 +697,39 @@ public class MainActivity extends Activity {
 		for (Map.Entry<String, BlePeer> entry : bleMessenger.peerMap.entrySet()) {
 		
 			BlePeer p  = entry.getValue();
+			String address = entry.getKey();
 			
-			if (p.TransportTo) {
-				p.BuildBleMessageOut(identityMessage().GetAllBytes());
-				logMessage("build message for: " + entry.getKey());
+			// if we don't have that this person is already connected
+			if (!connectedAddresses.contains(address)) {
+				
+				// add them to our list
+				connectedAddresses.add(address);
+				
+				// this should only be run immediately after connecting, and only if you want to send your id
+				if (p.TransportTo) {
+					p.BuildBleMessageOut(identityMessage().GetAllBytes());
+				}
+				
 			}
+			
+			ArrayList<BleApplicationMessage> friendMessages = GetMessageForFriend(address);
+			
+			// queue up all the messages we've got for this dude
+			for (BleApplicationMessage m : friendMessages) {
+
+				String queuedMsg = "";
+				
+				if (m != null) {
+					// I just want to pass in raw bytes here
+					queuedMsg = bleMessenger.peerMap.get(friendMessages).BuildBleMessageOut(m.GetAllBytes()).substring(0,8);
+					logMessage("! queued " + queuedMsg + " for " + friendMessages);
+				} else {
+					logMessage("a: no msg found for " + address);
+				}						
+			}
+			
+			
 		}
-		
 		
 		bleMessenger.GooseBusy();
 		
