@@ -330,11 +330,7 @@ public class BleMessenger {
 		
 		// given a peer, get the first message in the queue to send out
 		BleMessage m = peer.getBleMessageOut();
-		
-
-	
 			
-		
 		// if no message found, there's a problem
 		if (m == null) {
 			Log.v(TAG, "cannot 'writeOut' - peer.getBleMessageOut returned null");
@@ -343,7 +339,7 @@ public class BleMessenger {
 			return;
 		} else {
 			// the previous call allows us to get the current message
-			bleStatusCallback.headsUp("m: sending message: " + String.valueOf(peer.CurrentMessageIndex));
+			bleStatusCallback.headsUp("m: sending message: " + String.valueOf(m.GetMessageNumber()));
 		}
 		
 		// get a sparsearray of the packets pending send for the message m

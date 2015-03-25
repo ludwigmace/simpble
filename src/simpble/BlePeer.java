@@ -33,8 +33,7 @@ public class BlePeer {
 	 */
 	public String ConnectedAs;
 	
-	public int CurrentMessageIndex;
-	
+
 	// the last update of activity
 	private Date lastActivity;
 	
@@ -43,6 +42,9 @@ public class BlePeer {
 	
 	public boolean TransportTo;
 	public boolean TransportFrom;
+	
+	// need to keep track of our messages because we don't want to reset our counter
+	private int MaxMessageCounter;
 	
 	/**
 	 * 
@@ -55,7 +57,8 @@ public class BlePeer {
 		peerMessagesIn = new HashMap<Integer, BleMessage>();
 		
 		ConnectedAs = "";
-		CurrentMessageIndex = 0;
+		MaxMessageCounter = 0;
+		
 		subscribedChars ="";
 		
 		TransportTo = false;
@@ -123,7 +126,6 @@ public class BlePeer {
 	}
 	
 	public BleMessage getBleMessageOut(int MessageIdentifier) {
-		CurrentMessageIndex = MessageIdentifier;
 		
 		Log.v(TAG, "find message in peerMessagesOut at index " + String.valueOf(MessageIdentifier));
 		
@@ -143,7 +145,7 @@ public class BlePeer {
 	
 	public BleMessage getBleMessageOut() {
 		
-		Log.v(TAG, "peerMessagesOut.size is " + String.valueOf(peerMessagesOut.size()));
+		Log.v(TAG, "peerMessagesOut.size is " + String.valueOf(peerMessagesOut.size()) + ", max msg: " + MaxMessageCounter);
 		
 		// get the highest priority (lowest index) message to send out
 		int keyat = 0;
@@ -174,7 +176,7 @@ public class BlePeer {
 
 	public void RemoveBleMessage(BleMessage m) {
 		
-		// loop over all our packets to send
+		// loop over all our msgs to send
 		for (int i = 0; i < peerMessagesOut.size(); i++) {
 			BleMessage bm  = peerMessagesOut.valueAt(i);
 			
@@ -188,15 +190,13 @@ public class BlePeer {
 	
 	public String BuildBleMessageOut(byte[] MsgBytes) {
 		
-		int messageidx = peerMessagesOut.size();
-		
 		BleMessage m = new BleMessage();
 		m.SetRawBytes(MsgBytes);
 		
-		Log.v(TAG, "added message #" + String.valueOf(messageidx) + " (" + ByteUtilities.bytesToHex(m.MessageHash) + "), peer " + this.toString());
-		m.SetMessageNumber(messageidx);
-		peerMessagesOut.append(messageidx, m);
-		
+		Log.v(TAG, "added message #" + String.valueOf(MaxMessageCounter) + " (" + ByteUtilities.bytesToHex(m.MessageHash) + "), peer " + this.toString());
+		m.SetMessageNumber(MaxMessageCounter);
+		peerMessagesOut.append(MaxMessageCounter, m);
+		MaxMessageCounter++;
 		return ByteUtilities.bytesToHex(m.MessageHash);
 			
 	}

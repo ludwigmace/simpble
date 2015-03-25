@@ -43,7 +43,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
 
 	private static final String TAG = "MAIN";
-	private static final int DEBUGLEVEL = 1;
+	private static final int DEBUGLEVEL = 0;
 
     private static final int ACTIVITY_CREATE=0;
 
@@ -441,27 +441,6 @@ public class MainActivity extends Activity {
 						// we need to be able to look this person up by incoming address
 						// TODO: remove this association upon disconnect
 						addressesToFriends.put(remoteAddress, senderFingerprint);
-						
-						ArrayList<BleApplicationMessage> outMsgs = GetMessageForFriend(senderFingerprint);
-	
-						logMessage("a: known peer: " + senderFingerprint.substring(0,20));
-						
-						// we know that we have this peer as a friend
-	
-						// queue up all the messages we've got for this dude
-						for (BleApplicationMessage m : outMsgs) {
-	
-							String queuedMsg = "";
-							
-							if (m != null) {
-								// I just want to pass in raw bytes here
-								queuedMsg = bleMessenger.peerMap.get(remoteAddress).BuildBleMessageOut(m.GetAllBytes()).substring(0,8);
-								logMessage("a5: queued " + queuedMsg + " for " + remoteAddress);
-								
-							} else {
-								logMessage("a: no msg found for " + remoteAddress);
-							}						
-						}
 	
 					} else if (EnableReceiveID) {  // if we actually care who this person is, then store their FP
 						logMessage("a: this guy's FP isn't known to me: " + senderFingerprint.substring(0,20));
@@ -471,8 +450,7 @@ public class MainActivity extends Activity {
 				        i.putExtra("puk", payload);
 				        startActivityForResult(i, ACTIVITY_CREATE);
 											
-						// we don't know the sender and maybe should add them?
-						// parse the public key & friendly name out of the payload, and add this as a new person
+				        // TODO: add back to addressesToFriends
 					}
 					
 					break;
@@ -481,7 +459,7 @@ public class MainActivity extends Activity {
 				
 					// TODO: store in database
 					logMessage("message recvd of size " + String.valueOf(payload.length));
-	
+					// also, maybe, store the message?!?
 					break;
 					
 				case BleMessenger.MSGTYPE_ENCRYPTED_PAYLOAD:
@@ -701,33 +679,42 @@ public class MainActivity extends Activity {
 			
 			// if we don't have that this person is already connected
 			if (!connectedAddresses.contains(address)) {
+				logMessage("address not previously connected to; adding to arraylist");
 				
 				// add them to our list
 				connectedAddresses.add(address);
 				
 				// this should only be run immediately after connecting, and only if you want to send your id
 				if (p.TransportTo) {
+					logMessage("transport open, we want to send it, queue it up");					
 					p.BuildBleMessageOut(identityMessage().GetAllBytes());
 				}
 				
-			}
-			
-			ArrayList<BleApplicationMessage> friendMessages = GetMessageForFriend(address);
-			
-			// queue up all the messages we've got for this dude
-			for (BleApplicationMessage m : friendMessages) {
-
-				String queuedMsg = "";
+			} else {
+				// since we're already connected, now check friend stuff
+				logMessage("address previously connected to; meaning this is a session");
 				
-				if (m != null) {
-					// I just want to pass in raw bytes here
-					queuedMsg = bleMessenger.peerMap.get(friendMessages).BuildBleMessageOut(m.GetAllBytes()).substring(0,8);
-					logMessage("! queued " + queuedMsg + " for " + friendMessages);
-				} else {
-					logMessage("a: no msg found for " + address);
-				}						
-			}
+				if (addressesToFriends.containsKey(address)) {
+					logMessage("address maps to friend");	
 			
+					ArrayList<BleApplicationMessage> friendMessages = GetMessageForFriend(addressesToFriends.get(address));
+					
+					logMessage("found " + friendMessages.size() + " messages to send for friend");
+					// queue up all the messages we've got for this dude
+					for (BleApplicationMessage m : friendMessages) {
+		
+						String queuedMsg = "";
+						// TODO: try/catch after debugging
+						queuedMsg = bleMessenger.peerMap.get(address).BuildBleMessageOut(m.GetAllBytes()).substring(0,8);
+						logMessage("! queued " + queuedMsg + " for " + friendMessages);
+					}
+					
+				} else {
+					logMessage("address doesn't map to friend, won't queue message");
+				}
+				
+
+			}
 			
 		}
 		
