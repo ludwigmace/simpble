@@ -43,7 +43,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
 
 	private static final String TAG = "MAIN";
-	private static final int DEBUGLEVEL = 0;
+	private static final int DEBUGLEVEL = 1;
 
     private static final int ACTIVITY_CREATE=0;
 
@@ -342,6 +342,8 @@ public class MainActivity extends Activity {
 		// we just got a notification
 		public void peerNotification(String peerIndex, String notification) {
 			
+			Log.v(TAG, "peerNotification " + peerIndex + " " + notification);
+			
 			if (notification.equalsIgnoreCase("connection_change")) {
 				logMessage("a: connection status changed for " + peerIndex);
 			}
@@ -364,8 +366,12 @@ public class MainActivity extends Activity {
 
 				BleApplicationMessage sentMsg = new BleApplicationMessage();
 				
+				// rebuild the message that was just sent
 				sentMsg.SetRawBytes(bleMessenger.peerMap.get(peerIndex).getBleMessageOut(msg_id).GetAllBytes());
 				
+				// signature is only stored in the database
+								
+				// pull the message's signature to mark for closing
 				final String peerSentTo = peerIndex;
 				String sig = "no_signature";
 				
@@ -425,7 +431,7 @@ public class MainActivity extends Activity {
 						if (mTopic != null) {
 							
 							String queuedMsg = "";
-							queuedMsg = bleMessenger.peerMap.get(remoteAddress).BuildBleMessageOut(mTopic.GetAllBytes()).substring(0,8);
+							queuedMsg = bleMessenger.AddMessage(remoteAddress, mTopic);
 							
 							logMessage("a5: queued " + queuedMsg + " for " + remoteAddress);
 
@@ -687,7 +693,8 @@ public class MainActivity extends Activity {
 				// this should only be run immediately after connecting, and only if you want to send your id
 				if (p.TransportTo) {
 					logMessage("transport open, we want to send it, queue it up");					
-					p.BuildBleMessageOut(identityMessage().GetAllBytes());
+
+					String queuedMsg = bleMessenger.AddMessage(address, identityMessage());
 				}
 				
 			} else {
@@ -697,7 +704,7 @@ public class MainActivity extends Activity {
 				if (addressesToFriends.containsKey(address)) {
 					logMessage("address maps to friend");	
 			
-					ArrayList<BleApplicationMessage> friendMessages = GetMessageForFriend(addressesToFriends.get(address));
+					ArrayList<BleApplicationMessage> friendMessages = GetMessagesForFriend(addressesToFriends.get(address));
 					
 					logMessage("found " + friendMessages.size() + " messages to send for friend");
 					// queue up all the messages we've got for this dude
@@ -705,7 +712,8 @@ public class MainActivity extends Activity {
 		
 						String queuedMsg = "";
 						// TODO: try/catch after debugging
-						queuedMsg = bleMessenger.peerMap.get(address).BuildBleMessageOut(m.GetAllBytes()).substring(0,8);
+
+						queuedMsg = bleMessenger.AddMessage(address, m);
 						logMessage("! queued " + queuedMsg + " for " + friendMessages);
 					}
 					
@@ -820,7 +828,7 @@ public class MainActivity extends Activity {
 	}
 	
 	
-	private ArrayList<BleApplicationMessage> GetMessageForFriend(String candidateFingerprint) {
+	private ArrayList<BleApplicationMessage> GetMessagesForFriend(String candidateFingerprint) {
 		Cursor c = mDbHelper.fetchMsgsForFriend(candidateFingerprint);
 		
 		ArrayList<BleApplicationMessage> results = new ArrayList<BleApplicationMessage>();
@@ -834,7 +842,6 @@ public class MainActivity extends Activity {
 				
 				m = new BleApplicationMessage();
 				
-				
 				String msg_content = c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT));
 				String msg_type = c.getString(c.getColumnIndex(FriendsDb.KEY_M_MSGTYPE));
 				String msg_signature = c.getString(c.getColumnIndex(FriendsDb.KEY_M_MSGID));
@@ -842,10 +849,6 @@ public class MainActivity extends Activity {
 				
 				if (msg_signature == null) {
 					msg_signature = "";
-				}
-		
-				if (msg_type.equalsIgnoreCase("encrypt")) {
-					
 				}
 				
 				m.RecipientFingerprint = candidateFingerprint.getBytes();

@@ -146,6 +146,8 @@ public class BleApplicationMessage {
 				SenderFingerprint = Arrays.copyOfRange(RawBytes, 21, 41); // bytes 21-40
 				MessagePayload = Arrays.copyOfRange(RawBytes, 41, RawBytes.length+1); //bytes 41 through end
 	
+				messageSignature = ByteUtilities.digestAsHex(RawBytes);
+				
 				success = true;
 			}
 		}

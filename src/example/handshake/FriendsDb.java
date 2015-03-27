@@ -282,8 +282,9 @@ public class FriendsDb extends SQLiteOpenHelper {
     public boolean updateMsgSent(String signature, String fp) {
         ContentValues args = new ContentValues();
         args.put(KEY_M_RECIP, fp);
-
+        Log.v(TAG, "update msg " + signature + " w/ fp " + fp);
         return mDb.update(MSGS_TABLE, args, KEY_M_MSGID + " = ?", new String[] {signature}) > 0;
+        
     }
     
     // the message id from the database OBVIOUSLY doesn't match the message id for a message session

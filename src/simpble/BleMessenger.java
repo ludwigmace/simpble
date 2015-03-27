@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
@@ -122,7 +123,7 @@ public class BleMessenger {
 		serviceDef.add(new BleCharacteristic("identifier_read", uuidFromBase("100"), BleGattCharacteristics.GATT_READ));		
 		serviceDef.add(new BleCharacteristic("identifier_writes", uuidFromBase("101"), BleGattCharacteristics.GATT_WRITE));
 		serviceDef.add(new BleCharacteristic("data_notify", uuidFromBase("102"), BleGattCharacteristics.GATT_INDICATE));
-		serviceDef.add(new BleCharacteristic("flow_control", uuidFromBase("105"), BleGattCharacteristics.GATT_READ));
+		serviceDef.add(new BleCharacteristic("flow_control", uuidFromBase("105"), BleGattCharacteristics.GATT_READWRITE));
 		//serviceDef.add(new BleCharacteristic("data_indicate", uuidFromBase("103"), MyAdvertiser.GATT_INDICATE));
 		//serviceDef.add(new BleCharacteristic("data_write", uuidFromBase("104"), MyAdvertiser.GATT_WRITE));
 
@@ -388,14 +389,11 @@ public class BleMessenger {
 		
 		// we sent packets out, so clear our pending list (we'll requeue missing later)
 		m.ClearPendingPackets();
-		
+		/*
 		if (peer.ConnectedAs.equalsIgnoreCase("central")) {
 			// need to make sure I requeue all the packets if the other message doesn't know what happened
 			bleStatusCallback.headsUp("m: finished send; checking if rcvd");
-		
-			// TODO: this part about checking needs to be set from the calling application
-			// see if we're missing any pending packets
-			bleCentral.submitCharacteristicReadRequest(peerAddress, uuidFromBase("105"));
+			
 		} else {
 			if (sent == bps.size()) {
 				// TODO: the peripheral should check send status
@@ -406,7 +404,46 @@ public class BleMessenger {
 				bleStatusCallback.headsUp("m: sent " + String.valueOf(sent) + " packets instead of " + String.valueOf(bps.size()));
 			}
 		}
+		*/
+		RequestAcknowledgment(peer);
 		
+		
+	}
+	
+	private String GetAddressForPeer(BlePeer p) {
+		String peerAddress = "";
+		
+		for (Entry<String, BlePeer> entry : peerMap.entrySet()) {
+			if (p.equals(entry.getValue())) {
+				peerAddress = entry.getKey();
+			}
+		}
+		
+		return peerAddress;
+	}
+	
+	private boolean RequestAcknowledgment(BlePeer p) {
+		// TODO: this part about checking needs to be set from the calling application
+		boolean request_sent = false;
+		
+		String peerAddress = GetAddressForPeer(p);
+		
+		if (p.ConnectedAs.equalsIgnoreCase("central")) { 
+			if (p.TransportTo) {
+				bleCentral.submitCharacteristicReadRequest(peerAddress, uuidFromBase("105"));
+				request_sent = true;
+			}
+
+		} else {
+			if (p.TransportTo) {
+				//TODO: peripheral needs to send message to central requesting acknowledgment which central will write to 105
+				request_sent = true;
+			}
+		}
+		
+		// next action happens when processMessageSendAcknowledgment is called back
+		
+		return request_sent;
 		
 	}
 
@@ -506,12 +543,29 @@ public class BleMessenger {
     	
     	// If all the expected packets have been received, process this message
     	if (msgBeingBuilt.PendingPacketStatus() == false) {
-    		// hash was pulled in last BuildMessageFromPackets called
     		
-    		// TODO: the hash part is iffy here; right now hash part won't be here
-    		// need to add a transport level hash!
-    		// right now we have a message level hash!
+    		
+    		// we can do this before we're even asked about it
+    		if (p.ConnectedAs.equalsIgnoreCase("central")) {
+    			
+    			// what message are we talking about?
+    			byte[] ACKet = ByteUtilities.intToByte(parentMessage);
+    			
+    			// create an acknowledgment packet with only 0's, indicating we got it all
+    			byte[] ack = new byte[20];
+    			ack = Arrays.copyOf(ACKet, ack.length);
+    			
+    			//bleCentral.submitCharacteristicWriteRequest(remoteAddress, uuidFromBase("105"));
+    			bleCentral.submitCharacteristicWriteRequest(remoteAddress, uuidFromBase("105"), ack);
+    		} else {
+    			// when peripheral receives a message, we wait until asked
+    		}
+    		
+    		
+    		// TODO: do we need to have a hash check?
     		bleStatusCallback.handleReceivedMessage(remoteAddress, msgBeingBuilt.GetAllBytes());
+    		
+    		
 
     	} else {
     		// TODO: we need to have some kind of deal where we set a timer, and if no more packets are received for this message then we . . . do something?
@@ -522,7 +576,7 @@ public class BleMessenger {
 		
     }
     
-    public void checkSendStatus(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
+    public void processMessageSendAcknowledgment(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
     	// get the remote peer based on the address
     	
     	BlePeer p = peerMap.get(remoteAddress);
@@ -681,6 +735,7 @@ public class BleMessenger {
 					// get the first message
 					BleMessage m = p.getBleMessageIn(k);
 
+					// TODO: this can be its own function to be re-used for Central
 					if (!m.ReceiptAcknowledged) {
 						// see if we've got any missing packets
 						ArrayList<Integer> missing = m.GetMissingPackets();
@@ -744,7 +799,7 @@ public class BleMessenger {
     		if (remoteCharUUID.compareTo(uuidFromBase("102")) == 0) {
     			incomingMessage(remoteAddress, remoteCharUUID, incomingBytes);    			
     		} else if (remoteCharUUID.compareTo(uuidFromBase("105")) == 0) {
-    			checkSendStatus(remoteAddress, remoteCharUUID, incomingBytes);
+    			processMessageSendAcknowledgment(remoteAddress, remoteCharUUID, incomingBytes);
     		}
     		
     	}
@@ -807,6 +862,21 @@ public class BleMessenger {
     	
     };
     
-    
+    /**
+     * Add a message to the outgoing queue for a connected peer
+     * 
+     * @param remoteAddress The identifier for the target connectee; this is how SimpBle identifies the recipient
+     * @param msg A BleApplicationMessage object with all the right stuff
+     * @return The first several scharacters of a hash of the entire BleMessage (network level)
+     */
+    public String AddMessage(String remoteAddress, BleApplicationMessage msg) {
+    	String result = "";
+		BlePeer p = peerMap.get(remoteAddress);
+		
+		result = p.BuildBleMessageOut(msg.GetAllBytes()).substring(0,8);
+    	
+    	return result;
+    	
+    }
     
 }

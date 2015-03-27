@@ -29,6 +29,28 @@ public class ByteUtilities {
     	return bytes;
     }
     
+    /**
+     * Given a primitive int datatype (0-2,147,483,647), return the corresponding byte array
+     * 
+     * @param i Primitive integer between 0 and 2147483647
+     * @return byte array (max 4 bytes)
+     */
+    public static byte[] intToByte(int i) {
+    	
+    	if (i > 0 && i <= 255) {
+    		return new byte[] {(byte) i};
+    	} else if (i > 255 && i <= 65535) {
+    		return new byte[] {(byte) (i >> 8), (byte) i};
+    	} else if (i > 65535 && i <= 16777215) {
+    		return new byte[] {(byte) (i >> 16), (byte) (i >> 8), (byte) i};
+    	} else if (i > 65535 && i <= 16777215) {
+    		return new byte[] {(byte) (i >> 16), (byte) (i >> 8), (byte) i};
+    	} else if (i > 16777215 && i <= 2147483647) { // max for primitive int
+    		return new byte[] {(byte) (i >> 24), (byte) (i >> 16), (byte) (i >> 8), (byte) i};
+    	} else {
+    		return null;
+    	}
+    }
 
     
     public static byte[] trimmedBytes(byte[] bytes) {

@@ -191,12 +191,15 @@ public class BlePeer {
 	public String BuildBleMessageOut(byte[] MsgBytes) {
 		
 		BleMessage m = new BleMessage();
+		
 		m.SetRawBytes(MsgBytes);
 		
-		Log.v(TAG, "added message #" + String.valueOf(MaxMessageCounter) + " (" + ByteUtilities.bytesToHex(m.MessageHash) + "), peer " + this.toString());
 		m.SetMessageNumber(MaxMessageCounter);
+		
 		peerMessagesOut.append(MaxMessageCounter, m);
+		
 		MaxMessageCounter++;
+		
 		return ByteUtilities.bytesToHex(m.MessageHash);
 			
 	}
