@@ -134,7 +134,7 @@ public class BlePeer {
 		BleMessage m = peerMessagesOut.get(MessageIdentifier);
 			
 			if (m != null) {
-				Log.v(TAG, "found message at index " + String.valueOf(MessageIdentifier) + " with hash " + ByteUtilities.bytesToHex(m.MessageHash));
+				Log.v(TAG, "found message at index " + String.valueOf(MessageIdentifier) + " with hash " + ByteUtilities.bytesToHex(m.PayloadDigest));
 			} else {
 				Log.v(TAG, "no message found at index " + String.valueOf(MessageIdentifier));
 			}
@@ -188,19 +188,24 @@ public class BlePeer {
 	}
 	
 	
+	/**
+	 * Pass in a byte array to build a BleMessage from a BleApplicationMessage; the message is built and a payload of the digest is returned
+	 * 
+	 * @param MsgBytes Raw byte of the payload of the BleApplicationMessage to send
+	 * @return Digest of the payload
+	 */
 	public String BuildBleMessageOut(byte[] MsgBytes) {
 		
 		BleMessage m = new BleMessage();
 		
 		m.SetRawBytes(MsgBytes);
-		
 		m.SetMessageNumber(MaxMessageCounter);
 		
 		peerMessagesOut.append(MaxMessageCounter, m);
 		
 		MaxMessageCounter++;
 		
-		return ByteUtilities.bytesToHex(m.MessageHash);
+		return ByteUtilities.bytesToHex(m.PayloadDigest);
 			
 	}
 	

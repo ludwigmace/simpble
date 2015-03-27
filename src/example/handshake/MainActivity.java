@@ -337,32 +337,9 @@ public class MainActivity extends Activity {
 	// however if i just want to ferry messages or don't care to receive one (maybe i just want to send)
 	// then i don't need to volunteer my info
 	BleStatusCallback bleMessageStatus = new BleStatusCallback() {
-
 		
-		// we just got a notification
-		public void peerNotification(String peerIndex, String notification) {
-			
-			Log.v(TAG, "peerNotification " + peerIndex + " " + notification);
-			
-			if (notification.equalsIgnoreCase("connection_change")) {
-				logMessage("a: connection status changed for " + peerIndex);
-			}
-			
-			if (notification.equalsIgnoreCase("server_disconnected")) {
-				logMessage("a: disconnected from " + peerIndex);
-			}
-			
-			if (notification.contains("msg_sent")) {
-				
-				int msg_id = -1;
-				String msgid_as_string = "";
-				// here's me not being thread safe
-				try {
-					msgid_as_string = notification.substring(9, notification.length());
-					msg_id = Integer.valueOf(msgid_as_string);
-				} catch (Exception e) {
-					logMessage("!" + notification);
-				}
+		public void messageDelivered(String remoteAddress, String payloadDigest) {
+
 
 				BleApplicationMessage sentMsg = new BleApplicationMessage();
 				
@@ -381,10 +358,24 @@ public class MainActivity extends Activity {
 				
 				final String msgSignature = sig; 
 				
-				runOnUiThread(new Runnable() { public void run() { MarkMsgSent(msgSignature, peerSentTo); } });
+				runOnUiThread(new Runnable() { public void run() { MarkMsgSent(msgSignature, peerSentTo); } });			
+			
+		}
 				
-				
+		// we just got a notification
+		public void peerNotification(String peerIndex, String notification) {
+			
+			Log.v(TAG, "peerNotification " + peerIndex + " " + notification);
+			
+			if (notification.equalsIgnoreCase("connection_change")) {
+				logMessage("a: connection status changed for " + peerIndex);
 			}
+			
+			if (notification.equalsIgnoreCase("server_disconnected")) {
+				logMessage("a: disconnected from " + peerIndex);
+			}
+			
+
 			
 			
 		}
@@ -682,6 +673,8 @@ public class MainActivity extends Activity {
 		
 			BlePeer p  = entry.getValue();
 			String address = entry.getKey();
+			String queuedMessageDigest = "";
+
 			
 			// if we don't have that this person is already connected
 			if (!connectedAddresses.contains(address)) {
@@ -694,7 +687,7 @@ public class MainActivity extends Activity {
 				if (p.TransportTo) {
 					logMessage("transport open, we want to send it, queue it up");					
 
-					String queuedMsg = bleMessenger.AddMessage(address, identityMessage());
+					queuedMessageDigest = bleMessenger.AddMessage(address, identityMessage());
 				}
 				
 			} else {
@@ -709,21 +702,14 @@ public class MainActivity extends Activity {
 					logMessage("found " + friendMessages.size() + " messages to send for friend");
 					// queue up all the messages we've got for this dude
 					for (BleApplicationMessage m : friendMessages) {
-		
-						String queuedMsg = "";
-						// TODO: try/catch after debugging
-
-						queuedMsg = bleMessenger.AddMessage(address, m);
-						logMessage("! queued " + queuedMsg + " for " + friendMessages);
+						queuedMessageDigest = bleMessenger.AddMessage(address, m);
 					}
 					
 				} else {
 					logMessage("address doesn't map to friend, won't queue message");
 				}
-				
-
 			}
-			
+						
 		}
 		
 		bleMessenger.GooseBusy();

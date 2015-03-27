@@ -16,4 +16,6 @@ public interface BleStatusCallback {
 	
 	public void headsUp(String msg, String action);
 	
+	public void messageDelivered(String remoteAddress, String payloadDigest);
+	
 }

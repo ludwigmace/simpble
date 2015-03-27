@@ -19,7 +19,7 @@ import com.google.common.primitives.Bytes;
 public class BleMessage {
 
 	private static final String TAG = "BLEG";
-	private static final int MessagePacketSize = 20; 
+	private static final int PACKETSIZE = 20; 
 	
 	// holds all the packets that make up this message
 	private SparseArray<BlePacket> messagePackets;
@@ -43,8 +43,10 @@ public class BleMessage {
 	
 	public byte MessageType;
 	
-	// truncated sha1 of message; carried in Packet 0 of every message
-	public byte[] MessageHash;
+	/**
+	 * SHA1 hash of the message payload, truncated to fit in the last 15 bytes of the first packet that goes out
+	 */
+	public byte[] PayloadDigest;
 	
 	// body of message in bytes
 	public byte[] MessagePayload;
@@ -204,7 +206,7 @@ public class BleMessage {
         
         // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
         // (i want my digest to be the packet size less the 5 bytes needed for header info)
-        byte[] calcDigest = Arrays.copyOfRange(md.digest(ByteUtilities.trimmedBytes(allBytes)), 0, MessagePacketSize - 5);
+        byte[] calcDigest = Arrays.copyOfRange(md.digest(ByteUtilities.trimmedBytes(allBytes)), 0, PACKETSIZE - 5);
 		
 		//return ByteUtilities.bytesToHexShort(calcDigest);
         
@@ -228,7 +230,7 @@ public class BleMessage {
        
         // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
         // (i want my digest to be the packet size less the 5 bytes needed for header info)
-        return Arrays.copyOfRange(md.digest(ByteUtilities.trimmedBytes(allBytes)), 0, MessagePacketSize - 5);
+        return Arrays.copyOfRange(md.digest(ByteUtilities.trimmedBytes(allBytes)), 0, PACKETSIZE - 5);
 		
 	}
 	
@@ -237,9 +239,7 @@ public class BleMessage {
 	/**
 	 * Takes the message payload from the calling method and builds the list
 	 * of BlePackets
-	 * 
-	 * @param Payload Body of the message you want to send in bytes
-	 * @param MessagePacketSize The size of the message packets
+
 	 */
 	private void constructPackets() {
 
@@ -255,12 +255,10 @@ public class BleMessage {
         // how many packets?  divide msg length by packet size, w/ trick to round up
         // so the weird thing is we've got to leave a byte in each msg, so effectively our
         // msg blocks are decreased by an extra byte, hence the -4 and -3 below
-        int msgCount  = (allBytes.length + MessagePacketSize - 4) / (MessagePacketSize - 3);
+        int msgCount  = (allBytes.length + PACKETSIZE - 4) / (PACKETSIZE - 3);
         
         // first byte is counter; 0 provides meta info about msg
         // right now it's just how many packets to expect
-                
-        Log.v(TAG, "first payload is of size: " + String.valueOf(MessageHash.length));
         
         // first byte is which message this is for the receiver to understand
         // second/third bytes are current packet
@@ -278,7 +276,7 @@ public class BleMessage {
          * 2 bytes  - the number of BlePackets,
          * n bytes - the message digest
         */ 
-        byte[] firstPacket = Bytes.concat(new byte[]{(byte)(messageNumber & 0xFF)}, new byte[]{(byte)0x00, (byte)0x00}, msgSize, MessageHash);
+        byte[] firstPacket = Bytes.concat(new byte[]{(byte)(messageNumber & 0xFF)}, new byte[]{(byte)0x00, (byte)0x00}, msgSize, PayloadDigest);
 
         // create a BlePacket of index 0 using the just created payload
         addPacket(0, firstPacket);
@@ -291,10 +289,10 @@ public class BleMessage {
 			
 			/* based on the current sequence number and the message packet size
 			 *  get the read index in the MessageBytes array */
-			int currentReadIndex = ((msgSequence - 1) * (MessagePacketSize - 3));
+			int currentReadIndex = ((msgSequence - 1) * (PACKETSIZE - 3));
 		
 			// leave room for the message counters (the -3 at the end)
-			byte[] val = Arrays.copyOfRange(allBytes, currentReadIndex, currentReadIndex + MessagePacketSize - 3);
+			byte[] val = Arrays.copyOfRange(allBytes, currentReadIndex, currentReadIndex + PACKETSIZE - 3);
 
 			// the current packet counter is the message sequence, in two bytes
 	        byte[] currentPacketCounter = new byte[2];
@@ -407,7 +405,7 @@ public class BleMessage {
 		boolean success = false;
 		
 		allBytes = RawMessageBytes;
-		MessageHash  = Arrays.copyOfRange(ByteUtilities.digestAsBytes(allBytes), 0, MessagePacketSize - 5);
+		PayloadDigest  = Arrays.copyOfRange(ByteUtilities.digestAsBytes(allBytes), 0, PACKETSIZE - 5);
 
 		return success;
 	}
@@ -432,7 +430,7 @@ public class BleMessage {
 				try {
 					// if this is the first packet in the sequence, the first couple of bytes are header and the rest are the Hash
 		        	if (packet.MessageSequence == 0) {
-		        		MessageHash = Arrays.copyOfRange(packet.MessageBytes, 2, packet.MessageBytes.length);
+		        		PayloadDigest = Arrays.copyOfRange(packet.MessageBytes, 2, packet.MessageBytes.length);
 		        	} else {
 		        		try {
 							os.write(packet.MessageBytes);
@@ -442,7 +440,7 @@ public class BleMessage {
 						}
 		        	}
 				} catch (Exception e) {
-					Log.e(TAG, "b.MessageSequence didn't return anything, or couldn't build MessageHash: " + e.getMessage());
+					Log.e(TAG, "b.MessageSequence didn't return anything, or couldn't build PayloadDigest: " + e.getMessage());
 					return failure;
 				}
 			} else {

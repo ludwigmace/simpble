@@ -63,6 +63,8 @@ public class BleMessenger {
     // allows us to look up peers by connected addresses
     public Map<String, BlePeer> peerMap;
     
+    private Map<String, String> messageMap;
+    
     // our idmessage should stay the same, so save it in a global variable
     // allow to be set from calling functions
 	public BleMessage idMessage;
@@ -75,7 +77,7 @@ public class BleMessenger {
 	
     /**
      * Instantiates serviceDef arraylist, peerMap, fpNetMap, creates handles for peripheral/central,
-     * populates serviceDef, and instantiates bleMessageMap
+     * populates serviceDef
      * 
      * @param bluetoothManager Instantiated BluetoothManager object you create
      * @param bluetoothAdapter Instantiated BluetoothAdapter object you create
@@ -112,6 +114,9 @@ public class BleMessenger {
 		
 		// i need a place to put my found peers
 		peerMap = new HashMap<String, BlePeer>();
+		
+		// when you start delivering a message, get an identifier so you can tell the calling application when you've delivered it
+		messageMap = new HashMap<String, String>();
 		
 		// create your server for listening and your client for looking; Android can be both at the same time
 		
@@ -219,7 +224,7 @@ public class BleMessenger {
 			// we're calling a method to send any pending messages for a particular peer
 			// mainly because we don't store the identifier for the peer in a particular BleMessage (although we could?)
 			if (m != null) {
-				Log.v("DOIT", "pulled msg #" + String.valueOf(m.GetMessageNumber()) + ", " + ByteUtilities.bytesToHex(m.MessageHash).substring(0,8));
+				Log.v("DOIT", "pulled msg #" + String.valueOf(m.GetMessageNumber()) + ", " + ByteUtilities.bytesToHex(m.PayloadDigest).substring(0,8));
 				areWeSendingMessages = true;
 				sendMessagesToPeer(p);
 			}
@@ -331,6 +336,9 @@ public class BleMessenger {
 		
 		// given a peer, get the first message in the queue to send out
 		BleMessage m = peer.getBleMessageOut();
+		
+		// add (or update) a mapping of the digest of this message to a way to get it
+		messageMap.put(peerAddress + "_" + m.GetMessageNumber(), ByteUtilities.bytesToHex(m.PayloadDigest));
 			
 		// if no message found, there's a problem
 		if (m == null) {
@@ -603,6 +611,9 @@ public class BleMessenger {
     	bleStatusCallback.headsUp("m: msg currently has " + String.valueOf(m.GetPendingPackets().size()) + " packets to send");
 
 		if (m != null) {
+			
+			String payloadDigest = messageMap.get(remoteAddress + "_" + msg_id);
+			
 			bleStatusCallback.headsUp("m: bleMessage found at index " + String.valueOf(msg_id));
 
 			// how many missing packets?  if 0, we're all set; call it done
@@ -611,8 +622,10 @@ public class BleMessenger {
 	    	// if we're all done, mark this message sent
 	    	if (missing_packet_count == 0) {
 	    		bleStatusCallback.headsUp("m: all sent, removing msg " + String.valueOf(msg_id) + " from queue") ;
-	    		bleStatusCallback.peerNotification(remoteAddress, "msg_sent_" + String.valueOf(msg_id));
+	    		//bleStatusCallback.peerNotification(remoteAddress, "msg_sent_" + String.valueOf(msg_id));
+	    		bleStatusCallback.messageDelivered(remoteAddress, payloadDigest);
 	    		p.RemoveBleMessage(msg_id);
+	    		
 	    	} else {
 	    		// read the missing packet numbers into an array
 	    		byte[] missingPackets = Arrays.copyOfRange(incomingBytes, 2, incomingBytes.length);
@@ -687,8 +700,12 @@ public class BleMessenger {
 
     	public void incomingMissive(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
     		// based on remoteAddress, UUID of remote characteristic, put the incomingBytes into a Message
-    		// probably need to have a switchboard function
-    		incomingMessage(remoteAddress, remoteCharUUID, incomingBytes);
+    		
+    		if (remoteCharUUID.compareTo(uuidFromBase("105")) == 0) {
+    			processMessageSendAcknowledgment(remoteAddress, remoteCharUUID, incomingBytes);    			
+    		} else  {
+    			incomingMessage(remoteAddress, remoteCharUUID, incomingBytes);	
+    		}
     			
     	}
 
@@ -867,13 +884,14 @@ public class BleMessenger {
      * 
      * @param remoteAddress The identifier for the target connectee; this is how SimpBle identifies the recipient
      * @param msg A BleApplicationMessage object with all the right stuff
-     * @return The first several scharacters of a hash of the entire BleMessage (network level)
+     * @return A digest of the message's payload
      */
     public String AddMessage(String remoteAddress, BleApplicationMessage msg) {
     	String result = "";
 		BlePeer p = peerMap.get(remoteAddress);
 		
-		result = p.BuildBleMessageOut(msg.GetAllBytes()).substring(0,8);
+		// pass your message's bytes to the peer object to build a BleMessage to send, and get a digest of that message
+		result = p.BuildBleMessageOut(msg.GetAllBytes());
     	
     	return result;
     	
