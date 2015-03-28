@@ -6,8 +6,6 @@ public interface BleStatusCallback {
 	
 	public void handleReceivedMessage(String remoteAddress, byte[] MessageBytes);
 	
-	public void peerNotification(String peerIndex, String notification);
-	
 	public void advertisingStarted();
 	
 	public void advertisingStopped();
@@ -17,5 +15,7 @@ public interface BleStatusCallback {
 	public void headsUp(String msg, String action);
 	
 	public void messageDelivered(String remoteAddress, String payloadDigest);
+	
+	public void peerDisconnect(String device);
 	
 }

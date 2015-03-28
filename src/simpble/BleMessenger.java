@@ -21,6 +21,7 @@ import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.os.Build;
 import android.util.Log;
@@ -397,22 +398,7 @@ public class BleMessenger {
 		
 		// we sent packets out, so clear our pending list (we'll requeue missing later)
 		m.ClearPendingPackets();
-		/*
-		if (peer.ConnectedAs.equalsIgnoreCase("central")) {
-			// need to make sure I requeue all the packets if the other message doesn't know what happened
-			bleStatusCallback.headsUp("m: finished send; checking if rcvd");
-			
-		} else {
-			if (sent == bps.size()) {
-				// TODO: the peripheral should check send status
-				bleStatusCallback.peerNotification(peerAddress, "msg_sent_" + String.valueOf(m.GetMessageNumber()));
-				peer.RemoveBleMessage(m.GetMessageNumber());
-			} else {
 
-				bleStatusCallback.headsUp("m: sent " + String.valueOf(sent) + " packets instead of " + String.valueOf(bps.size()));
-			}
-		}
-		*/
 		RequestAcknowledgment(peer);
 		
 		
@@ -626,7 +612,7 @@ public class BleMessenger {
 	    	// if we're all done, mark this message sent
 	    	if (missing_packet_count == 0) {
 	    		bleStatusCallback.headsUp("m: all sent, removing msg " + String.valueOf(msg_id) + " from queue") ;
-	    		//bleStatusCallback.peerNotification(remoteAddress, "msg_sent_" + String.valueOf(msg_id));
+
 	    		bleStatusCallback.messageDelivered(remoteAddress, payloadDigest);
 	    		p.RemoveBleMessage(msg_id);
 	    		
@@ -675,7 +661,7 @@ public class BleMessenger {
     		BlePeer p = new BlePeer(device);
     		
     		// if connected
-    		if (newStatus == 2) {
+    		if (newStatus == BluetoothProfile.STATE_CONNECTED) {
     			
 	    		Log.v(TAG, "add id message to connection's message map");
 	    		
@@ -695,7 +681,7 @@ public class BleMessenger {
 	    		
     		} else {
 	    		// let the calling activity know that as a peripheral, we've lost or connection
-    			bleStatusCallback.peerNotification(device, "connection_change");
+    			bleStatusCallback.peerDisconnect(device);
     			p.TransportFrom = false;
     			p.TransportTo = false;
     		}
@@ -878,7 +864,7 @@ public class BleMessenger {
 		@Override
 		public void reportDisconnect(String remoteAddress) {
 			// report disconnection to MainActivity
-			bleStatusCallback.peerNotification(remoteAddress, "server_disconnected");
+			bleStatusCallback.peerDisconnect(remoteAddress);
 		}
     	
     };

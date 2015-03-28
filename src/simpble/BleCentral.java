@@ -58,7 +58,7 @@ public class BleCentral {
     // bluetooth gatt functionality pointed to a particular remote server
     private Map<String, BluetoothGatt> gattS;
     
-    // scan for 2 1/2 seconds at a time
+    // scan duration
     private long scanDuration;
 
     // scanning object
@@ -88,6 +88,7 @@ public class BleCentral {
     	
     	boolean validUuidBase = false;
     	
+    	// check if the service base passed in is valid
     	try {
     		UUID u = UUID.fromString(serviceUuidBase);
     		validUuidBase = true;
@@ -117,8 +118,8 @@ public class BleCentral {
         gattS = new HashMap<String, BluetoothGatt>();
         
         ScanSettings.Builder sb = new ScanSettings.Builder();
-        sb.setReportDelay(0);
-        sb.setScanMode(1);         //sb.setScanMode(ScanSettings.SCAN_MODE_BALANCED);
+        sb.setReportDelay(0); // report results immediately
+        sb.setScanMode(ScanSettings.SCAN_MODE_BALANCED); // options are: ScanSettings.SCAN_MODE_BALANCED; ScanSettings.SCAN_MODE_LOW_LATENCY, ScanSettings.SCAN_MODE_LOW_POWER;
         bleScanSettings = sb.build();
         
         ScanFilter.Builder sf = new ScanFilter.Builder();
@@ -154,9 +155,7 @@ public class BleCentral {
     
     
     public void setRequiredServiceDef(List<BleCharacteristic> bleChars) {
-    	
     	serviceDef = bleChars;
-    	
     }
     
     public boolean submitSubscription(String remoteAddr, UUID uuidChar) {
@@ -209,9 +208,7 @@ public class BleCentral {
     	    	
 		return result;
     }
-    
-
-    
+        
     public boolean isScanning() {
     	return mScanning;
     }
@@ -343,11 +340,7 @@ public class BleCentral {
         		
         		bleCentralHandler.subscribeSuccess(remote, c.getUuid());	
         		
-    			
     		}
-    		
-    		
-
     	}
     	    	
         @Override
@@ -444,12 +437,10 @@ public class BleCentral {
         // Result of a characteristic read operation
         public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
-            	
-            	//bleCentralHandler.readCharacteristicReturned(gatt, characteristic, characteristic.getValue(), status);
-            	//bleCentralHandler.getReadCharacteristic(gatt, characteristic, characteristic.getValue(), status);
+
             	bleCentralHandler.incomingMissive(gatt.getDevice().getAddress(), characteristic.getUuid(), characteristic.getValue());
-            	
                 Log.v(TAG, "+read " + characteristic.getUuid().toString() + ": " + new String((characteristic.getValue())));
+                
             } else {
             	Log.v(TAG, "-fail read " + characteristic.getUuid().toString());
             }

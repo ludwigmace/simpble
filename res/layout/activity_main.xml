@@ -60,14 +60,6 @@
 	        android:onClick="handleButtonToggleBusy"
 	        android:enabled="true" />
 	    
-		<Button
-	        android:id="@+id/startpair"
-	        android:layout_width="wrap_content"
-	        android:layout_height="wrap_content"
-	        android:text="@string/msgs_startpair"
-	        android:onClick="handleButtonStartPair"
-	        android:enabled="true" />
-
    </LinearLayout>
    
      

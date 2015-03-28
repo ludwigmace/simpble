@@ -74,8 +74,6 @@ public class MainActivity extends Activity {
     
     private Context ctx;
     
-    String currentTask;
-	
     private boolean messageReceiving = false;
     private boolean messageSending = false;
     private boolean sendToAnybody = true;
@@ -99,7 +97,6 @@ public class MainActivity extends Activity {
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
-		currentTask = "";
 		statusLogText = "";
 		ctx = this;
 		
@@ -344,6 +341,10 @@ public class MainActivity extends Activity {
 	// then i don't need to volunteer my info
 	BleStatusCallback bleMessageStatus = new BleStatusCallback() {
 		
+		public void peerDisconnect(String device) {
+			logMessage("a: disconnected from " + device);
+		}
+		
 		public void messageDelivered(String remoteAddress, String payloadDigest) {
 
 								
@@ -357,24 +358,6 @@ public class MainActivity extends Activity {
 			
 		}
 				
-		// we just got a notification
-		public void peerNotification(String peerIndex, String notification) {
-			
-			Log.v(TAG, "peerNotification " + peerIndex + " " + notification);
-			
-			if (notification.equalsIgnoreCase("connection_change")) {
-				logMessage("a: connection status changed for " + peerIndex);
-			}
-			
-			if (notification.equalsIgnoreCase("server_disconnected")) {
-				logMessage("a: disconnected from " + peerIndex);
-			}
-			
-
-			
-			
-		}
-		
 		// this is when all the packets have come in, and a message is received in its entirety
 		// TODO: too much happens in this callback; need to move things out of here!
 		@Override
@@ -660,19 +643,15 @@ public class MainActivity extends Activity {
 		
 	}
 	
-	
+	/**
+	 * Call this method to loop over every currently connected peer and make sure they're in our local list of connected peers.  If we weren't already connected
+	 * to this peer, queue up an Identity message to send to that peer.  If we've already been connected, look up this peer to see if we should
+	 * send them any messages.
+	 * 
+	 * @param view
+	 */
 	public void handleButtonToggleBusy(View view) {
-		
-		// if we're currently busy, stop being busy
-		/*
-		if (bleMessenger.BusyStatus()) {
-			bleMessenger.StopBusy();
-			btnToggleBusy.setText("!Busy");
-		} else {
-			bleMessenger.StartBusy();
-			btnToggleBusy.setText("Busy!");
-		}*/
-	
+			
 		// i really want BlePeer to not be used outside of BleMessenger!
 		for (Map.Entry<String, BlePeer> entry : bleMessenger.peerMap.entrySet()) {
 		
@@ -689,6 +668,7 @@ public class MainActivity extends Activity {
 				connectedAddresses.add(address);
 				
 				// this should only be run immediately after connecting, and only if you want to send your id
+				// if we can send messages to this peer, add our ID message
 				if (p.TransportTo) {
 					logMessage("transport open, we want to send it, queue it up");					
 
@@ -729,8 +709,6 @@ public class MainActivity extends Activity {
 		// now we need to create the payload with our friendly name and public key
 		Log.v(TAG, "Advertising Toggle Pressed");
 		
-		currentTask = "normal";
-		
 		if (!visible) {
 			Log.v(TAG, "Not currently visible, begin stuff");
 
@@ -746,41 +724,9 @@ public class MainActivity extends Activity {
 		
 		
 	}
-	
-	public void handleButtonStartPair(View view) {
-		
-		currentTask = "pair";
-		
-		// very few Android devices support advertising, so if you can, start off with advertising 
-		if (bleMessenger.SupportsAdvertising) {
-			bleMessenger.BeFound();
-		} else {
-			// central needs to scan, connect
-			bleMessenger.ScanForPeers(2500); // scan for 2.5 seconds			
-		}
-		
-		
-		// send id
-		
-	}
-	
-
-
-    final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
-    public static String bytesToHex(byte[] bytes) {
-        char[] hexChars = new char[bytes.length * 2];
-        for ( int j = 0; j < bytes.length; j++ ) {
-            int v = bytes[j] & 0xFF;
-            hexChars[j * 2] = hexArray[v >>> 4];
-            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
-        }
-        return new String(hexChars);
-    }
-    
+	    
 	public void handleButtonFindAFriend(View view) {
 		logMessage("a: look around");
-
-		currentTask = "normal";
 		
 		// calls back bleMessageStatus when peers are found
 		bleMessenger.ScanForPeers(2500);
@@ -858,14 +804,9 @@ public class MainActivity extends Activity {
 					SecureRandom sr = new SecureRandom();
 					byte[] aeskey = new byte[32]; // 512 bit key
 					sr.nextBytes(aeskey);
-					//byte[] aeskey = new String("thisismydamnpassphrasepleaseacceptthisasthegodshonestthruthofmine!").getBytes();
 
-					// and random IV
 					byte[] iv = new byte[16];
 					sr.nextBytes(iv);
-					
-					// debugging
-					//iv = new byte[] { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
 					
 					AESCrypt aes = null;
 					
@@ -888,7 +829,7 @@ public class MainActivity extends Activity {
 						if (msgbytes != null) {
 							// encrypt our encryption key using our recipient's public key 							
 							try {
-								aesKeyEncrypted = encryptedSymmetricKey(puk, aeskey);
+								aesKeyEncrypted = aes.encryptedSymmetricKey(puk);
 								Log.v(TAG, "encrypted aes key: " + ByteUtilities.bytesToHex(aesKeyEncrypted));
 							} catch (Exception e) {
 								Log.v(TAG, "couldn't encrypt aes key");	
@@ -1005,19 +946,7 @@ public class MainActivity extends Activity {
 	}
 
 	
-	private byte[] encryptedSymmetricKey(byte[] friendPuk, byte[] secretKeyBytes) throws Exception {
-    	
-		PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(friendPuk));
-    	Cipher mCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-        mCipher.init(Cipher.WRAP_MODE, publicKey);
-        
-        SecretKey symmkey = new SecretKeySpec(secretKeyBytes, "AES");
-        
-        byte[] encryptedSK = mCipher.wrap(symmkey);
-        
-        return encryptedSK;
-        
-	}
+
 
     
 }
