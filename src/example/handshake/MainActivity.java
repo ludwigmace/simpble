@@ -384,6 +384,8 @@ public class MainActivity extends Activity {
 			
 			boolean bMessageBuilt = incomingMsg.SetRawBytes(MessageBytes);
 			
+			Log.v(TAG, "incoming raw bytes: " + ByteUtilities.bytesToHex(MessageBytes));
+			
 			if (!bMessageBuilt) {
 				return;
 			}
@@ -842,8 +844,8 @@ public class MainActivity extends Activity {
 					msg_signature = "";
 				}
 				
-				m.RecipientFingerprint = candidateFingerprint.getBytes();
-				m.SenderFingerprint = myFingerprint.getBytes();  // should probably pull from database instead; for relaying of messages
+				m.RecipientFingerprint = ByteUtilities.hexToBytes(candidateFingerprint);
+				m.SenderFingerprint = ByteUtilities.hexToBytes(myFingerprint);  // should probably pull from database instead; for relaying of messages
 				m.ApplicationIdentifier = msg_signature;
 				
 				// in case we need to encrypt this message
@@ -853,18 +855,17 @@ public class MainActivity extends Activity {
 				// if our message is meant to be encrypted, do that first
 				if (msg_type.equalsIgnoreCase("encrypted")) {
 					
-					//make this a random encryption key
 					SecureRandom sr = new SecureRandom();
-					//byte[] aeskey = new byte[32]; // 512 bit key
-					//sr.nextBytes(aeskey);
-					byte[] aeskey = new String("thisismydamnpassphrasepleaseacceptthisasthegodshonestthruthofmine!").getBytes();
+					byte[] aeskey = new byte[32]; // 512 bit key
+					sr.nextBytes(aeskey);
+					//byte[] aeskey = new String("thisismydamnpassphrasepleaseacceptthisasthegodshonestthruthofmine!").getBytes();
 
 					// and random IV
 					byte[] iv = new byte[16];
-					//sr.nextBytes(iv);
+					sr.nextBytes(iv);
 					
 					// debugging
-					iv = new byte[] { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+					//iv = new byte[] { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
 					
 					AESCrypt aes = null;
 					
@@ -905,7 +906,7 @@ public class MainActivity extends Activity {
 				if (msg_type.equalsIgnoreCase("encrypted")) {
 					
 					
-					m.MessageType = (byte)BleMessenger.MSGTYPE_ENCRYPTED_PAYLOAD;
+					m.MessageType = (byte)BleMessenger.MSGTYPE_ENCRYPTED_PAYLOAD & 0xFF;
 					m.setPayload(msgbytes);
 					
 					BleApplicationMessage m_key = new BleApplicationMessage();
@@ -932,10 +933,11 @@ public class MainActivity extends Activity {
 					results.add(m_key);
 				
 				} else {
-					m.MessageType = (byte)BleMessenger.MSGTYPE_PLAIN;
+					m.MessageType = (byte)BleMessenger.MSGTYPE_PLAIN & 0xFF;
 					m.setPayload(msgbytes);
-					
 				}
+				
+				
 				
 				results.add(m);
 			}
@@ -1004,7 +1006,7 @@ public class MainActivity extends Activity {
 
 	
 	private byte[] encryptedSymmetricKey(byte[] friendPuk, byte[] secretKeyBytes) throws Exception {
-    	/*
+    	
 		PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(friendPuk));
     	Cipher mCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
         mCipher.init(Cipher.WRAP_MODE, publicKey);
@@ -1014,8 +1016,7 @@ public class MainActivity extends Activity {
         byte[] encryptedSK = mCipher.wrap(symmkey);
         
         return encryptedSK;
-        */
-		return secretKeyBytes;
+        
 	}
 
     

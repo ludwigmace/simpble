@@ -122,9 +122,13 @@ public class BleApplicationMessage {
 		
 		allBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
 		
+		Log.v(TAG, "allBytes:" + ByteUtilities.bytesToHex(allBytes));
+		
         // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
         // (i want my digest to be the packet size less the 5 bytes needed for header info)
 		MessageHash  = Arrays.copyOfRange(ByteUtilities.digestAsBytes(allBytes), 0, MessagePacketSize - 5);
+		
+		Log.v(TAG, "Hash:" + ByteUtilities.bytesToHex(MessageHash));
      	
 	}
 	
@@ -151,6 +155,11 @@ public class BleApplicationMessage {
 				SenderFingerprint = Arrays.copyOfRange(RawBytes, 21, 41); // bytes 21-40
 				MessagePayload = Arrays.copyOfRange(RawBytes, 41, RawBytes.length+1); //bytes 41 through end
 	
+				Log.v(TAG, "MessageType: " + ByteUtilities.bytesToHex(new byte[]{MessageType}));
+				Log.v(TAG, "RecipientFingerprint: " + ByteUtilities.bytesToHex(RecipientFingerprint));
+				Log.v(TAG, "SenderFingerprint: " + ByteUtilities.bytesToHex(SenderFingerprint));
+				Log.v(TAG, "MessagePayload: " + ByteUtilities.bytesToHex(MessagePayload));
+				
 				messageSignature = ByteUtilities.digestAsHex(RawBytes);
 				
 				success = true;
