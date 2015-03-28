@@ -165,7 +165,7 @@ public class FriendsDb extends SQLiteOpenHelper {
 		
 		String qry = "SELECT a." + KEY_M_ROWID + ", " + KEY_M_CONTENT + ", " + KEY_M_MSGTYPE + ", " + KEY_M_MSGID + ", " + KEY_F_PUK;
 		qry += " FROM " + MSGS_TABLE + " a INNER JOIN " + FRIENDS_TABLE + " b ON ";
-		qry += "a." + KEY_M_FNAME + " = b." + KEY_F_NAME + " WHERE b." + KEY_F_FP + " = ?";
+		qry += "a." + KEY_M_FNAME + " = b." + KEY_F_NAME + " WHERE b." + KEY_F_FP + " = ? AND (" + KEY_M_RECIP + " = '' OR " + KEY_M_RECIP + " IS NULL)";
 		
 		Log.v(TAG, "fetchMsgsForFriend: " + qry);
 		Log.v(TAG, "friendFP: " + friendFP);

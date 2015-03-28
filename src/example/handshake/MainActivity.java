@@ -451,6 +451,8 @@ public class MainActivity extends Activity {
 				
 					// TODO: store in database
 					logMessage("message recvd of size " + String.valueOf(payload.length));
+					logMessage("message: " + new String(payload));
+					
 					// also, maybe, store the message?!?
 					break;
 					
@@ -506,9 +508,9 @@ public class MainActivity extends Activity {
 				case BleMessenger.MSGTYPE_ENCRYPTED_KEY:
 					logMessage("received encrypted key of size:" + String.valueOf(payload.length));
 					
-					byte[] incomingMessageHash = processIncomingKeyMsg(payload);
+					Log.v(TAG, "aes key payload in: " + ByteUtilities.bytesToHex(payload));
 					
-					Log.v(TAG, "added key for incoming msg hash " + ByteUtilities.bytesToHex(incomingMessageHash));
+					byte[] incomingMessageHash = processIncomingKeyMsg(payload);
 	
 					byte[] encryptedPayload = hashToPayload.get(ByteUtilities.bytesToHex(incomingMessageHash));
 					
@@ -623,12 +625,14 @@ public class MainActivity extends Activity {
 		// first 15 bytes are the hash that corresponds to the encrypted msg this key is for
 		// aesKey
 		
+		Log.v(TAG, "incoming key payload bytes:" + ByteUtilities.bytesToHex(keyPayload));
+		
 		// read in the hash of the originating message
 		byte[] hash = Arrays.copyOfRange(keyPayload, 0, 15);
 		byte[] encrypted_key = Arrays.copyOfRange(keyPayload, 15, 256+15);
 		
 		Log.v(TAG, "encrypted_key length is: " + String.valueOf(encrypted_key.length));
-		Log.v(TAG, "encrypted_key bytes are: " + ByteUtilities.bytesToHex(encrypted_key));
+		Log.v(TAG, "key bytes are: " + ByteUtilities.bytesToHex(encrypted_key));
 		
 		// let's decrypt the key so we can unlock the other message
 		SecretKey symmetric_key = null;
@@ -637,13 +641,17 @@ public class MainActivity extends Activity {
 			symmetric_key = rsaKey.unwrap(encrypted_key);
 		} catch (GeneralSecurityException e) {
 			Log.v(TAG, e.getMessage());
-			logMessage("can't unwrap the damn key");
+			logMessage("can't unwrap the key");
 		}
 		
-		// map our messages hashes to our encryption keys
-		hashToKey.put(ByteUtilities.bytesToHex(hash), symmetric_key.getEncoded());
+		if (symmetric_key != null) {
+			// map our messages hashes to our encryption keys
+			hashToKey.put(ByteUtilities.bytesToHex(hash), symmetric_key.getEncoded());
 		
-		Log.v("DOIT", "key is: " + ByteUtilities.bytesToHex(symmetric_key.getEncoded()));
+			Log.v("DOIT", "key is: " + ByteUtilities.bytesToHex(symmetric_key.getEncoded()));
+		} else {
+			Log.v("DOIT", "unable to store key");
+		}
 		
 		return hash;
 		
@@ -697,6 +705,7 @@ public class MainActivity extends Activity {
 					logMessage("found " + friendMessages.size() + " messages to send for friend");
 					// queue up all the messages we've got for this dude
 					for (BleApplicationMessage m : friendMessages) {
+						
 						queuedMessageDigest = bleMessenger.AddMessage(address, m);
 						queuedMessageMap.put(queuedMessageDigest, m.ApplicationIdentifier);
 					}
@@ -846,12 +855,16 @@ public class MainActivity extends Activity {
 					
 					//make this a random encryption key
 					SecureRandom sr = new SecureRandom();
-					byte[] aeskey = new byte[32]; // 512 bit key
-					sr.nextBytes(aeskey);
+					//byte[] aeskey = new byte[32]; // 512 bit key
+					//sr.nextBytes(aeskey);
+					byte[] aeskey = new String("thisismydamnpassphrasepleaseacceptthisasthegodshonestthruthofmine!").getBytes();
 
 					// and random IV
 					byte[] iv = new byte[16];
-					sr.nextBytes(iv);
+					//sr.nextBytes(iv);
+					
+					// debugging
+					iv = new byte[] { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
 					
 					AESCrypt aes = null;
 					
@@ -875,6 +888,7 @@ public class MainActivity extends Activity {
 							// encrypt our encryption key using our recipient's public key 							
 							try {
 								aesKeyEncrypted = encryptedSymmetricKey(puk, aeskey);
+								Log.v(TAG, "encrypted aes key: " + ByteUtilities.bytesToHex(aesKeyEncrypted));
 							} catch (Exception e) {
 								Log.v(TAG, "couldn't encrypt aes key");	
 							}
@@ -912,6 +926,8 @@ public class MainActivity extends Activity {
 					// encrypted portion of the aes key
 					byte[] aes_payload = Bytes.concat(m.MessageHash, aesKeyEncrypted);
 					m_key.setPayload(aes_payload);
+					
+					Log.v(TAG, "aes key payload out: " + ByteUtilities.bytesToHex(aes_payload));
 					
 					results.add(m_key);
 				
@@ -988,7 +1004,8 @@ public class MainActivity extends Activity {
 
 	
 	private byte[] encryptedSymmetricKey(byte[] friendPuk, byte[] secretKeyBytes) throws Exception {
-    	PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(friendPuk));
+    	/*
+		PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(friendPuk));
     	Cipher mCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
         mCipher.init(Cipher.WRAP_MODE, publicKey);
         
@@ -997,6 +1014,8 @@ public class MainActivity extends Activity {
         byte[] encryptedSK = mCipher.wrap(symmkey);
         
         return encryptedSK;
+        */
+		return secretKeyBytes;
 	}
 
     
