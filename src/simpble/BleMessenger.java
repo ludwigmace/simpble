@@ -144,16 +144,6 @@ public class BleMessenger {
 		// when we connect, send the id message to the connecting party
 	}
 	
-	private void sendMessagesToPeer(String PeerAddress) {
-		BlePeer p = peerMap.get(PeerAddress);
-		
-		sendMessagesToPeer(p);
-	}
-	
-	public void GooseBusy() {
-		LoopSendMessages();
-	}
-	
 	/**
 	 * Send all the messages to the passed in Peer
 	 * @param Peer
@@ -202,18 +192,10 @@ public class BleMessenger {
 	}
 
 	
-	private String getFirstChars(String str, int index) {
-		if (str.length() >= index) {
-			return str.substring(0, index);
-		} else {
-			return str;
-		}
-	}
-
-	private void LoopSendMessages() {
+	public void SendMessagesToConnectedPeers() {
 		//setupBusinessTimer(BUSINESS_TIMEOUT);
 
-		Log.v(TAG, "LoopSendMessages on thread " + Thread.currentThread().getName());	
+		//Log.v(TAG, "LoopSendMessages on thread " + Thread.currentThread().getName());	
 			
 		// loop over all the peers i have that i'm connected to	
 		for (BlePeer p: peerMap.values()) {
@@ -249,8 +231,7 @@ public class BleMessenger {
 					businessTimer.cancel();
 					businessTimer = null;
 					
-					// check timing on connections; drop those that are stale
-					LoopSendMessages();
+					SendMessagesToConnectedPeers();
 				}
 				
 			}, youStillBusy);
@@ -341,17 +322,9 @@ public class BleMessenger {
 		// add (or update) a mapping of the digest of this message to a way to get it
 		messageMap.put(peerAddress + "_" + m.GetMessageNumber(), ByteUtilities.bytesToHex(m.PayloadDigest));
 			
-		// if no message found, there's a problem
-		if (m == null) {
-			Log.v(TAG, "cannot 'writeOut' - peer.getBleMessageOut returned null");
-			bleStatusCallback.headsUp("m: (writeOut) no message found for peer");
-			
-			return;
-		} else {
-			// the previous call allows us to get the current message
-			bleStatusCallback.headsUp("m: sending message: " + String.valueOf(m.GetMessageNumber()));
-		}
-		
+		// the previous call allows us to get the current message
+		bleStatusCallback.headsUp("m: sending message: " + String.valueOf(m.GetMessageNumber()));
+
 		// get a sparsearray of the packets pending send for the message m
 		SparseArray<BlePacket> bps = m.GetPendingPackets();
 		

@@ -2,16 +2,12 @@ package example.handshake;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
-import java.security.KeyFactory;
-import java.security.PublicKey;
 import java.security.SecureRandom;
-import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -74,8 +70,6 @@ public class MainActivity extends Activity {
     
     private Context ctx;
     
-    private boolean messageReceiving = false;
-    private boolean messageSending = false;
     private boolean sendToAnybody = true;
     
     private boolean EnableSendID;
@@ -136,10 +130,6 @@ public class MainActivity extends Activity {
 		addressesToFriends = new HashMap<String, String>();
 		
 		connectedAddresses = new ArrayList<String>();
-		
-		// do you want to be able to receive messages?
-		// TODO: have the UI capture this
-		messageReceiving = true;
 		
 		// we're not showing ourselves when the program starts
 		visible = false;
@@ -212,11 +202,13 @@ public class MainActivity extends Activity {
 	protected void onStart() {
 		super.onStart();
 		
+		// Rebuild our bleFriends map, as we may have added or removed some
+		// Consider not pre-populating a map and do a database lookup as we connect to each peer
 		PopulateFriends();
 	}
 	
 	/**
-	 * Update the messages table with the fingerprint of the person to whom you sent this msg
+	 * Update the messages table with the fingerprint of the person to whom you sent this message
 	 * 
 	 * @param msg_content Content of the message
 	 * @param msgtype Type of message, as a string
@@ -224,12 +216,11 @@ public class MainActivity extends Activity {
 	 */
 	public void MarkMsgSent(String messageSignature, String peerIndex) {
 		
+		// look up your friend's fingerprint based on the index provided earlier by BleMessenger
 		String fp = addressesToFriends.get(peerIndex);
 		
 		// update as sent using the messageSignature to identify
 		boolean updated = mDbHelper.updateMsgSent(messageSignature, fp);
-		
-		Log.v(TAG, "mDbHelper.updateMsgSent(" + messageSignature + ", " + fp);
 		
 		if (updated) {
 			if (messageSignature.length() > 8) {
@@ -241,6 +232,10 @@ public class MainActivity extends Activity {
 		
 	}
 	
+	/**
+	 * Loop over all the friends we have in our database and populate our global bleFriends map with
+	 * BleApplication peer objects for each of them
+	 */
 	private void PopulateFriends() {
 		
 		// let's build our friends that we've got stored up in the database
@@ -259,15 +254,14 @@ public class MainActivity extends Activity {
 			new_peer.SetFingerprint(peer_fp);
 			new_peer.SetName(peer_name);
 			new_peer.SetPublicKey(peer_puk);
-			
-			// for testing, don't add your peer
+
 			bleFriends.put(peer_fp, new_peer);
-			logMessage("adding peer " + peer_fp.substring(0,8));
 		}
 	}
 
-
-		
+	/**
+	 * Makes sure that your Bluetooth adapter is up and going
+	 */
 	private void SetUpBle() {
 		if (btAdptr != null) {
 			if (btAdptr.isEnabled()) {
@@ -277,10 +271,10 @@ public class MainActivity extends Activity {
 					Log.v(TAG, "bleMessenger is already instantiated; we're good to go.");
 				}
 			} else {
-				showMessage("Your Bluetooth Adapter isn't enabled; please close the app and enable it.");
+				popUpMessage("Your Bluetooth Adapter isn't enabled; please close the app and enable it.");
 			}
 		} else {
-			showMessage("Your Bluetooth Adapter isn't instantiated; something is wrong.");
+			popUpMessage("Your Bluetooth Adapter isn't instantiated; something is wrong.");
 		}
 	}
 	
@@ -347,20 +341,15 @@ public class MainActivity extends Activity {
 		
 		public void messageDelivered(String remoteAddress, String payloadDigest) {
 
-								
-				// pull the message's signature to mark for closing
-				final String peerSentTo = remoteAddress;
-				String sig = "no_signature";
-				
-				final String msgSignature = queuedMessageMap.get(payloadDigest);
-				
-				runOnUiThread(new Runnable() { public void run() { MarkMsgSent(msgSignature, peerSentTo); } });			
+			// pull the message's signature to mark for closing
+			final String peerSentTo = remoteAddress;
+			
+			final String msgSignature = queuedMessageMap.get(payloadDigest);
+			
+			runOnUiThread(new Runnable() { public void run() { MarkMsgSent(msgSignature, peerSentTo); } });			
 			
 		}
 				
-		// this is when all the packets have come in, and a message is received in its entirety
-		// TODO: too much happens in this callback; need to move things out of here!
-		@Override
 		public void handleReceivedMessage(String remoteAddress, byte[] MessageBytes) {
 
 			BleApplicationMessage incomingMsg = new BleApplicationMessage();
@@ -542,13 +531,6 @@ public class MainActivity extends Activity {
 			
 		}
 
-
-		@Override
-		public void remoteServerAdded(String serverName) {
-			showMessage(serverName);
-		}
-
-		@Override
 		public void advertisingStarted() {
 			logMessage("a: advertising started");
 			
@@ -561,7 +543,6 @@ public class MainActivity extends Activity {
 			
 		}
 
-		@Override
 		public void advertisingStopped() {
 			logMessage("a: advertising stopped");
 			
@@ -575,18 +556,18 @@ public class MainActivity extends Activity {
 			
 		}
 
-		@Override
 		public void headsUp(String msg) {
 			logMessage(msg, 1);
 		}
 
-		@Override
-		public void headsUp(String msg, String action) {
-			logMessage(msg);			
-		}
 		
 	};
-	
+
+	/**
+	 * Given a digest of an encrypted message, return the corresponding AES key
+	 * @param incomingHash Byte array of message digest, 16 bytes 
+	 * @return
+	 */
 	public SecretKey getKeyForMessageHash(byte[] incomingHash) {
 				
 		byte[] aesKey = hashToKey.get(ByteUtilities.bytesToHex(incomingHash));
@@ -594,16 +575,21 @@ public class MainActivity extends Activity {
 		SecretKey key = null;
 		
 		if (aesKey != null) {
-			Log.v(TAG, "found key for " + ByteUtilities.bytesToHex(incomingHash).substring(0,8));
 			key = new SecretKeySpec(aesKey, 0, aesKey.length, "AES");
-		} else {
-			Log.v(TAG, "NO key found for " + ByteUtilities.bytesToHex(incomingHash).substring(0,8));
 		}
 		
 		return key;
 				
 	}
 	
+	/** Takes an incoming byte array of an RSA wrapped AES key and unwraps it, storing the AES key 
+	 * and hash of the corresponding encrypted message in the hashToKey Map and returning
+	 * the aforementioned hash.
+	 * 
+	 * @param keyPayload Byte array where the first 16 bytes are a hash of the plaintext of an encrypted message
+	 * and the remaining bytes are the wrapped key.
+	 * @return
+	 */
 	public byte[] processIncomingKeyMsg(byte[] keyPayload) {
 		
 		//keyPayload = Bytes.concat(m.MessageHash, aesKeyEncrypted);
@@ -699,12 +685,15 @@ public class MainActivity extends Activity {
 						
 		}
 		
-		bleMessenger.GooseBusy();
+		bleMessenger.SendMessagesToConnectedPeers();
 		
 		
 	}
     
-	
+	/**
+	 * Enter BLE Peripheral mode to be found by a scanning Central
+	 * @param view
+	 */
 	public void handleButtonBeAFriend(View view) {
 		// now we need to create the payload with our friendly name and public key
 		Log.v(TAG, "Advertising Toggle Pressed");
@@ -725,6 +714,11 @@ public class MainActivity extends Activity {
 		
 	}
 	    
+	/**
+	 * Scan for peers in BLE peripheral mode
+	 * 
+	 * @param view
+	 */
 	public void handleButtonFindAFriend(View view) {
 		logMessage("a: look around");
 		
@@ -732,7 +726,11 @@ public class MainActivity extends Activity {
 		bleMessenger.ScanForPeers(2500);
 	}
 		
-	private void showMessage(String msg) {
+	/**
+	 * Shortcut to show a Toast
+	 * @param msg Message to pop-up
+	 */
+	private void popUpMessage(String msg) {
 
 		final String message = msg;
 		final Context fctx = this;
@@ -745,28 +743,37 @@ public class MainActivity extends Activity {
 		
 	}
 	
+	/**
+	 * Shortcut function to logMessage with a debug level of 0.
+	 * @param msg Message to show
+	 */
 	private void logMessage(String msg) {
 		logMessage(msg, 0);
 	}
 	
-	
+	/**
+	 * A shortcut function to display messages in the main output feed
+	 * @param msg Message to show
+	 * @param level Debug level, where 0 only shows error messages and 1 includes informational messages
+	 */
 	private void logMessage(String msg, int level) {
 		
 		if (level <= DEBUGLEVEL) {
-
 			statusLogText = "- " + msg + "\n" + statusLogText;
-			
 			runOnUiThread(new Runnable() {
 				  public void run() {
 					  statusText.setText(statusLogText);
 				  }
 			});
-			
 		}
-		
 	}
 	
-	
+	/** 
+	 * Given a hex representation of the public key fingerprint for a peer, search the database for any messages to be sent to this peer
+	 * and return them in an ArrayList of type BleApplicationMessage.
+	 * @param candidateFingerprint Public key fingerprint for peer, hexadecimal
+	 * @return
+	 */
 	private ArrayList<BleApplicationMessage> GetMessagesForFriend(String candidateFingerprint) {
 		Cursor c = mDbHelper.fetchMsgsForFriend(candidateFingerprint);
 		
@@ -921,10 +928,11 @@ public class MainActivity extends Activity {
 			rfp = Arrays.copyOf(recipient_name.getBytes(), 20);
 			m.RecipientFingerprint = rfp;
 			m.SenderFingerprint = anonFP;
-			m.MessageType = (byte)(90 & 0xFF); // just throwing out 90 as indicating a share msg
+			m.MessageType = (byte)(BleMessenger.MSGTYPE_DROP & 0xFF);
 			m.setPayload(msg_content.getBytes());
 			
 			m.SetSignature(msg_signature);
+
 			
 		}
 		
@@ -933,7 +941,10 @@ public class MainActivity extends Activity {
 	}
 	
 	
-	// creates a message formatted for identity exchange
+	/**
+	 * Creates and returns a BleApplication message object with this peer's identifying details 
+	 * @return
+	 */
 	private BleApplicationMessage identityMessage() {
 		BleApplicationMessage m = new BleApplicationMessage();
 		m.MessageType = (byte)1 & 0xFF;
