@@ -38,6 +38,11 @@ public class BleApplicationMessage {
 	// the raw bytes of this message
 	private byte[] allBytes;
 	
+	/**
+	 * A way for the calling application to identify a particular message
+	 * Doesn't have any setters/getters
+	 */
+	public String ApplicationIdentifier;
 	
 
 	// initializes our list of BlePackets, current counter, and sent status

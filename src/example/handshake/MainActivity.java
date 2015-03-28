@@ -92,6 +92,8 @@ public class MainActivity extends Activity {
     
     private ArrayList<String> connectedAddresses;
     
+    private Map<String, String> queuedMessageMap;
+    
     
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -120,6 +122,8 @@ public class MainActivity extends Activity {
 		// use this when you don't want to use your fingerprint
 		anonFP = new byte[20];
 		Arrays.fill(anonFP, (byte) 0);
+		
+		queuedMessageMap = new HashMap<String, String>();
 		
         // get a pointer to the status text
         statusText = (TextView) findViewById(R.id.status_log);
@@ -227,6 +231,8 @@ public class MainActivity extends Activity {
 		
 		// update as sent using the messageSignature to identify
 		boolean updated = mDbHelper.updateMsgSent(messageSignature, fp);
+		
+		Log.v(TAG, "mDbHelper.updateMsgSent(" + messageSignature + ", " + fp);
 		
 		if (updated) {
 			if (messageSignature.length() > 8) {
@@ -340,23 +346,12 @@ public class MainActivity extends Activity {
 		
 		public void messageDelivered(String remoteAddress, String payloadDigest) {
 
-
-				BleApplicationMessage sentMsg = new BleApplicationMessage();
-				
-				// rebuild the message that was just sent
-				sentMsg.SetRawBytes(bleMessenger.peerMap.get(peerIndex).getBleMessageOut(msg_id).GetAllBytes());
-				
-				// signature is only stored in the database
 								
 				// pull the message's signature to mark for closing
-				final String peerSentTo = peerIndex;
+				final String peerSentTo = remoteAddress;
 				String sig = "no_signature";
 				
-				if (sentMsg.GetSignature() != null) {
-					sig = sentMsg.GetSignature();
-				}
-				
-				final String msgSignature = sig; 
+				final String msgSignature = queuedMessageMap.get(payloadDigest);
 				
 				runOnUiThread(new Runnable() { public void run() { MarkMsgSent(msgSignature, peerSentTo); } });			
 			
@@ -703,6 +698,7 @@ public class MainActivity extends Activity {
 					// queue up all the messages we've got for this dude
 					for (BleApplicationMessage m : friendMessages) {
 						queuedMessageDigest = bleMessenger.AddMessage(address, m);
+						queuedMessageMap.put(queuedMessageDigest, m.ApplicationIdentifier);
 					}
 					
 				} else {
@@ -839,7 +835,7 @@ public class MainActivity extends Activity {
 				
 				m.RecipientFingerprint = candidateFingerprint.getBytes();
 				m.SenderFingerprint = myFingerprint.getBytes();  // should probably pull from database instead; for relaying of messages
-				m.SetSignature(msg_signature);
+				m.ApplicationIdentifier = msg_signature;
 				
 				// in case we need to encrypt this message
 				byte[] msgbytes = null;
@@ -908,6 +904,8 @@ public class MainActivity extends Activity {
 					
 					// get the sending fingerprint from the main message
 					m_key.SenderFingerprint = m.SenderFingerprint;
+					
+					m_key.ApplicationIdentifier = "key_" + msg_signature;
 					
 					// the payload needs to include the encrypted key, and the orig msg's fingerprint
 					// if the hash is a certain size, then we can assume the rest of the message is the

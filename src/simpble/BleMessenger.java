@@ -556,8 +556,12 @@ public class BleMessenger {
     		// we can do this before we're even asked about it
     		if (p.ConnectedAs.equalsIgnoreCase("central")) {
     			
+    			Log.v(TAG, "parentMessage # is:" + parentMessage);
+    			
     			// what message are we talking about?
-    			byte[] ACKet = ByteUtilities.intToByte(parentMessage);
+    			//byte[] ACKet = ByteUtilities.intToByte(parentMessage);
+    			
+    			byte[] ACKet = new byte[] {(byte)parentMessage};
     			
     			// create an acknowledgment packet with only 0's, indicating we got it all
     			byte[] ack = new byte[20];
