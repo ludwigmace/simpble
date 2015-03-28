@@ -531,31 +531,29 @@ public class MainActivity extends Activity {
 			
 		}
 
-		public void advertisingStarted() {
-			logMessage("a: advertising started");
-			
-			runOnUiThread(new Runnable() {
-				  public void run() {
-						visible = true;
-						btnAdvertise.setText("!Adv");
-				  }
-				});
-			
-		}
-
-		public void advertisingStopped() {
-			logMessage("a: advertising stopped");
-			
-			runOnUiThread(new Runnable() {
-				  public void run() {
-						visible = false;
-						btnAdvertise.setText("Advt");
-				  }
-				});
-
+		public void advertisingStatusUpdate(boolean isAdvertising) {
+			if (isAdvertising) {
+				logMessage("a: advertising started");
+				
+				runOnUiThread(new Runnable() {
+					  public void run() {
+							visible = true;
+							btnAdvertise.setText("!Adv");
+					  }
+					});
+			} else {
+				logMessage("a: advertising stopped");
+				
+				runOnUiThread(new Runnable() {
+					  public void run() {
+							visible = false;
+							btnAdvertise.setText("Advt");
+					  }
+					});
+			}
 			
 		}
-
+		
 		public void headsUp(String msg) {
 			logMessage(msg, 1);
 		}

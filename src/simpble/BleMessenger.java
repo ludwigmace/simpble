@@ -688,11 +688,7 @@ public class BleMessenger {
 
 		@Override
 		public void handleAdvertiseChange(boolean advertising) {
-			if (advertising) {
-				bleStatusCallback.advertisingStarted();
-			} else {
-				bleStatusCallback.advertisingStopped();
-			}
+			bleStatusCallback.advertisingStatusUpdate(advertising);
 		}
 
 		@Override
