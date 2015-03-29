@@ -11,7 +11,6 @@ import java.util.Map;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
-import simpble.BleApplicationMessage;
 import simpble.BleApplicationPeer;
 import simpble.BleMessenger;
 import simpble.BlePeer;
@@ -43,6 +42,13 @@ public class MainActivity extends Activity {
 
     private static final int ACTIVITY_CREATE=0;
 
+	
+	public static final int MSGTYPE_ID = 1;
+	public static final int MSGTYPE_PLAIN = 2;
+	public static final int MSGTYPE_ENCRYPTED_PAYLOAD = 20;
+	public static final int MSGTYPE_ENCRYPTED_KEY = 21;
+	public static final int MSGTYPE_DROP = 90;
+    
 	
 	BleMessenger bleMessenger;
  
@@ -359,15 +365,13 @@ public class MainActivity extends Activity {
 				
 		public void handleReceivedMessage(String remoteAddress, byte[] MessageBytes) {
 
-			BleApplicationMessage incomingMsg = new BleApplicationMessage();
+			ApplicationMessage incomingMsg = new ApplicationMessage();
 			
-			boolean bMessageBuilt = incomingMsg.SetRawBytes(MessageBytes);
+			String incomingDigest = incomingMsg.SetRawBytes(MessageBytes);
+			// we added this 
+			incomingMsg.BuildMessageDetails();
 			
-			Log.v(TAG, "incoming raw bytes: " + ByteUtilities.bytesToHex(MessageBytes));
-			
-			if (!bMessageBuilt) {
-				return;
-			}
+			Log.v(TAG, "incoming msg digest: " + incomingDigest);
 			
 			
 			// get the message type in integer form; should be between 0 and 255 so &0xFF should work
@@ -378,7 +382,7 @@ public class MainActivity extends Activity {
 			byte[] messageHash = incomingMsg.BuildMessageMIC();
 						
 			switch (mt) {
-				case BleMessenger.MSGTYPE_ID:
+				case MSGTYPE_ID:
 					Log.v(TAG, "received identity msg");
 					
 	
@@ -386,7 +390,7 @@ public class MainActivity extends Activity {
 					// or how do we know when the other person wants messages?
 					if (sendToAnybody) {
 						
-						BleApplicationMessage mTopic = null;
+						ApplicationMessage mTopic = null;
 						
 						try {
 						// TODO: consider location as well
@@ -428,7 +432,7 @@ public class MainActivity extends Activity {
 					
 					break;
 					
-				case BleMessenger.MSGTYPE_PLAIN:
+				case MSGTYPE_PLAIN:
 				
 					// TODO: store in database
 					logMessage("message recvd of size " + String.valueOf(payload.length));
@@ -437,7 +441,7 @@ public class MainActivity extends Activity {
 					// also, maybe, store the message?!?
 					break;
 					
-				case BleMessenger.MSGTYPE_ENCRYPTED_PAYLOAD:
+				case MSGTYPE_ENCRYPTED_PAYLOAD:
 					logMessage("received encrypted msg of size:" + String.valueOf(payload.length));
 					
 					// payload might be padded with zeroes, strip out trailing null bytes
@@ -486,7 +490,7 @@ public class MainActivity extends Activity {
 					
 					break;
 					
-				case BleMessenger.MSGTYPE_ENCRYPTED_KEY:
+				case MSGTYPE_ENCRYPTED_KEY:
 					logMessage("received encrypted key of size:" + String.valueOf(payload.length));
 					
 					Log.v(TAG, "aes key payload in: " + ByteUtilities.bytesToHex(payload));
@@ -504,7 +508,7 @@ public class MainActivity extends Activity {
 					
 					break;
 				
-				case BleMessenger.MSGTYPE_DROP:
+				case MSGTYPE_DROP:
 					
 					// this can be for topics; but need to differentiate if bytes or not
 					String topic_name = "";
@@ -533,6 +537,9 @@ public class MainActivity extends Activity {
 					logMessage("stored msg: " + String.valueOf(storedMsgId));
 					
 					break;
+					
+				default:
+					logMessage("received msg of unknown type " + mt);
 					
 			}
 			
@@ -673,11 +680,11 @@ public class MainActivity extends Activity {
 				if (addressesToFriends.containsKey(address)) {
 					logMessage("address maps to friend");	
 			
-					ArrayList<BleApplicationMessage> friendMessages = GetMessagesForFriend(addressesToFriends.get(address));
+					ArrayList<ApplicationMessage> friendMessages = GetMessagesForFriend(addressesToFriends.get(address));
 					
 					logMessage("found " + friendMessages.size() + " messages to send for friend");
 					// queue up all the messages we've got for this dude
-					for (BleApplicationMessage m : friendMessages) {
+					for (ApplicationMessage m : friendMessages) {
 						
 						queuedMessageDigest = bleMessenger.AddMessage(address, m);
 						queuedMessageMap.put(queuedMessageDigest, m.ApplicationIdentifier);
@@ -776,19 +783,19 @@ public class MainActivity extends Activity {
 	 * @param candidateFingerprint Public key fingerprint for peer, hexadecimal
 	 * @return
 	 */
-	private ArrayList<BleApplicationMessage> GetMessagesForFriend(String candidateFingerprint) {
+	private ArrayList<ApplicationMessage> GetMessagesForFriend(String candidateFingerprint) {
 		Cursor c = mDbHelper.fetchMsgsForFriend(candidateFingerprint);
 		
-		ArrayList<BleApplicationMessage> results = new ArrayList<BleApplicationMessage>();
+		ArrayList<ApplicationMessage> results = new ArrayList<ApplicationMessage>();
 		
-		BleApplicationMessage m = null; 
+		ApplicationMessage m = null; 
 
 		// if we have any messages
 		if (c.getCount() > 0) {
 				//loop over these messages
 				while (c.moveToNext()) {
 				
-				m = new BleApplicationMessage();
+				m = new ApplicationMessage();
 				
 				String msg_content = c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT));
 				String msg_type = c.getString(c.getColumnIndex(FriendsDb.KEY_M_MSGTYPE));
@@ -856,16 +863,16 @@ public class MainActivity extends Activity {
 				if (msg_type.equalsIgnoreCase("encrypted")) {
 					
 					
-					m.MessageType = (byte)BleMessenger.MSGTYPE_ENCRYPTED_PAYLOAD & 0xFF;
+					m.MessageType = (byte)MSGTYPE_ENCRYPTED_PAYLOAD & 0xFF;
 					m.setPayload(msgbytes);
 					
-					BleApplicationMessage m_key = new BleApplicationMessage();
+					ApplicationMessage m_key = new ApplicationMessage();
 					
 					// get the fingerprint from the Friend object
 					m_key.RecipientFingerprint = m.RecipientFingerprint;
 					
 					// gotta give it a pre-determined messagetype to know this is an encryption key
-					m_key.MessageType = (byte)BleMessenger.MSGTYPE_ENCRYPTED_KEY;
+					m_key.MessageType = (byte)MSGTYPE_ENCRYPTED_KEY & 0xFF;
 					
 					// get the sending fingerprint from the main message
 					m_key.SenderFingerprint = m.SenderFingerprint;
@@ -883,7 +890,7 @@ public class MainActivity extends Activity {
 					results.add(m_key);
 				
 				} else {
-					m.MessageType = (byte)BleMessenger.MSGTYPE_PLAIN & 0xFF;
+					m.MessageType = (byte) MSGTYPE_PLAIN & 0xFF;
 					m.setPayload(msgbytes);
 				}
 				
@@ -904,18 +911,18 @@ public class MainActivity extends Activity {
 	 * @param candidateFingerprint The PukFP of the person we're ensure only gets a single share of a particular topic
 	 * @return A message in a BleMessage object 
 	 */
-	private BleApplicationMessage GetUnsentEligibleTopicMessage(String candidateFingerprint) {
+	private ApplicationMessage GetUnsentEligibleTopicMessage(String candidateFingerprint) {
 		
 		// topic messages eligible to go to this recipient
 		Cursor c = mDbHelper.topicsNotSentToRecipient(candidateFingerprint);
 		
-		BleApplicationMessage m = null; 
+		ApplicationMessage m = null; 
 		
 		if (c.getCount() > 0) {
 			c.moveToFirst();
 			
 			// found an eligible message in the database, so build it for the application
-			m = new BleApplicationMessage();
+			m = new ApplicationMessage();
 			
 			String recipient_name = c.getString(c.getColumnIndex(FriendsDb.KEY_M_FNAME));
 			String msg_content = c.getString(c.getColumnIndex(FriendsDb.KEY_M_CONTENT));
@@ -930,7 +937,7 @@ public class MainActivity extends Activity {
 			rfp = Arrays.copyOf(recipient_name.getBytes(), 20);
 			m.RecipientFingerprint = rfp;
 			m.SenderFingerprint = anonFP;
-			m.MessageType = (byte)(BleMessenger.MSGTYPE_DROP & 0xFF);
+			m.MessageType = (byte)(MSGTYPE_DROP & 0xFF);
 			m.setPayload(msg_content.getBytes());
 			
 			m.SetSignature(msg_signature);
@@ -947,8 +954,8 @@ public class MainActivity extends Activity {
 	 * Creates and returns a BleApplication message object with this peer's identifying details 
 	 * @return
 	 */
-	private BleApplicationMessage identityMessage() {
-		BleApplicationMessage m = new BleApplicationMessage();
+	private ApplicationMessage identityMessage() {
+		ApplicationMessage m = new ApplicationMessage();
 		m.MessageType = (byte)1 & 0xFF;
 		m.SenderFingerprint = rsaKey.PuFingerprint();
 		m.RecipientFingerprint = new byte[20];

@@ -7,7 +7,7 @@ import android.util.Log;
 
 import com.google.common.primitives.Bytes;
 
-public class BleApplicationMessage {
+public abstract class BleApplicationMessage {
 
 	private static final String TAG = "BLEAPPMSG";
 	private static final int MessagePacketSize = 20; 
@@ -16,12 +16,6 @@ public class BleApplicationMessage {
 	private int messageNumber;
 	
 	public byte MessageType;
-	
-	// sha1 of public key for recipient
-	public byte[] RecipientFingerprint;
-	
-	// sha1 of public key for sender
-	public byte[] SenderFingerprint;
 	
 	// truncated sha1 of message; carried in Packet 0 of every message
 	public byte[] MessageHash;
@@ -34,7 +28,7 @@ public class BleApplicationMessage {
 	public boolean ReceiptAcknowledged;
 	
 	// the raw bytes of this message
-	private byte[] allBytes;
+	protected byte[] allBytes;
 	
 	/**
 	 * A way for the calling application to identify a particular message
@@ -42,11 +36,15 @@ public class BleApplicationMessage {
 	 */
 	public String ApplicationIdentifier;
 	
-
+	// this is meant to be a helper that the calling application will implement
+	public abstract boolean BuildMessageDetails();
+	
+	
 	// initializes our list of BlePackets, current counter, and sent status
 	public BleApplicationMessage() {
 		ReceiptAcknowledged = false;
 	}
+	
 	
 	// allows calling program to set which number identifies this message
 	public void SetMessageNumber(int MessageNumber) {
@@ -54,143 +52,31 @@ public class BleApplicationMessage {
 	
 	}
 
+
 	
 	// get the message sequence number
 	public int GetMessageNumber() {
 		return messageNumber;
 	}
-	
-	/**
-	 * A message signature uniquely identifies a line-item message in the database
-	 * 
-	 * @return A most-likely unique signature for this message that can be reconstructed
-	 */
-	public String GetSignature() {
-		return messageSignature;
-	}
-	
-	/**
-	 * A message signature uniquely identifies a line-item message in the database
-	 * 
-	 * @param Pass in a signature
-	 * @return returns the signature that you probably just passed in
-	 */
-	public String SetSignature(String signature) {
-		messageSignature = signature;
 		
-		return messageSignature;
-	}
-	
-	public String GetPayload() {
-		return ByteUtilities.bytesToHex(MessagePayload).substring(0,8);
-	}
-	
-
-	public byte[] BuildMessageMIC() {
-		
-        // get a digest for the message, to define it
-        MessageDigest md = null;
-        
-        try {
-			md = MessageDigest.getInstance("SHA-1");
-		} catch (NoSuchAlgorithmException e) {
-
-			e.printStackTrace();
-		}
-        
-        
-        byte[] MessageBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
-        
-        // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
-        // (i want my digest to be the packet size less the 5 bytes needed for header info)
-        return Arrays.copyOfRange(md.digest(ByteUtilities.trimmedBytes(MessageBytes)), 0, MessagePacketSize - 5);
-		
-	}
-	
-	
-	/**
-	 * Sets the MessagePayload class variable to the bytes you pass in.  Constructs a SHA1 hash based on
-	 * (MessageType, RecipientFingerprint, SenderFingerprint, MessagePayload), strips off the last 5 bytes,
-	 * and stores this value in the class variable MessagePayload.
-	 * 
-	 * @param Payload
-	 */
-	public void setPayload(byte[] Payload) {
-		MessagePayload = Payload;
-		
-		allBytes = Bytes.concat(new byte[]{MessageType}, RecipientFingerprint, SenderFingerprint, MessagePayload);
-		
-		Log.v(TAG, "allBytes:" + ByteUtilities.bytesToHex(allBytes));
-		
-        // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
-        // (i want my digest to be the packet size less the 5 bytes needed for header info)
-		MessageHash  = Arrays.copyOfRange(ByteUtilities.digestAsBytes(allBytes), 0, MessagePacketSize - 5);
-		
-		Log.v(TAG, "Hash:" + ByteUtilities.bytesToHex(MessageHash));
-     	
-	}
-	
-
-	
-	private boolean BuildMessageDetails(byte[] RawBytes) {
-		
-		boolean success = false;
-		
-		/*
-		 * - message type
-		 * - recipient fingerprint
-		 * - sender fingerprint
-		 * - hash/mic
-		 * - payload
-		 */
-		
-		if (RawBytes != null) {
-			// we need this to be 41+ bytes
-			if (RawBytes.length > 41) {
-			
-				MessageType = Arrays.copyOfRange(RawBytes, 0, 1)[0]; // byte 0
-				RecipientFingerprint = Arrays.copyOfRange(RawBytes, 1, 21); // bytes 1-20
-				SenderFingerprint = Arrays.copyOfRange(RawBytes, 21, 41); // bytes 21-40
-				MessagePayload = Arrays.copyOfRange(RawBytes, 41, RawBytes.length+1); //bytes 41 through end
-	
-				Log.v(TAG, "MessageType: " + ByteUtilities.bytesToHex(new byte[]{MessageType}));
-				Log.v(TAG, "RecipientFingerprint: " + ByteUtilities.bytesToHex(RecipientFingerprint));
-				Log.v(TAG, "SenderFingerprint: " + ByteUtilities.bytesToHex(SenderFingerprint));
-				Log.v(TAG, "MessagePayload: " + ByteUtilities.bytesToHex(MessagePayload));
-				
-				messageSignature = ByteUtilities.digestAsHex(RawBytes);
-				
-				success = true;
-			}
-		}
-		
-		return success;
-		
-	}
-
-	
 	public byte[] GetAllBytes() {
 		return allBytes;
 	}
 	
-	/**
-	 * 
-	 * 
+	/** 
+	 * Sets the bytes that make up this message
 	 * @param RawMessageBytes The raw bytes that make up this message
 	 * @return If this message could be properly constructed from these bytes, return TRUE
 	 */
-	public boolean SetRawBytes(byte[] RawMessageBytes) {
+	public String SetRawBytes(byte[] RawMessageBytes) {
 		
-		boolean success = false;
 		
 		allBytes = RawMessageBytes;
         // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
         // (i want my digest to be the packet size less the 5 bytes needed for header info)
 		MessageHash  = Arrays.copyOfRange(ByteUtilities.digestAsBytes(allBytes), 0, MessagePacketSize - 5);
 		
-		success = BuildMessageDetails(RawMessageBytes);
-		
-		return success;
+		return ByteUtilities.bytesToHex(MessageHash);
 	}
 
 	

@@ -25,12 +25,6 @@ public class BleMessenger {
 	private static int INACTIVE_TIMEOUT = 600000; // 5 minute timeout
 	private static int BUSINESS_TIMEOUT = 5000; // 5 second timeout
 	
-	public static final int MSGTYPE_ID = 1;
-	public static final int MSGTYPE_PLAIN = 2;
-	public static final int MSGTYPE_ENCRYPTED_PAYLOAD = 20;
-	public static final int MSGTYPE_ENCRYPTED_KEY = 21;
-	public static final int MSGTYPE_DROP = 90;
-	
 	public static final int CONNECTION_DISCONNECTED = 0;
 	public static final int CONNECTION_CONNECTED = 1;
 	public static final int CONNECTION_NEGOTIATING = 2;
@@ -835,6 +829,24 @@ public class BleMessenger {
 		
 		// pass your message's bytes to the peer object to build a BleMessage to send, and get a digest of that message
 		result = p.BuildBleMessageOut(msg.GetAllBytes());
+    	
+    	return result;
+    	
+    }
+    
+    /**
+     * Add a message to the outgoing queue for a connected peer
+     * 
+     * @param remoteAddress The identifier for the target connectee; this is how SimpBle identifies the recipient
+     * @param messageBytes Raw bytes to send to the connected peer; it's smarter to use your own BleApplicationMessage object
+     * @return A digest of the message's payload
+     */
+    public String AddMessage(String remoteAddress, byte[] messageBytes) {
+    	String result = "";
+		BlePeer p = peerMap.get(remoteAddress);
+		
+		// pass your message's bytes to the peer object to build a BleMessage to send, and get a digest of that message
+		result = p.BuildBleMessageOut(messageBytes);
     	
     	return result;
     	
