@@ -288,7 +288,7 @@ public class BleMessenger {
 			bleCentral.disconnectAddress(remoteAddress);
 		}
 		
-		peerMap.remove(remoteAddress); // because we've disconnected, remove from our peerlist
+		//peerMap.remove(remoteAddress); // because we've disconnected, remove from our peerlist
 	
 	}
 
@@ -644,6 +644,7 @@ public class BleMessenger {
 
     		} else {
 	    		// let the calling activity know that as a peripheral, we've lost or connection
+    			peerMap.remove(remoteAddress);
     			bleStatusCallback.peerConnectionStatus(remoteAddress, CONNECTION_DISCONNECTED);
     			p.TransportFrom = false;
     			p.TransportTo = false;
@@ -830,6 +831,7 @@ public class BleMessenger {
 		@Override
 		public void reportDisconnect(String remoteAddress) {
 			// report disconnection to MainActivity
+			peerMap.remove(remoteAddress);
 			bleStatusCallback.peerConnectionStatus(remoteAddress, CONNECTION_DISCONNECTED);
 		}
     	
