@@ -272,6 +272,25 @@ public class BleMessenger {
 		}
 
 	}
+	
+	/**
+	 * Disconnect from a peer
+	 * @param remoteAddress The Bluetooth address of the peer from whom you wish to disconnect
+	 */
+	public void disconnectPeer(String remoteAddress) {
+		
+		BlePeer p = peerMap.get(remoteAddress);
+		
+		// depending on how you're connected, disconnect
+		if (p.ConnectedAs.equalsIgnoreCase("peripheral")) {
+			blePeripheral.closeConnection(remoteAddress);
+		} else {
+			bleCentral.disconnectAddress(remoteAddress);
+		}
+		
+		peerMap.remove(remoteAddress); // because we've disconnected, remove from our peerlist
+	
+	}
 
 	private void writeOut(String peerAddress) {
 		UUID uuid = uuidFromBase("102");

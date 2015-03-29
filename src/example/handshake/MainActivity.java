@@ -262,6 +262,11 @@ public class MainActivity extends Activity {
 			bleFriends.put(peer_fp, new_peer);
 		}
 	}
+	
+	// need to call this from somewhere to disconnect the peer
+	private void disconnectPeer(String remoteAddress) {
+		disconnectPeer(remoteAddress);
+	}
 
 	/**
 	 * Makes sure that your Bluetooth adapter is up and going
