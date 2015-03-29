@@ -11,6 +11,10 @@ import android.bluetooth.BluetoothGattServer;
 
 public interface BleCentralHandler {
 	
+	/**
+	 * Executed after BleCentral is done scanning and has found some devices
+	 * @param devices
+	 */
 	public void intakeFoundDevices(ArrayList<BluetoothDevice> devices);
 	public void connectedServiceGood(String remoteAddress);
 	public void incomingMissive(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes);

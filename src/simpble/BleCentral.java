@@ -121,6 +121,7 @@ public class BleCentral {
         sb.setScanMode(ScanMode); // options are: ScanSettings.SCAN_MODE_BALANCED; ScanSettings.SCAN_MODE_LOW_LATENCY, ScanSettings.SCAN_MODE_LOW_POWER;
         bleScanSettings = sb.build();
         
+        // only report devices that contain our desired service uuid
         ScanFilter.Builder sf = new ScanFilter.Builder();
         sf.setServiceUuid(ParcelUuid.fromString(strSvcUuidBase));
         bleScanFilter = new ArrayList<ScanFilter>();

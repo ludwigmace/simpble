@@ -26,13 +26,13 @@ public interface BleStatusCallback {
 	public void messageDelivered(String remoteAddress, String payloadDigest);
 	
 	/**
-	 * Regardless of whether you were connected as Central or Peripheral, you're now no longer connected to this device.
+	 * Callback executed when connection (Bluetooth or messenger) status has changed
 	 * 
-	 * @param remoteAddress Bluetooth address (just used as an index, could be anything) of the now-disconnected peer 
+	 * @param remoteAddress Bluetooth address (just used as an index, could be anything) of the now-disconnected peer
+	 * @param ConnectionStatus 	CONNECTION_DISCONNECTED, CONNECTION_CONNECTED, CONNECTION_NEGOTIATING
 	 */
-	public void peerDisconnect(String remoteAddress);
-	
-	
+	public void peerConnectionStatus(String remoteAddress, int ConnectionStatus);
+		
 	/**
 	 * You can use this for debugging; for example in the implementation of the callback you can show messages in popups or otherwise 
 	 * @param msg

@@ -45,9 +45,7 @@ public class MainActivity extends Activity {
 
 	
 	BleMessenger bleMessenger;
-	
-	// maybe for these guys I should leave these inside of the BleMessenger class?
-	// because if I reference a BlePeer from here, I'm not hitting up the same memory address in BleMessenger 
+ 
 	
 	Map <String, BleApplicationPeer> bleFriends;  // folks whom i have previously connected to, or i have their id info	
 	
@@ -335,8 +333,17 @@ public class MainActivity extends Activity {
 	// then i don't need to volunteer my info
 	BleStatusCallback bleMessageStatus = new BleStatusCallback() {
 		
-		public void peerDisconnect(String device) {
-			logMessage("a: disconnected from " + device);
+		public void peerConnectionStatus(String remoteAddress, int ConnectionStatus) {
+			
+			if (ConnectionStatus == BleMessenger.CONNECTION_NEGOTIATING) {
+				logMessage("negotiating connection with " + remoteAddress);	
+			} else if (ConnectionStatus == BleMessenger.CONNECTION_CONNECTED) {
+				logMessage("connected to " + remoteAddress);
+			} else if (ConnectionStatus == BleMessenger.CONNECTION_DISCONNECTED) {
+				logMessage("disconnected from " + remoteAddress);
+			}
+			
+			
 		}
 		
 		public void messageDelivered(String remoteAddress, String payloadDigest) {

@@ -53,7 +53,10 @@ public class BlePeripheral {
 	private String serviceBaseUUID;
 	int globalCharacteristicCount;
 	
-    private Map<UUID, BluetoothGattCharacteristic> myBGCs = new HashMap<UUID, BluetoothGattCharacteristic>();
+	// keep instances of BluetoothGattCharacteristics, able to look them up via UUID
+    private Map<UUID, BluetoothGattCharacteristic> uuidToGattCharacteristics = new HashMap<UUID, BluetoothGattCharacteristic>();
+    
+    // right now this only supports a single central being subscribed to a characteristic, which is fine for BT 4.0 but needs to be expanded for BT 4.1
     private Map<BluetoothGattCharacteristic, BluetoothDevice> mySubscribers = new HashMap<BluetoothGattCharacteristic, BluetoothDevice>();
 	
     /**
@@ -105,7 +108,7 @@ public class BlePeripheral {
 	public boolean updateCharValue(UUID charUUID, byte[] value) {
 		
 		// get the Characteristic we want to update
-		BluetoothGattCharacteristic bgc = myBGCs.get(charUUID);
+		BluetoothGattCharacteristic bgc = uuidToGattCharacteristics.get(charUUID);
 
 		boolean sent = false;
 		
@@ -197,7 +200,7 @@ public class BlePeripheral {
         BluetoothGattService theService = new BluetoothGattService(serviceUUID, BluetoothGattService.SERVICE_TYPE_PRIMARY);
 		
 		// loop over all the characteristics and add them to the service
-        for (Entry<UUID, BluetoothGattCharacteristic> entry : myBGCs.entrySet()) {
+        for (Entry<UUID, BluetoothGattCharacteristic> entry : uuidToGattCharacteristics.entrySet()) {
         	theService.addCharacteristic(entry.getValue());
         	Log.v(TAG, "adding characteristic " + entry.getKey().toString());
         }
@@ -232,7 +235,7 @@ public class BlePeripheral {
         AdvertiseData.Builder dataBuilder = new AdvertiseData.Builder();
         AdvertiseSettings.Builder settingsBuilder = new AdvertiseSettings.Builder();
         
-        // allows us to fit in a 31 byte advertisement
+        // allows us to fit in a 31 byte advertisement; we're not worried about proximity
         dataBuilder.setIncludeTxPowerLevel(false);
         
         // this is the operative call which gives the parceluuid info to our advertiser to link to our gatt server
@@ -249,18 +252,17 @@ public class BlePeripheral {
         UUID tUID = new UUID((long) 0x46, (long) 0x41);
         ParcelUuid serviceDataID = new ParcelUuid(tUID);
         
-        // API 5
+        // service data, apparently Android asks for it but it's not used
         dataBuilder.addServiceData(serviceDataID, serviceData);
         
-        // i guess we need all these things for our settings
+        // advertise settings
         settingsBuilder.setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY);
         settingsBuilder.setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH);
-                
-        // API 5
         settingsBuilder.setConnectable(true);
         
         isAdvertising = true;
        
+        // start advertising
         try {
         	btLeAdv.startAdvertising(settingsBuilder.build(), dataBuilder.build(), advertiseCallback);
         } catch (Exception ex) {
@@ -273,29 +275,16 @@ public class BlePeripheral {
 	}
 	
 	public BluetoothGattCharacteristic getChar(UUID uuid) {
-		return myBGCs.get(uuid);
+		return uuidToGattCharacteristics.get(uuid);
 	}
-	
-	public UUID addChar(String charType) {
-		UUID lUUID = addChar(charType, peripheralHandler);
-		return lUUID;
-	}
-	
-	public boolean IsClientSubscribed(String clientAddress, UUID charToCheck) {
-		//Map<BluetoothGattCharacteristic, BluetoothDevice> mySubscribers
 		
-		
-		
-		return true;
-	}
-	
 	public UUID addChar(String charType, UUID uuid, BlePeripheralHandler charHandler) {
 		Log.v(TAG, "adding chartype:" + charType + " uuid:" + uuid.toString());
 		//TODO: convert to simpler intProperties/intPermissions and add subscribe descriptors for appropriate characteristics
 		if (charType.equals(BleGattCharacteristics.GATT_NOTIFY)) {
 		
 			Log.v(TAG, "adding notify characteristic");
-	        myBGCs.put(uuid, new BleGattCharacteristics(
+	        uuidToGattCharacteristics.put(uuid, new BleGattCharacteristics(
 	        		uuid,
 	                BluetoothGattCharacteristic.PROPERTY_NOTIFY,
 	                BluetoothGattCharacteristic.PERMISSION_READ,
@@ -305,7 +294,7 @@ public class BlePeripheral {
 	        
 	        // since this is a Notify, add the descriptor
 	        BluetoothGattDescriptor gD = new BluetoothGattDescriptor(UUID.fromString("00002902-0000-1000-8000-00805F9B34FB"), BluetoothGattDescriptor.PERMISSION_WRITE | BluetoothGattDescriptor.PERMISSION_READ);
-	        BluetoothGattCharacteristic bgc = myBGCs.get(uuid);
+	        BluetoothGattCharacteristic bgc = uuidToGattCharacteristics.get(uuid);
 	        bgc.addDescriptor(gD);
 	        bgc = null;
 		}
@@ -313,7 +302,7 @@ public class BlePeripheral {
 		if (charType.equals(BleGattCharacteristics.GATT_READ)) {
 			
 			Log.v(TAG, "adding read characteristic");
-	        myBGCs.put(uuid, new BleGattCharacteristics(
+	        uuidToGattCharacteristics.put(uuid, new BleGattCharacteristics(
 	        		uuid,
 	                BluetoothGattCharacteristic.PROPERTY_READ,
 	                BluetoothGattCharacteristic.PERMISSION_READ,
@@ -325,7 +314,7 @@ public class BlePeripheral {
 		if (charType.equals(BleGattCharacteristics.GATT_READWRITE)) {
 			
 			Log.v(TAG, "adding readwrite characteristic");
-	        myBGCs.put(uuid, new BleGattCharacteristics(
+	        uuidToGattCharacteristics.put(uuid, new BleGattCharacteristics(
 	        		uuid,
 	                BluetoothGattCharacteristic.PROPERTY_WRITE | BluetoothGattCharacteristic.PROPERTY_READ,
 	                BluetoothGattCharacteristic.PERMISSION_WRITE | BluetoothGattCharacteristic.PERMISSION_READ,
@@ -338,7 +327,7 @@ public class BlePeripheral {
 		if (charType.equals(BleGattCharacteristics.GATT_WRITE)) {
 			
 			Log.v(TAG, "adding write characteristic");
-	        myBGCs.put(uuid, new BleGattCharacteristics(
+	        uuidToGattCharacteristics.put(uuid, new BleGattCharacteristics(
 	        		uuid,
 	                BluetoothGattCharacteristic.PROPERTY_WRITE,
 	                BluetoothGattCharacteristic.PERMISSION_WRITE,
@@ -351,7 +340,7 @@ public class BlePeripheral {
 		if (charType.equals(BleGattCharacteristics.GATT_INDICATE)) {
 			
 			Log.v(TAG, "adding indicate characteristic");
-	        myBGCs.put(uuid, new BleGattCharacteristics(
+	        uuidToGattCharacteristics.put(uuid, new BleGattCharacteristics(
 	        		uuid,
 	                BluetoothGattCharacteristic.PROPERTY_INDICATE,
 	                BluetoothGattCharacteristic.PERMISSION_READ,
@@ -361,7 +350,7 @@ public class BlePeripheral {
 	        
 	        // since this is an Indicate, add the descriptor
 	        BluetoothGattDescriptor gD = new BluetoothGattDescriptor(UUID.fromString("00002902-0000-1000-8000-00805F9B34FB"), BluetoothGattDescriptor.PERMISSION_WRITE | BluetoothGattDescriptor.PERMISSION_READ);
-	        BluetoothGattCharacteristic bgc = myBGCs.get(uuid);
+	        BluetoothGattCharacteristic bgc = uuidToGattCharacteristics.get(uuid);
 	        bgc.addDescriptor(gD);
 	        bgc = null;
 		}
@@ -369,24 +358,6 @@ public class BlePeripheral {
 		return uuid;
 	}
 	
-
-	/**
-	 * This signature is only used for adding characteristics without a specified UUID; it'll generate it for ya
-	 * @param charType Type of Gatt Characteristic (read, write, readwrite, notify, indicate)
-	 * @param charHandler The particular handler you'd like take care of events
-	 * @return
-	 */
-	public UUID addChar(String charType, BlePeripheralHandler charHandler) {
-
-		//increment the counter for the next characteristic
-		globalCharacteristicCount++;
-		
-		String strUUID =  serviceBaseUUID.substring(0, 4) + new String(new char[3]).replace("\0", "0") + String.valueOf(globalCharacteristicCount) + serviceBaseUUID.substring(8, serviceBaseUUID.length());
-		UUID uuid = UUID.fromString(strUUID);
-		
-		return addChar(charType, uuid, charHandler);
-		
-	}
 	
     public BluetoothGattServerCallback gattServerCallback = new BluetoothGattServerCallback() {
         @Override
@@ -442,7 +413,7 @@ public class BlePeripheral {
         	btGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
         	
         	// find my custom characteristic class . . .
-        	BleGattCharacteristics myBGC = (BleGattCharacteristics) myBGCs.get(descriptor.getCharacteristic().getUuid());
+        	BleGattCharacteristics myBGC = (BleGattCharacteristics) uuidToGattCharacteristics.get(descriptor.getCharacteristic().getUuid());
         	
         	// . . . and call the correct handler
         	if (status == "notify" || status == "indicate") {
@@ -460,7 +431,7 @@ public class BlePeripheral {
         @Override
         public void onCharacteristicReadRequest(BluetoothDevice device, int requestId, int offset, BluetoothGattCharacteristic characteristic) {
         	// get the characteristic that was affected
-            BleGattCharacteristics myBGC = (BleGattCharacteristics) myBGCs.get(characteristic.getUuid());
+            BleGattCharacteristics myBGC = (BleGattCharacteristics) uuidToGattCharacteristics.get(characteristic.getUuid());
 
             // prep the read characteristic for send
             myBGC.charHandler.prepReadCharacteristic(device.getAddress(), characteristic.getUuid());
@@ -484,7 +455,7 @@ public class BlePeripheral {
         	characteristic.setValue(value);
         	
         	// get the characteristic that was affected, and call its handler!
-            BleGattCharacteristics myBGC = (BleGattCharacteristics) myBGCs.get(characteristic.getUuid());
+            BleGattCharacteristics myBGC = (BleGattCharacteristics) uuidToGattCharacteristics.get(characteristic.getUuid());
             
             // since this is a Write request, use the incomingBytes method for the characteristic we want
             // -- device, requestId, characteristic, preparedwrite, responseneeded, offset, value

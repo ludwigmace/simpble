@@ -31,6 +31,10 @@ public class BleMessenger {
 	public static final int MSGTYPE_ENCRYPTED_KEY = 21;
 	public static final int MSGTYPE_DROP = 90;
 	
+	public static final int CONNECTION_DISCONNECTED = 0;
+	public static final int CONNECTION_CONNECTED = 1;
+	public static final int CONNECTION_NEGOTIATING = 2;
+	
 	private boolean StayingBusy;
 	
 	private Timer longTimer;
@@ -606,29 +610,28 @@ public class BleMessenger {
     	 * The Gatt Peripheral handler provides an update for the connection state; here we handle that
     	 * If we're connected
     	 */
-    	public void ConnectionState(String device, int status, int newStatus) {
+    	public void ConnectionState(String remoteAddress, int status, int newStatus) {
 
-    		BlePeer p = new BlePeer(device);
+    		BlePeer p = new BlePeer(remoteAddress);
     		
     		// if connected
     		if (newStatus == BluetoothProfile.STATE_CONNECTED) {
-    			
-	    		Log.v(TAG, "add id message to connection's message map");
-	    		
-	    		bleStatusCallback.headsUp("m: accepted connection from a central");
 	    		
 	    		 // create a new peer to hold messages and such for this network device
 	    		p.ConnectedAs = "peripheral";
 	    		
-	    		peerMap.put(device, p);
+	    		peerMap.put(remoteAddress, p);
 	    		
 	    		// if we've been connected to, we can assume the central can write out to us
 	    		p.TransportFrom = true;
 	    		// we can't set TransportTo, because we haven't been subscribed to yet
+	    		
+	    		// the peer hasn't subscribed yet, so we're not fully connected
+	    		bleStatusCallback.peerConnectionStatus(remoteAddress, CONNECTION_NEGOTIATING);
 
     		} else {
 	    		// let the calling activity know that as a peripheral, we've lost or connection
-    			bleStatusCallback.peerDisconnect(device);
+    			bleStatusCallback.peerConnectionStatus(remoteAddress, CONNECTION_DISCONNECTED);
     			p.TransportFrom = false;
     			p.TransportTo = false;
     		}
@@ -647,13 +650,16 @@ public class BleMessenger {
     	}
 
 		@Override
-		public void handleNotifyRequest(String device, UUID uuid) {
+		public void handleNotifyRequest(String remoteAddress, UUID uuid) {
     		// we're connected, so initiate send to "device", to whom we're already connected
     		Log.v(TAG, "from handleNotifyRequest, initiate sending messages");
     		
     		// we've got a notify request, so let's reset this peer's inactivity timeout
-    		bleStatusCallback.headsUp("m: notify request from " + device + "; reset timeout");
-    		BlePeer p = peerMap.get(device);
+    		//bleStatusCallback.headsUp("m: notify request from " + device + "; reset timeout");
+    		
+    		bleStatusCallback.peerConnectionStatus(remoteAddress, CONNECTION_CONNECTED);
+    		
+    		BlePeer p = peerMap.get(remoteAddress);
     		p.MarkActive();
     		p.subscribedChars = uuid.toString() + ";" + p.subscribedChars;
     		p.TransportTo = true;
@@ -736,7 +742,9 @@ public class BleMessenger {
     	@Override
     	public void subscribeSuccess(String remoteAddress, UUID remoteCharUUID) {
     		
-    		bleStatusCallback.headsUp("TransportFrom:true");
+    		// we've subscribed, so we can consider ourselves connected
+    		bleStatusCallback.peerConnectionStatus(remoteAddress, CONNECTION_CONNECTED);
+    		
     		BlePeer p  = peerMap.get(remoteAddress);
     		p.TransportFrom = true;
     		
@@ -787,7 +795,9 @@ public class BleMessenger {
 		@Override
 		public void connectedServiceGood(String remoteAddress) {
 
-			bleStatusCallback.headsUp("connectedServiceGood: submitSubscription");
+    		// we've subscribed, so we can consider ourselves connected
+    		bleStatusCallback.peerConnectionStatus(remoteAddress, CONNECTION_NEGOTIATING);
+			
 			// get a handle to this peer
 			BlePeer p = peerMap.get(remoteAddress);
 			
@@ -807,7 +817,7 @@ public class BleMessenger {
 		@Override
 		public void reportDisconnect(String remoteAddress) {
 			// report disconnection to MainActivity
-			bleStatusCallback.peerDisconnect(remoteAddress);
+			bleStatusCallback.peerConnectionStatus(remoteAddress, CONNECTION_DISCONNECTED);
 		}
     	
     };
