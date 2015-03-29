@@ -1,13 +1,8 @@
 package simpble;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -17,16 +12,13 @@ import java.util.UUID;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.os.Build;
 import android.util.Log;
 import android.util.SparseArray;
-import android.widget.Toast;
 
 public class BleMessenger {
 	private static String TAG = "BLEM";
@@ -74,8 +66,6 @@ public class BleMessenger {
     
     private List<BleCharacteristic> serviceDef;
     
-    private boolean areWeSendingMessages;
-	
     /**
      * Instantiates serviceDef arraylist, peerMap, fpNetMap, creates handles for peripheral/central,
      * populates serviceDef
@@ -107,10 +97,6 @@ public class BleMessenger {
 			}
 		}
 		
-		//if (btAdptr.getName().equalsIgnoreCase("Nexus 5")) {
-		//			SupportsAdvertising = false;
-		//}
-		
 		serviceDef = new ArrayList<BleCharacteristic>();
 		
 		// i need a place to put my found peers
@@ -120,22 +106,20 @@ public class BleMessenger {
 		messageMap = new HashMap<String, String>();
 		
 		// create your server for listening and your client for looking; Android can be both at the same time
-		
 		if (SupportsAdvertising) {
 			blePeripheral = new BlePeripheral(uuidServiceBase, ctx, btAdptr, btMgr, peripheralHandler);
 		}
-		bleCentral = new BleCentral(btAdptr, ctx, centralHandler, uuidServiceBase, 3000);
+		
+		bleCentral = new BleCentral(btAdptr, ctx, centralHandler, uuidServiceBase, 3000, ScanSettings.SCAN_MODE_BALANCED);
 		
 		serviceDef.add(new BleCharacteristic("identifier_read", uuidFromBase("100"), BleGattCharacteristics.GATT_READ));		
 		serviceDef.add(new BleCharacteristic("identifier_writes", uuidFromBase("101"), BleGattCharacteristics.GATT_WRITE));
-		serviceDef.add(new BleCharacteristic("data_notify", uuidFromBase("102"), BleGattCharacteristics.GATT_INDICATE));
+		serviceDef.add(new BleCharacteristic("data_notify", uuidFromBase("102"), BleGattCharacteristics.GATT_NOTIFY));
+		serviceDef.add(new BleCharacteristic("data_indicate", uuidFromBase("103"), BleGattCharacteristics.GATT_INDICATE));
+		serviceDef.add(new BleCharacteristic("data_write", uuidFromBase("104"), BleGattCharacteristics.GATT_WRITE));
 		serviceDef.add(new BleCharacteristic("flow_control", uuidFromBase("105"), BleGattCharacteristics.GATT_READWRITE));
-		//serviceDef.add(new BleCharacteristic("data_indicate", uuidFromBase("103"), MyAdvertiser.GATT_INDICATE));
-		//serviceDef.add(new BleCharacteristic("data_write", uuidFromBase("104"), MyAdvertiser.GATT_WRITE));
 
 		bleCentral.setRequiredServiceDef(serviceDef);
-
-		areWeSendingMessages = false;
 		
 		setupStaleChecker(INACTIVE_TIMEOUT);  // setup timeout
 		setupBusinessTimer(BUSINESS_TIMEOUT); // every second make sure that we're all stayin' busy
@@ -181,17 +165,7 @@ public class BleMessenger {
 		}
 
 	}
-	
-	public BlePeer GetBlePeerByAddress(String remoteAddress) {
 		
-		bleStatusCallback.headsUp("m: check peerMap for remote: " + remoteAddress);
-		
-		BlePeer p = peerMap.get(remoteAddress);
-		
-		return p;
-	}
-
-	
 	public void SendMessagesToConnectedPeers() {
 		//setupBusinessTimer(BUSINESS_TIMEOUT);
 
@@ -208,7 +182,6 @@ public class BleMessenger {
 			// mainly because we don't store the identifier for the peer in a particular BleMessage (although we could?)
 			if (m != null) {
 				Log.v("DOIT", "pulled msg #" + String.valueOf(m.GetMessageNumber()) + ", " + ByteUtilities.bytesToHex(m.PayloadDigest).substring(0,8));
-				areWeSendingMessages = true;
 				sendMessagesToPeer(p);
 			}
 
@@ -288,7 +261,7 @@ public class BleMessenger {
 			if (p.CheckStale()) {
 				// connected to your peer as a peripheral
 				if (p.ConnectedAs.equalsIgnoreCase("peripheral")) {
-					blePeripheral.closeConnection();
+					blePeripheral.closeConnection(entry.getKey());
 				} else {
 					// connected to your peer as a central
 					bleCentral.disconnectAddress(entry.getKey());
@@ -363,10 +336,7 @@ public class BleMessenger {
     		}
 			
 		}
-		
-		// well now we've sent some messages
-		areWeSendingMessages = false;
-		
+
 		bleStatusCallback.headsUp("m: " + String.valueOf(sent) + " packets sent");
 		
 		// we sent packets out, so clear our pending list (we'll requeue missing later)
@@ -414,7 +384,12 @@ public class BleMessenger {
 		
 	}
 
-	
+	/**
+	 * Create a new UUID using uuidServiceBase as the base; this function is more of a shortcut than anything.
+	 * For instance if your uuidServiceBase is 73A20000-2C47-11E4-8C21-0800200C9A66, and you pass in "102", this function builds 73A20102-2C47-11E4-8C21-0800200C9A66 
+	 * @param smallUUID A string representation of a small number
+	 * @return
+	 */
 	private UUID uuidFromBase(String smallUUID) {
 		String strUUID =  uuidServiceBase.substring(0, 4) + new String(new char[4-smallUUID.length()]).replace("\0", "0") + smallUUID + uuidServiceBase.substring(8, uuidServiceBase.length());
 		UUID idUUID = UUID.fromString(strUUID);
@@ -422,37 +397,41 @@ public class BleMessenger {
 		return idUUID;
 	}
 	
+	/**
+	 * Scan for ble peripherals as a central device
+	 * @param duration Milliseconds to scan at a given time
+	 */
 	public void ScanForPeers(int duration) {
 		
 		bleCentral.setScanDuration(duration);
-		// call our Central object to scan for devices
 		bleCentral.scanForPeripherals(true);
 		
-		// centralHandler's intakeFoundDevices method is called after scanning is complete
-		// -- this then calls BleCentral's connectAddress for each found device
-		// -- which then discovers services by calling gattServer.discoverServices()
-		// -- if the service definition is met, then centralHandler's parlayWithRemote is called
 	}
 		
-	public boolean BeFound() {
+	/**
+	 * (Only works if peripheral mode is enabled)
+	 * Build the service definition based on the characteristics we'd like to have, and then advertise
+	 * @return
+	 */
+	public boolean StartAdvertising() {
 		
-		
-		try {
-			
-			// pull from the service definition
-			for (BleCharacteristic c: serviceDef) {
-				blePeripheral.addChar(c.type, c.uuid, peripheralHandler);
+		if (SupportsAdvertising) {		
+			try {
+				// pull from the service definition
+				for (BleCharacteristic c: serviceDef) {
+					blePeripheral.addChar(c.type, c.uuid, peripheralHandler);
+				}
+				
+				return blePeripheral.advertiseNow();
+			} catch (Exception e) {
+				return false;
 			}
-			
-			// advertising doesn't take much energy, so go ahead and do it
-			return blePeripheral.advertiseNow();
-		} catch (Exception e) {
+		} else {
 			return false;
 		}
-		
 	}
 	
-	public void HideYourself() {
+	public void StopAdvertising() {
 		blePeripheral.advertiseOff();
 	}
 	
@@ -547,7 +526,7 @@ public class BleMessenger {
 		
     }
     
-    public void processMessageSendAcknowledgment(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
+    private void processMessageSendAcknowledgment(String remoteAddress, UUID remoteCharUUID, byte[] incomingBytes) {
     	// get the remote peer based on the address
     	
     	BlePeer p = peerMap.get(remoteAddress);
@@ -623,8 +602,6 @@ public class BleMessenger {
     
     
     BlePeripheralHandler peripheralHandler = new BlePeripheralHandler() {
-    	
-    	
     	/**
     	 * The Gatt Peripheral handler provides an update for the connection state; here we handle that
     	 * If we're connected
@@ -648,10 +625,7 @@ public class BleMessenger {
 	    		// if we've been connected to, we can assume the central can write out to us
 	    		p.TransportFrom = true;
 	    		// we can't set TransportTo, because we haven't been subscribed to yet
-	    		
-	    		// we also need to indicate to the calling application that this peer has just connected,
-	    		// so that we can do some "this dude has just connected!" types of things
-	    		
+
     		} else {
 	    		// let the calling activity know that as a peripheral, we've lost or connection
     			bleStatusCallback.peerDisconnect(device);

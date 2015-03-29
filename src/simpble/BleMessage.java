@@ -18,7 +18,7 @@ import com.google.common.primitives.Bytes;
 
 public class BleMessage {
 
-	private static final String TAG = "BLEG";
+	private static final String TAG = "BLEMSG";
 	private static final int PACKETSIZE = 20; 
 	
 	// holds all the packets that make up this message
@@ -90,10 +90,6 @@ public class BleMessage {
 	//  returns all the pending BlePackets that make up this message
 	public SparseArray<BlePacket> GetPendingPackets() {
 		return pendingPackets;
-	}
-	
-	public void PacketSent(int i) {
-		pendingPackets.removeAt(i);
 	}
 	
 	public boolean PacketReQueue(int i) {
@@ -183,58 +179,6 @@ public class BleMessage {
 		
 		return messageSignature;
 	}
-	
-	public String GetPayload() {
-		return ByteUtilities.bytesToHex(MessagePayload).substring(0,8);
-	}
-
-	/**
-	 * Calculates a hash and checks if it matches what was provided
-	 */
-	public String GetCalcHash() {
-		
-        // get a digest for the message, to define it
-        MessageDigest md = null;
-        
-        try {
-			md = MessageDigest.getInstance("SHA-1");
-		} catch (NoSuchAlgorithmException e) {
-
-			e.printStackTrace();
-		}
-        
-        
-        // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
-        // (i want my digest to be the packet size less the 5 bytes needed for header info)
-        byte[] calcDigest = Arrays.copyOfRange(md.digest(ByteUtilities.trimmedBytes(allBytes)), 0, PACKETSIZE - 5);
-		
-		//return ByteUtilities.bytesToHexShort(calcDigest);
-        
-        // return the source for our hash so we can see if it's what we need
-        return ByteUtilities.bytesToHex(calcDigest).substring(0,8);
-	}
-	
-
-	public byte[] BuildMessageMIC() {
-		
-        // get a digest for the message, to define it
-        MessageDigest md = null;
-        
-        try {
-			md = MessageDigest.getInstance("SHA-1");
-		} catch (NoSuchAlgorithmException e) {
-
-			e.printStackTrace();
-		}
-        
-       
-        // this builds a message digest of the MessageBytes, and culls the size less 5 bytes
-        // (i want my digest to be the packet size less the 5 bytes needed for header info)
-        return Arrays.copyOfRange(md.digest(ByteUtilities.trimmedBytes(allBytes)), 0, PACKETSIZE - 5);
-		
-	}
-	
-
 	
 	/**
 	 * Takes the message payload from the calling method and builds the list
@@ -395,7 +339,8 @@ public class BleMessage {
 	}
 	
 	/**
-	 * 
+	 * Assign whatever byte array is passed in to the bytes that comprise this message, as well as
+	 * assign a digest to PayloadDigest
 	 * 
 	 * @param RawMessageBytes The raw bytes that make up this message
 	 * @return If this message could be properly constructed from these bytes, return TRUE

@@ -699,14 +699,11 @@ public class MainActivity extends Activity {
 		if (!visible) {
 			Log.v(TAG, "Not currently visible, begin stuff");
 
-			if (bleMessenger.BeFound()) {
+			if (bleMessenger.StartAdvertising()) {
 				Log.v(TAG, "advertising supported");
-			} else {
-				Log.v(TAG, "advertising NOT supported");
 			}
 		} else {
-			Log.v(TAG, "Go Invisible");
-			bleMessenger.HideYourself();
+			bleMessenger.StopAdvertising();
 		}
 		
 		

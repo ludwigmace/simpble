@@ -4,7 +4,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import android.util.Log;
-import android.util.SparseArray;
 
 import com.google.common.primitives.Bytes;
 
@@ -13,7 +12,6 @@ public class BleApplicationMessage {
 	private static final String TAG = "BLEAPPMSG";
 	private static final int MessagePacketSize = 20; 
 
-		
 	// included in packet and serves as an identification so that the receiver can build msg from packets
 	private int messageNumber;
 	

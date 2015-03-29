@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.Map.Entry;
 
-import android.annotation.TargetApi;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -23,7 +22,6 @@ import android.bluetooth.le.AdvertiseData;
 import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.content.Context;
-import android.os.Build;
 import android.os.ParcelUuid;
 import android.util.Log;
 
@@ -50,7 +48,7 @@ public class BlePeripheral {
     
     private Context thisContext;
     
-    private BlePeripheralHandler defaultHandler;
+    private BlePeripheralHandler peripheralHandler;
         
 	private String serviceBaseUUID;
 	int globalCharacteristicCount;
@@ -58,6 +56,15 @@ public class BlePeripheral {
     private Map<UUID, BluetoothGattCharacteristic> myBGCs = new HashMap<UUID, BluetoothGattCharacteristic>();
     private Map<BluetoothGattCharacteristic, BluetoothDevice> mySubscribers = new HashMap<BluetoothGattCharacteristic, BluetoothDevice>();
 	
+    /**
+     * A helper class for dealing with peripheral operations.
+     * 
+     * @param baseUUID  A base uuid for creating characteristics
+     * @param ctx The application's context, necessary for Bluetooth operations
+     * @param btAdapter The system's Bluetooth adapter, necessary for Bluetooth operations
+     * @param btManager The system's Bluetooth manager, necessary for Bluetooth operations
+     * @param myHandler
+     */
 	BlePeripheral(String baseUUID, Context ctx, BluetoothAdapter btAdapter, BluetoothManager btManager, BlePeripheralHandler myHandler) {
 
 		serviceBaseUUID = baseUUID;
@@ -67,7 +74,7 @@ public class BlePeripheral {
 		btAdptr = btAdapter;      
 		btMgr = btManager;
 		
-		defaultHandler = myHandler;
+		peripheralHandler = myHandler;
 		
 		if (btAdptr.isMultipleAdvertisementSupported()) {
 			Log.v(TAG, "advertisement is SUPPORTED on this chipset!");
@@ -88,7 +95,10 @@ public class BlePeripheral {
    
 	}
 	
-	public void closeConnection() {
+	/**
+	 * Close the connection to the central 
+	 */
+	public void closeConnection(String peerAddress) {
 		btGattServer.cancelConnection(btClient);
 	}
 	
@@ -162,7 +172,7 @@ public class BlePeripheral {
         gattServices.clear();
         
         // tell our handler that we've stopped advertising
-        defaultHandler.handleAdvertiseChange(false);
+        peripheralHandler.handleAdvertiseChange(false);
         
 	}
 	
@@ -188,7 +198,6 @@ public class BlePeripheral {
 		
 		// loop over all the characteristics and add them to the service
         for (Entry<UUID, BluetoothGattCharacteristic> entry : myBGCs.entrySet()) {
-        	//entry.getKey();
         	theService.addCharacteristic(entry.getValue());
         	Log.v(TAG, "adding characteristic " + entry.getKey().toString());
         }
@@ -200,8 +209,9 @@ public class BlePeripheral {
     	gattServices.add(theService);
         gattServiceIDs.add(new ParcelUuid(theService.getUuid()));
 
-    	// if we're already advertising, just quit here
         //  TODO: if we get this far and advertising is already started, we may want reset everything!
+        
+    	// but, for right now, if we're already advertising, just quit here
         if(isAdvertising) return true;
 
         // - calls bluetoothManager.openGattServer(activity, whatever_the_callback_is) as gattServer
@@ -220,7 +230,6 @@ public class BlePeripheral {
         
         // the AdvertiseData and AdvertiseSettings are both required
         AdvertiseData.Builder dataBuilder = new AdvertiseData.Builder();
-        //AdvertisementData.Builder dataBuilder = new AdvertisementData.Builder();
         AdvertiseSettings.Builder settingsBuilder = new AdvertiseSettings.Builder();
         
         // allows us to fit in a 31 byte advertisement
@@ -250,11 +259,6 @@ public class BlePeripheral {
         // API 5
         settingsBuilder.setConnectable(true);
         
-        // we created this earlier with bluetoothAdapter.getBluetoothLeAdvertiser();
-        // - looks like we also need to have an advertiseCallback
-        // --- this needs to override onSuccess and onFailure, and really those are just for debug messages
-        // --- but it looks like you HAVE to do this
-        // set our boolean so we don't try to re-advertise
         isAdvertising = true;
        
         try {
@@ -273,7 +277,7 @@ public class BlePeripheral {
 	}
 	
 	public UUID addChar(String charType) {
-		UUID lUUID = addChar(charType, defaultHandler);
+		UUID lUUID = addChar(charType, peripheralHandler);
 		return lUUID;
 	}
 	
@@ -393,7 +397,7 @@ public class BlePeripheral {
             }
             Log.v(TAG, "onConnectionStateChange status=" + status + "->" + newState);
             
-            defaultHandler.ConnectionState(device.getAddress(), status, newState);
+            peripheralHandler.ConnectionState(device.getAddress(), status, newState);
             
             
         }
@@ -455,9 +459,6 @@ public class BlePeripheral {
         
         @Override
         public void onCharacteristicReadRequest(BluetoothDevice device, int requestId, int offset, BluetoothGattCharacteristic characteristic) {
-            // An application must call sendResponse(BluetoothDevice, int, int, int, byte[]) to complete the request.
-            //Log.d(TAG, "onCharacteristicReadRequest requestId=" + requestId + " offset=" + offset);
-
         	// get the characteristic that was affected
             BleGattCharacteristics myBGC = (BleGattCharacteristics) myBGCs.get(characteristic.getUuid());
 
@@ -470,10 +471,8 @@ public class BlePeripheral {
 				Log.v(TAG, "sending message:" + new String(characteristic.getValue()));
 			}
             
+            // per spec, this has to be called
             btGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, characteristic.getValue());
-            
-            // since this is a Read request,  we can act on the fact this msg was read
-            //myBGC.charHandler.handleReadRequest(characteristic.getUuid());
 
         }
 
@@ -496,54 +495,33 @@ public class BlePeripheral {
         }
     };
 
-    // advertising worked - you can use this to notify
+    /**
+     * AdvertiseCallback, calls BlePeripheralHandler.handleAdvertiseChange when advertising is successful
+     * Right now nothing is done with AdvertiseSettings.getMode() or AdvertiseSettings.getTxPowerLevel()
+     */
     private AdvertiseCallback advertiseCallback = new AdvertiseCallback() {
         @Override
         public void onStartSuccess(AdvertiseSettings aS) {
-        //public void onSuccess(AdvertiseSettings aS) {
+        	
         	boolean bType = false;
-        	int iType = 9;
+        	/*
         	int iMode = 9;
         	int iPowerLevel = 9;
+        	try { iMode = aS.getMode(); } catch (Exception e) { }
         	
-        	try {
-        		// API 5
-        		//bType = aS.isConnectable();
-        		
-        		// API L
-        		//iType = aS.getType();
-        	} catch (Exception e) {
-        		
-        	}
-
-        	try {
-        		iMode = aS.getMode();
-        	} catch (Exception e) {
-        		
-        	}
+        	try { iPowerLevel = aS.getTxPowerLevel(); } catch (Exception e) { }
+        	*/
         	
-        	try {
-        		iPowerLevel = aS.getTxPowerLevel();
-        	} catch (Exception e) {
-        		
-        	}
+        	try { bType = aS.isConnectable(); } catch (Exception e) { }
         	
-        	//aS.getType(); // 0: non-connectable, 1: scannable, 2: connectable
-        	//aS.getMode(); // 0: low power, 1: balanced, 2: low latency
-        	//aS.getTxPowerLevel(); // 0: ultra low, 1: low, 2: medium, 3: high
-            
-            //Log.v(TAG, "success_" + String.valueOf(bType) + String.valueOf(iMode) + String.valueOf(iPowerLevel));
-
-        	defaultHandler.handleAdvertiseChange(isAdvertising);
+        	if (bType) {
+        		peripheralHandler.handleAdvertiseChange(isAdvertising);
+        	}
         }
 
         @Override
         public void onStartFailure(int i) {
-        //public void onFailure(int i) {
-            String failMsg = "Advertisement command attempt failed: " + i;
-            Log.e(TAG, failMsg);
-            defaultHandler.handleAdvertiseChange(false);
-            
+            peripheralHandler.handleAdvertiseChange(false);
         }
 
     };
