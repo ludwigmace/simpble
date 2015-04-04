@@ -79,7 +79,7 @@ public class ShowMessagesActivity extends Activity implements LoaderManager.Load
     
     
     
-    // These are the Contacts rows that we will retrieve.
+    // message rows
     static final String[] MSGS_SUMMARY_PROJECTION = new String[] {
     	FriendsDb.KEY_M_ROWID,
     	FriendsDb.KEY_M_MSGTYPE,

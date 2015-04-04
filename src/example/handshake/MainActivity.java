@@ -260,6 +260,8 @@ public class MainActivity extends Activity {
 			new_peer.SetPublicKey(peer_puk);
 
 			bleFriends.put(peer_fp, new_peer);
+			
+			logMessage("adding/or readding friend " + peer_fp);
 		}
 	}
 	
@@ -421,8 +423,8 @@ public class MainActivity extends Activity {
 					if (bleFriends.containsKey(senderFingerprint)) {
 						
 						// we need to be able to look this person up by incoming address
-						// TODO: remove this association upon disconnect
 						addressesToFriends.put(remoteAddress, senderFingerprint);
+						logMessage("linking address " + remoteAddress + " to friend " + senderFingerprint);
 	
 					} else if (EnableReceiveID) {  // if we actually care who this person is, then store their FP
 						logMessage("a: this guy's FP isn't known to me: " + senderFingerprint.substring(0,20));

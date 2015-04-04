@@ -359,7 +359,8 @@ public class BleCentral {
 
     }
 
-    /**
+
+	/**
      * This callback is provided by Android to handle Gatt stuff.
      * 
      * onCharacteristicChanged - calls BleCentralHandler.incomingMissive in BleMessenger when receiving data from an Indicate or Notify characteristic

@@ -105,7 +105,9 @@ public class BlePeripheral {
 		btGattServer.cancelConnection(btClient);
 	}
 	
-	public boolean updateCharValue(UUID charUUID, byte[] value) {
+	public boolean updateCharValue(String remoteAddress, UUID charUUID, byte[] value) {
+		//TODO: use remoteAddress to identify by lookig up their Bluetoothclient
+		// right now this just works for Bluetooth 4.0 and a singly connected central
 		
 		// get the Characteristic we want to update
 		BluetoothGattCharacteristic bgc = uuidToGattCharacteristics.get(charUUID);
@@ -256,8 +258,11 @@ public class BlePeripheral {
         dataBuilder.addServiceData(serviceDataID, serviceData);
         
         // advertise settings
-        settingsBuilder.setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY);
-        settingsBuilder.setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH);
+        settingsBuilder.setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED);
+        //settingsBuilder.setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH);
+        //settingsBuilder.setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM);
+        settingsBuilder.setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_LOW);
+        //settingsBuilder.setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_ULTRA_LOW);
         settingsBuilder.setConnectable(true);
         
         isAdvertising = true;
@@ -281,10 +286,10 @@ public class BlePeripheral {
 	public UUID addChar(String charType, UUID uuid, BlePeripheralHandler charHandler) {
 		Log.v(TAG, "adding chartype:" + charType + " uuid:" + uuid.toString());
 		//TODO: convert to simpler intProperties/intPermissions and add subscribe descriptors for appropriate characteristics
-		if (charType.equals(BleGattCharacteristics.GATT_NOTIFY)) {
+		if (charType.equals(BleGattCharacteristic.GATT_NOTIFY)) {
 		
 			Log.v(TAG, "adding notify characteristic");
-	        uuidToGattCharacteristics.put(uuid, new BleGattCharacteristics(
+	        uuidToGattCharacteristics.put(uuid, new BleGattCharacteristic(
 	        		uuid,
 	                BluetoothGattCharacteristic.PROPERTY_NOTIFY,
 	                BluetoothGattCharacteristic.PERMISSION_READ,
@@ -299,10 +304,10 @@ public class BlePeripheral {
 	        bgc = null;
 		}
 
-		if (charType.equals(BleGattCharacteristics.GATT_READ)) {
+		if (charType.equals(BleGattCharacteristic.GATT_READ)) {
 			
 			Log.v(TAG, "adding read characteristic");
-	        uuidToGattCharacteristics.put(uuid, new BleGattCharacteristics(
+	        uuidToGattCharacteristics.put(uuid, new BleGattCharacteristic(
 	        		uuid,
 	                BluetoothGattCharacteristic.PROPERTY_READ,
 	                BluetoothGattCharacteristic.PERMISSION_READ,
@@ -311,10 +316,10 @@ public class BlePeripheral {
 	        );
 		}
 
-		if (charType.equals(BleGattCharacteristics.GATT_READWRITE)) {
+		if (charType.equals(BleGattCharacteristic.GATT_READWRITE)) {
 			
 			Log.v(TAG, "adding readwrite characteristic");
-	        uuidToGattCharacteristics.put(uuid, new BleGattCharacteristics(
+	        uuidToGattCharacteristics.put(uuid, new BleGattCharacteristic(
 	        		uuid,
 	                BluetoothGattCharacteristic.PROPERTY_WRITE | BluetoothGattCharacteristic.PROPERTY_READ,
 	                BluetoothGattCharacteristic.PERMISSION_WRITE | BluetoothGattCharacteristic.PERMISSION_READ,
@@ -324,10 +329,10 @@ public class BlePeripheral {
 	        
 		}
 		
-		if (charType.equals(BleGattCharacteristics.GATT_WRITE)) {
+		if (charType.equals(BleGattCharacteristic.GATT_WRITE)) {
 			
 			Log.v(TAG, "adding write characteristic");
-	        uuidToGattCharacteristics.put(uuid, new BleGattCharacteristics(
+	        uuidToGattCharacteristics.put(uuid, new BleGattCharacteristic(
 	        		uuid,
 	                BluetoothGattCharacteristic.PROPERTY_WRITE,
 	                BluetoothGattCharacteristic.PERMISSION_WRITE,
@@ -337,10 +342,10 @@ public class BlePeripheral {
 	        
 		}
 		
-		if (charType.equals(BleGattCharacteristics.GATT_INDICATE)) {
+		if (charType.equals(BleGattCharacteristic.GATT_INDICATE)) {
 			
 			Log.v(TAG, "adding indicate characteristic");
-	        uuidToGattCharacteristics.put(uuid, new BleGattCharacteristics(
+	        uuidToGattCharacteristics.put(uuid, new BleGattCharacteristic(
 	        		uuid,
 	                BluetoothGattCharacteristic.PROPERTY_INDICATE,
 	                BluetoothGattCharacteristic.PERMISSION_READ,
@@ -413,7 +418,7 @@ public class BlePeripheral {
         	btGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
         	
         	// find my custom characteristic class . . .
-        	BleGattCharacteristics myBGC = (BleGattCharacteristics) uuidToGattCharacteristics.get(descriptor.getCharacteristic().getUuid());
+        	BleGattCharacteristic myBGC = (BleGattCharacteristic) uuidToGattCharacteristics.get(descriptor.getCharacteristic().getUuid());
         	
         	// . . . and call the correct handler
         	if (status == "notify" || status == "indicate") {
@@ -431,7 +436,7 @@ public class BlePeripheral {
         @Override
         public void onCharacteristicReadRequest(BluetoothDevice device, int requestId, int offset, BluetoothGattCharacteristic characteristic) {
         	// get the characteristic that was affected
-            BleGattCharacteristics myBGC = (BleGattCharacteristics) uuidToGattCharacteristics.get(characteristic.getUuid());
+            BleGattCharacteristic myBGC = (BleGattCharacteristic) uuidToGattCharacteristics.get(characteristic.getUuid());
 
             // prep the read characteristic for send
             myBGC.charHandler.prepReadCharacteristic(device.getAddress(), characteristic.getUuid());
@@ -455,7 +460,7 @@ public class BlePeripheral {
         	characteristic.setValue(value);
         	
         	// get the characteristic that was affected, and call its handler!
-            BleGattCharacteristics myBGC = (BleGattCharacteristics) uuidToGattCharacteristics.get(characteristic.getUuid());
+            BleGattCharacteristic myBGC = (BleGattCharacteristic) uuidToGattCharacteristics.get(characteristic.getUuid());
             
             // since this is a Write request, use the incomingBytes method for the characteristic we want
             // -- device, requestId, characteristic, preparedwrite, responseneeded, offset, value

@@ -9,7 +9,7 @@ import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattServer;
 
-public interface BleCentralHandler {
+interface BleCentralHandler {
 	
 	/**
 	 * Executed after BleCentral is done scanning and has found some devices

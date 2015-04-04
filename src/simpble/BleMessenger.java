@@ -110,12 +110,12 @@ public class BleMessenger {
 		
 		bleCentral = new BleCentral(btAdptr, ctx, centralHandler, uuidServiceBase, 3000, ScanSettings.SCAN_MODE_BALANCED);
 		
-		serviceDef.add(new BleCharacteristic("identifier_read", uuidFromBase("100"), BleGattCharacteristics.GATT_READ));		
-		serviceDef.add(new BleCharacteristic("identifier_writes", uuidFromBase("101"), BleGattCharacteristics.GATT_WRITE));
-		serviceDef.add(new BleCharacteristic("data_notify", uuidFromBase("102"), BleGattCharacteristics.GATT_NOTIFY));
-		serviceDef.add(new BleCharacteristic("data_indicate", uuidFromBase("103"), BleGattCharacteristics.GATT_INDICATE));
-		serviceDef.add(new BleCharacteristic("data_write", uuidFromBase("104"), BleGattCharacteristics.GATT_WRITE));
-		serviceDef.add(new BleCharacteristic("flow_control", uuidFromBase("105"), BleGattCharacteristics.GATT_READWRITE));
+		//serviceDef.add(new BleCharacteristic("identifier_read", uuidFromBase("100"), BleGattCharacteristics.GATT_READ));		
+		serviceDef.add(new BleCharacteristic("data_write", uuidFromBase("101"), BleGattCharacteristic.GATT_WRITE));
+		serviceDef.add(new BleCharacteristic("data_notify", uuidFromBase("102"), BleGattCharacteristic.GATT_NOTIFY));
+		//serviceDef.add(new BleCharacteristic("data_indicate", uuidFromBase("103"), BleGattCharacteristics.GATT_INDICATE));
+		//serviceDef.add(new BleCharacteristic("data_write", uuidFromBase("104"), BleGattCharacteristics.GATT_WRITE));
+		serviceDef.add(new BleCharacteristic("data_ack", uuidFromBase("105"), BleGattCharacteristic.GATT_READWRITE));
 
 		bleCentral.setRequiredServiceDef(serviceDef);
 		
@@ -292,13 +292,9 @@ public class BleMessenger {
 	
 	}
 
-	private void writeOut(String peerAddress) {
-		UUID uuid = uuidFromBase("102");
-		writeOut(peerAddress, uuid);
-	}
 	
 	//TODO: change writeOut to indicate which particular message you're sending out
-	private void writeOut(String peerAddress, UUID uuid) {
+	private void writeOut(String peerAddress) {
 
 		// if i'm connected to you as a peripheral, and you are not yet subscribed, i should not be sending you
 		// any damn messages
@@ -338,7 +334,7 @@ public class BleMessenger {
 	    				flag_sent = bleCentral.submitCharacteristicWriteRequest(peerAddress, uuidFromBase("101"), nextPacket);
 	    				Log.v(TAG, "writing packet #" + i);
 	    			} else {
-	    				flag_sent = blePeripheral.updateCharValue(uuid, nextPacket);
+	    				flag_sent = blePeripheral.updateCharValue(peerAddress, uuidFromBase("102"), nextPacket);
 	    			}
 	    		}
 	    		
@@ -377,7 +373,7 @@ public class BleMessenger {
 	}
 	
 	private boolean RequestAcknowledgment(BlePeer p) {
-		// TODO: this part about checking needs to be set from the calling application
+		// TODO: this part about automatic acknowledgment should be set from the calling application
 		boolean request_sent = false;
 		
 		String peerAddress = GetAddressForPeer(p);
@@ -470,7 +466,7 @@ public class BleMessenger {
     		return;
     	}
 
-    	// Process the header of this packet, whicg entails parsing out the parentMessage and which packet this is in the message
+    	// Process the header of this packet, which entails parsing out the parentMessage and which packet this is in the message
     	
     	// get the Message to which these packets belong as well as the current counter
     	int parentMessage = incomingBytes[0] & 0xFF; //00
@@ -729,7 +725,7 @@ public class BleMessenger {
 						}
 						
 						// if we still need packets
-						blePeripheral.updateCharValue(remoteCharUUID, missingPackets);
+						blePeripheral.updateCharValue(remoteAddress, remoteCharUUID, missingPackets);
 						
 						// should we do this here - to support one message going to multiple folks,
 						// you may want to have a different array/map to check
@@ -776,7 +772,6 @@ public class BleMessenger {
     		
     	}
     	
-		@Override
 		public void intakeFoundDevices(ArrayList<BluetoothDevice> devices) {
 			bleStatusCallback.headsUp("m: stopped scanning");
 			Log.v(TAG, "intake devices, thread "+ Thread.currentThread().getName());

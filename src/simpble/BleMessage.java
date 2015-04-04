@@ -24,6 +24,7 @@ public class BleMessage {
 	// holds all the packets that make up this message
 	private SparseArray<BlePacket> messagePackets;
 	
+	// packets pending send for this message
 	private SparseArray<BlePacket> pendingPackets;
 	
 	// number of packets that make up this message
@@ -43,9 +44,7 @@ public class BleMessage {
 	
 	public byte MessageType;
 	
-	/**
-	 * SHA1 hash of the message payload, truncated to fit in the last 15 bytes of the first packet that goes out
-	 */
+	//SHA1 hash of the message payload, truncated to fit in the last 15 bytes of the first packet that goes out
 	public byte[] PayloadDigest;
 	
 	// body of message in bytes
@@ -186,19 +185,11 @@ public class BleMessage {
 
 	 */
 	private void constructPackets() {
-
-		// for an id message:
-		// first byte, 0x01, indicates an identity message
-		// next 20 bytes are recipient fingerprint
-		// next 20 bytes are sender fingerprint
-		// final arbitrary bytes are the payload
 		
 		// clear the list of packets; we're building a new message using packets!
         messagePackets.clear();
         
-        // how many packets?  divide msg length by packet size, w/ trick to round up
-        // so the weird thing is we've got to leave a byte in each msg, so effectively our
-        // msg blocks are decreased by an extra byte, hence the -4 and -3 below
+        // divide msg length by packet size, w/ trick to round up
         int msgCount  = (allBytes.length + PACKETSIZE - 4) / (PACKETSIZE - 3);
         
         // first byte is counter; 0 provides meta info about msg
@@ -208,18 +199,20 @@ public class BleMessage {
         // second/third bytes are current packet
         // fourth/fifth bytes are message size
         // 6+ is the digest truncated to 15 bytes
+
+        /* The first BlePacket includes:
+         * 1 byte - this BleMessage's identifying number,
+         * 2 bytes - the current packet counter, 
+         * 2 bytes  - the number of BlePackets,
+         * n bytes - the message digest
+        */ 
         
         // build the message size tag, which is the number of BlePackets represented in two bytes
         byte[] msgSize = new byte[2];
         msgSize[0] = (byte)(msgCount >> 8);
         msgSize[1] = (byte)(msgCount & 0xFF);
         
-        /* The first BlePacket!!!  includes:
-         * 1 byte - this BleMessage's identifying number,
-         * 2 bytes - the current packet counter, 
-         * 2 bytes  - the number of BlePackets,
-         * n bytes - the message digest
-        */ 
+
         byte[] firstPacket = Bytes.concat(new byte[]{(byte)(messageNumber & 0xFF)}, new byte[]{(byte)0x00, (byte)0x00}, msgSize, PayloadDigest);
 
         // create a BlePacket of index 0 using the just created payload

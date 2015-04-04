@@ -1,6 +1,6 @@
 package simpble;
 
-public class BlePacket {
+class BlePacket {
 	public int MessageSequence;
 	public byte[] MessageBytes;
 
